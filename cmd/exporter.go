@@ -28,9 +28,12 @@ func Run() {
 	app.EnableBashCompletion = true
 	app.Authors = []*cli.Author{
 		{Name: "Charlie Haley", Email: "charlie-haley@users.noreply.github.com"},
+		{Name: "Roman (RCooLeR) Derevianko", Email: "RCooLeR@users.noreply.github.com"},
 	}
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{Destination: &conf.Host, Required: true, Name: "host", Value: "", Usage: "The hostname of the Omada Controller, including protocol.", EnvVars: []string{"OMADA_HOST"}},
+		&cli.StringFlag{Destination: &conf.ClientId, Required: false, Name: "client-id", Value: "", Usage: "ClientId for your Omada user.", EnvVars: []string{"OMADA_CLIENT_ID"}},
+		&cli.StringFlag{Destination: &conf.SecretId, Required: false, Name: "secret-id", Value: "", Usage: "SecretId for your Omada user.", EnvVars: []string{"OMADA_SECRET_ID"}},
 		&cli.StringFlag{Destination: &conf.Username, Required: true, Name: "username", Value: "", Usage: "Username of the Omada user you'd like to use to fetch metrics.", EnvVars: []string{"OMADA_USER"}},
 		&cli.StringFlag{Destination: &conf.Password, Required: true, Name: "password", Value: "", Usage: "Password for your Omada user.", EnvVars: []string{"OMADA_PASS"}},
 		&cli.StringFlag{Destination: &conf.Port, Name: "port", Value: "9202", Usage: "Port on which to expose the Prometheus metrics.", EnvVars: []string{"OMADA_PORT"}},
@@ -102,10 +105,10 @@ func run(c *cli.Context) error {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`<html>
     <head>
-	<title>omada_exporter</title>
+	<title>Omada exporter<</title>
 	</head>
     	<body>
-			<h1>omada_exporter</h1>
+			<h1>Omada exporter</h1>
 			<p>
 				<a href="/metrics">Metrics</a>
 			</p>
@@ -155,10 +158,16 @@ func mdocs() {
 
 // collectors returns the full complement of configured collectors.
 func collectors(client *api.Client) []prometheus.Collector {
-	return []prometheus.Collector{
+	cols := []prometheus.Collector{
 		collector.NewClientCollector(client),
 		collector.NewControllerCollector(client),
 		collector.NewDeviceCollector(client),
 		collector.NewPortCollector(client),
 	}
+	if client.Config.ClientId != "" && client.Config.SecretId != "" {
+		cols = append(cols, collector.NewWanCollector(client))
+		cols = append(cols, collector.NewVpnCollector(client))
+		cols = append(cols, collector.NewVpnStatsCollector(client))
+	}
+	return cols
 }

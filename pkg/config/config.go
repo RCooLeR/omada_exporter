@@ -4,6 +4,8 @@ type Config struct {
 	Host                     string
 	Username                 string
 	Password                 string
+	ClientId                 string
+	SecretId                 string
 	Port                     string
 	Site                     string
 	LogLevel                 string

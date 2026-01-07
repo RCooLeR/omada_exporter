@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (c *Client) IsLoggedIn() (bool, error) {
@@ -99,8 +102,72 @@ func (c *Client) Login() error {
 	if err != nil {
 		return err
 	}
-
+	log.Info().Msg(fmt.Sprintf("Login with username %s successful", c.Config.Username))
 	c.token = logindata.Result.Token
+	return nil
+}
+
+func (c *Client) LoginOpenApi() error {
+	logindata := loginResponse{}
+
+	url := fmt.Sprintf("%s/openapi/authorize/token?grant_type=client_credentials", c.Config.Host)
+	jsonStr := []byte(fmt.Sprintf(`{"omadacId":"%s","client_id":"%s","client_secret":"%s"}`, c.omadaCID, c.Config.ClientId, c.Config.SecretId))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+	res, err := c.makeRequest(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(body, &logindata)
+	if err != nil {
+		return err
+	}
+	log.Info().Msg("OpenApi authentication successful")
+	c.accessToken = logindata.Result.AccessToken
+	c.refreshToken = logindata.Result.RefreshToken
+	c.accessTokenExpiresAt = time.Now().Add(time.Duration(logindata.Result.ExpiresIn-5) * time.Second)
+	return nil
+}
+func (c *Client) RefreshOpenApiToken() error {
+	url := fmt.Sprintf("%s/openapi/authorize/token?client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token", c.Config.Host, c.Config.ClientId, c.Config.SecretId, c.refreshToken)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+	res, err := c.makeRequest(req)
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	logindata := loginResponse{}
+
+	err = json.Unmarshal(body, &logindata)
+	if err != nil {
+		return err
+	}
+	log.Info().Msg("OpenApi Access Token refresh successful")
+	c.accessToken = logindata.Result.AccessToken
+	c.refreshToken = logindata.Result.RefreshToken
+	c.accessTokenExpiresAt = time.Now().Add(time.Duration(logindata.Result.ExpiresIn-5) * time.Second)
 	return nil
 }
 
@@ -108,7 +175,11 @@ type loginResponse struct {
 	Result loginResult `json:"result"`
 }
 type loginResult struct {
-	Token string `json:"token"`
+	Token        string `json:"token"`
+	AccessToken  string `json:"accessToken"`
+	TokenType    string `json:"tokenType"`
+	ExpiresIn    int32  `json:"expiresIn"`
+	RefreshToken string `json:"refreshToken"`
 }
 type loginStatus struct {
 	ErrorCode int            `json:"errorCode"`

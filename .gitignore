@@ -19,3 +19,6 @@ go.work
 
 # generated metrics table
 gen-metrics-table.md
+
+#IDE
+.idea

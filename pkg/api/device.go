@@ -39,6 +39,13 @@ func (c *Client) GetDevices() ([]Device, error) {
 			}
 			devicedata.Result[i].Ports = switchPorts
 		}
+		if d.Type == "gateway" {
+			gatewayWans, err := c.GetWans(d.Mac)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get wan data: %s", err)
+			}
+			devicedata.Result[i].Wans = gatewayWans
+		}
 	}
 
 	return devicedata.Result, err
@@ -62,6 +69,7 @@ type Device struct {
 	RxRate      float64 `json:"rxRate"`
 	PoeRemain   float64 `json:"poeRemain"`
 	Ports       []Port  `json:"ports"`
-	Download    int64   `json:"download"`
-	Upload      int64   `json:"upload"`
+	Wans        []Wan
+	Download    int64 `json:"download"`
+	Upload      int64 `json:"upload"`
 }

@@ -12,11 +12,14 @@ import (
 )
 
 type Client struct {
-	Config     *config.Config
-	httpClient *http.Client
-	token      string
-	omadaCID   string
-	SiteId     string
+	Config               *config.Config
+	httpClient           *http.Client
+	token                string
+	omadaCID             string
+	SiteId               string
+	accessToken          string
+	refreshToken         string
+	accessTokenExpiresAt time.Time
 }
 
 func setuphttpClient(insecure bool, timeout int) (*http.Client, error) {
@@ -91,4 +94,21 @@ func (c *Client) makeLoggedInRequest(req *http.Request) (*http.Response, error) 
 	}
 
 	return c.makeRequest(req)
+}
+
+func (c *Client) makeOpenApiRequest(req *http.Request) (*http.Response, error) {
+	//	with bearer token accessToken
+	if time.Now().After(c.accessTokenExpiresAt) && (c.refreshToken != "") {
+		c.RefreshOpenApiToken()
+	}
+	if c.accessTokenExpiresAt.IsZero() || time.Now().After(c.accessTokenExpiresAt) || (c.accessToken == "") {
+		c.LoginOpenApi()
+	}
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("X-Requested-With", "XMLHttpRequest")
+	req.Header.Add("User-Agent", "omada_exporter")
+	req.Header.Add("Connection", "keep-alive")
+	req.Header.Add("Authorization", "AccessToken="+c.accessToken)
+
+	return c.httpClient.Do(req)
 }

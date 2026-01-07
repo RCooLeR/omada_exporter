@@ -76,24 +76,25 @@ type data struct {
 	Data []NetworkClient `json:"data"`
 }
 type NetworkClient struct {
-	Name        string  `json:"name"`
-	HostName    string  `json:"hostName"`
-	Mac         string  `json:"mac"`
-	Port        float64 `json:"port"`
-	Ip          string  `json:"ip"`
-	VlanId      float64 `json:"vid"`
-	ApName      string  `json:"apName"`
-	Wireless    bool    `json:"wireless"`
-	SwitchMac   string  `json:"switchMac"`
-	Vendor      string  `json:"vendor"`
-	Activity    float64 `json:"activity"`
-	SignalLevel float64 `json:"signalLevel"`
-	SignalNoise float64 `json:"snr"`
-	WifiMode    float64 `json:"wifiMode"`
-	Ssid        string  `json:"ssid"`
-	Rssi        float64 `json:"rssi"`
-	TrafficDown float64 `json:"trafficDown"`
-	TrafficUp   float64 `json:"trafficUp"`
-	RxRate      float64 `json:"rxRate"`
-	TxRate      float64 `json:"txRate"`
+	Name           string  `json:"name"`
+	HostName       string  `json:"hostName"`
+	Mac            string  `json:"mac"`
+	Port           float64 `json:"port"`
+	Ip             string  `json:"ip"`
+	VlanId         float64 `json:"vid"`
+	ApName         string  `json:"apName"`
+	Wireless       bool    `json:"wireless"`
+	SwitchMac      string  `json:"switchMac"`
+	Vendor         string  `json:"vendor"`
+	Activity       float64 `json:"activity"`
+	UploadActivity float64 `json:"uploadActivity"`
+	SignalLevel    float64 `json:"signalLevel"`
+	SignalNoise    float64 `json:"snr"`
+	WifiMode       float64 `json:"wifiMode"`
+	Ssid           string  `json:"ssid"`
+	Rssi           float64 `json:"rssi"`
+	TrafficDown    float64 `json:"trafficDown"`
+	TrafficUp      float64 `json:"trafficUp"`
+	RxRate         float64 `json:"rxRate"`
+	TxRate         float64 `json:"txRate"`
 }

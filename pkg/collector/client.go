@@ -10,6 +10,7 @@ import (
 
 type clientCollector struct {
 	omadaClientDownloadActivityBytes *prometheus.Desc
+	omadaClientUploadActivityBytes   *prometheus.Desc
 	omadaClientSignalPct             *prometheus.Desc
 	omadaClientSignalNoiseDbm        *prometheus.Desc
 	omadaClientRssiDbm               *prometheus.Desc
@@ -23,6 +24,7 @@ type clientCollector struct {
 
 func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaClientDownloadActivityBytes
+	ch <- c.omadaClientUploadActivityBytes
 	ch <- c.omadaClientSignalPct
 	ch <- c.omadaClientSignalNoiseDbm
 	ch <- c.omadaClientRssiDbm
@@ -86,10 +88,16 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 			totals[wifiMode] += 1
 			ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity,
 				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wireless", wifiMode, item.ApName, item.Ssid, vlanId, "")
+
+			ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity,
+				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wireless", wifiMode, item.ApName, item.Ssid, vlanId, "")
 		}
 		if !item.Wireless {
 			totals["wired"] += 1
 			ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity,
+				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wired", "", "", "", vlanId, port)
+
+			ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity,
 				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wired", "", "", "", vlanId, port)
 		}
 	}
@@ -112,6 +120,12 @@ func NewClientCollector(c *api.Client) *clientCollector {
 	return &clientCollector{
 		omadaClientDownloadActivityBytes: prometheus.NewDesc("omada_client_download_activity_bytes",
 			"The current download activity for the client in bytes.",
+			wired_client_labels,
+			nil,
+		),
+
+		omadaClientUploadActivityBytes: prometheus.NewDesc("omada_client_upload_activity_bytes",
+			"The current upload activity for the client in bytes.",
 			wired_client_labels,
 			nil,
 		),
