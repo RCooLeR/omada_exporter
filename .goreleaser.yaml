@@ -1,133 +1,44 @@
-env:
-  - GO111MODULE=on
-
-gomod:
-  proxy: true
+project_name: omada-exporter
 
 builds:
-  - env:
-      - CGO_ENABLED=0
+  - id: omada_exporter
+    main: .
+    binary: omada-exporter
     goos:
-      #- windows
-      - darwin
       - linux
+      - windows
+      - darwin
     goarch:
       - amd64
       - arm64
-    mod_timestamp: '{{ .CommitTimestamp }}'
-    flags:
-      - -trimpath
     ldflags:
       - -s -w
-    binary: omada-exporter
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: RCooLeR
+    name: omada_exporter
+  draft: false
+  prerelease: false
 
 dockers:
   - image_templates:
-      - "docker.io/chhaley/omada_exporter:latest-amd64"
-      - "docker.io/chhaley/omada_exporter:{{ .Version }}-amd64"
-      - "docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-amd64"
-      - "docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}-amd64"
-      - "docker.io/chhaley/omada_exporter:{{ .Major }}-amd64"
-
-      - "ghcr.io/charlie-haley/omada_exporter:latest-amd64"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Version }}-amd64"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-amd64"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}-amd64"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Major }}-amd64"
-    use: buildx
+      - rcooler/omada_exporter:{{ .Tag }}
+      - rcooler/omada_exporter:latest
+      - rcooler/omada-exporter:latest
     dockerfile: Dockerfile
-    goarch: amd64
     build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--build-arg=VERSION={{.Version}}"
-      - "--build-arg=BUILD_DATE={{.Date}}"
-      - "--build-arg=VCS_REF={{.FullCommit}}"
       - "--platform=linux/amd64"
-  - image_templates:
-      - "docker.io/chhaley/omada_exporter:latest-arm64v8"
-      - "docker.io/chhaley/omada_exporter:{{ .Version }}-arm64v8"
-      - "docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-arm64v8"
-      - "docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}-arm64v8"
-      - "docker.io/chhaley/omada_exporter:{{ .Major }}-arm64v8"
-
-      - "ghcr.io/charlie-haley/omada_exporter:latest-arm64v8"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Version }}-arm64v8"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-arm64v8"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}-arm64v8"
-      - "ghcr.io/charlie-haley/omada_exporter:{{ .Major }}-arm64v8"
-    use: buildx
-    dockerfile: Dockerfile
-    goarch: arm64
-    build_flag_templates:
-    - "--pull"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title={{.ProjectName}}"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--build-arg=VERSION={{.Version}}"
-    - "--build-arg=BUILD_DATE={{.Date}}"
-    - "--build-arg=VCS_REF={{.FullCommit}}"
-    - "--platform=linux/arm64/v8"
-
-docker_manifests:
-## Docker Hub
-  - name_template: docker.io/chhaley/omada_exporter:latest
-    image_templates:
-    - docker.io/chhaley/omada_exporter:latest-amd64
-    - docker.io/chhaley/omada_exporter:latest-arm64v8
-
-  - name_template: docker.io/chhaley/omada_exporter:{{ .Version }}
-    image_templates:
-    - docker.io/chhaley/omada_exporter:{{ .Version }}-amd64
-    - docker.io/chhaley/omada_exporter:{{ .Version }}-arm64v8
-
-  - name_template: docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}
-    image_templates:
-    - docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-amd64
-    - docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-arm64v8
-
-  - name_template: docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}
-    image_templates:
-    - docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}-amd64
-    - docker.io/chhaley/omada_exporter:{{ .Major }}.{{ .Minor }}-arm64v8
-
-  - name_template: docker.io/chhaley/omada_exporter:{{ .Major }}
-    image_templates:
-    - docker.io/chhaley/omada_exporter:{{ .Major }}-amd64
-    - docker.io/chhaley/omada_exporter:{{ .Major }}-arm64v8
-
-## GHCR
-  - name_template: ghcr.io/charlie-haley/omada_exporter:latest
-    image_templates:
-    - ghcr.io/charlie-haley/omada_exporter:latest-amd64
-    - ghcr.io/charlie-haley/omada_exporter:latest-arm64v8
-
-  - name_template: ghcr.io/charlie-haley/omada_exporter:{{ .Version }}
-    image_templates:
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Version }}-amd64
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Version }}-arm64v8
-
-  - name_template: ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}
-    image_templates:
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-amd64
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}.{{ .Patch }}-arm64v8
-
-  - name_template: ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}
-    image_templates:
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}-amd64
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Major }}.{{ .Minor }}-arm64v8
-
-  - name_template: ghcr.io/charlie-haley/omada_exporter:{{ .Major }}
-    image_templates:
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Major }}-amd64
-    - ghcr.io/charlie-haley/omada_exporter:{{ .Major }}-arm64v8
-
-release:
-  prerelease: auto
-
-archives:
-  - format: binary
+    goos: linux
+    goarch: amd64
+    skip_push: false

@@ -1,6 +1,6 @@
 # omada_exporter
 
-![docker-publish](https://github.com/charlie-haley/omada_exporter/actions/workflows/docker-publish.yml/badge.svg)
+![docker-publish](https://github.com/RCooLeR/omada_exporter/actions/workflows/release.yml/badge.svg)
 
 <p align="center" style="text-align: center">
     <img src="./docs/images/logo-dark-mode.svg#gh-dark-mode-only" width="70%"><br/>
@@ -28,7 +28,7 @@ You can also find it on [Grafana.com](https://grafana.com/grafana/dashboards/163
 - Service User – Create under: `Account section` at `Global level`.
   Assign viewer role for read-only access.
 
-### 📣 Docker
+### 🚀 Docker Run Example
 
 ```bash
 docker run -d \
@@ -42,33 +42,28 @@ docker run -d \
     chhaley/omada_exporter
 ```
 
-**There's also a GHCR mirror available if you'd prefer to not use Docker Hub. `ghcr.io/charlie-haley/omada_exporter`**
+### 📦 Docker Compose Example
 
-### ☘️ Helm
-
-```bash
-helm repo add charlie-haley http://charts.charliehaley.dev
-helm repo update
-helm install omada-exporter charlie-haley/omada-exporter \
-    --set omada.host=https://192.1.1.20 \
-    --set omada.username=exporter \
-    --set omada.password=mypassword \
-    --set omada.site=Default \
-    --set omada.clientId= \
-    --set omada.secretId= \
-    -n monitoring
+```yaml
+services:
+  omada_exporter:
+    image: rcooler/omada_exporter:latest
+    container_name: omada_exporter
+    ports:
+      - "9202:9202"
+    environment:
+      OMADA_HOST: "https://192.168.1.20:443"
+      OMADA_USER: "exporter"
+      OMADA_PASS: "mypassword"
+      OMADA_SITE: "Default"
+      OMADA_CLIENT_ID: ""
+      OMADA_SECRET_ID: ""
+    restart: unless-stopped
 ```
-
-If you want to use the ServiceMonitor (which is enabled by default) you'll need to
-have [prometheus-operator](https://github.com/prometheus-operator/prometheus-operator) deployed to your cluster,
-see [values](https://github.com/charlie-haley/private-charts/blob/main/charts/omada-exporter/values.yaml) to disable it
-if you'd like use ingress instead.
-
-[You can find the chart repo here](https://github.com/charlie-haley/private-charts), if you'd like to contribute.
 
 ### 🖥️ Command Line
 
-[You can download the latest binary release here.](https://github.com/charlie-haley/omada_exporter/releases/latest)
+[You can download the latest binary release here.](https://github.com/RCooLeR/omada_exporter/releases/latest)
 
 ```
 NAME:
@@ -82,6 +77,7 @@ VERSION:
 
 AUTHOR:
    Charlie Haley <charlie-haley@users.noreply.github.com>
+   Roman Derevianko <RCooLeR@users.noreply.github.com>
 
 COMMANDS:
    version, v  prints the current version.
@@ -106,6 +102,21 @@ GLOBAL OPTIONS:
 
 ## ⚙️ Configuration
 
+
+### 📡 Prometheus Scrape Job Example
+
+Add the following job to your `prometheus.yml` configuration:
+
+```yaml
+  - job_name: 'Omada'
+    scrape_interval: 30s
+    scrape_timeout: 30s
+    static_configs:
+      - targets: ['omada_exporter:9202']
+```
+
+> Make sure `omada` resolves to your container or host running `omada_exporter`.
+
 ### Environment Variables
 
 | Variable                        | Purpose                                                                           |
@@ -122,20 +133,6 @@ GLOBAL OPTIONS:
 | LOG_LEVEL                       | Application log level. (default: "error")                                         |
 | OMADA_CLIENT_ID                 | Optional Client ID for Open API authentication (WAN & VPN metrics)                |
 | OMADA_SECRET_ID                 | Optional Secret ID for Open API authentication (WAN & VPN metrics)                |
-
-### Helm
-
-```
-# values.yaml
-omada:
-    host: "https://192.168.0.2" # The hostname of the Omada Controller, including protocol.
-    username: "exporter"       # Username of the Omada user you'd like to use to fetch metrics.
-    password: "mypassword"     # Password for your Omada user.
-    site: "Default"            # Site you'd like to get metrics from. (default: "Default")
-    insecure: false            # Whether to skip verifying the SSL certificate on the controller. (default: false)
-    clientId: ""               # Optional Client ID for Open API authentication (WAN & VPN metrics)
-    secretId: ""               # Optional Secret ID for Open API authentication (WAN & VPN metrics)
-```
 
 ## 📊 Metrics pulled via Web API v2
 
