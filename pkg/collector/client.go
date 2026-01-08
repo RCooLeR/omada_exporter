@@ -45,6 +45,8 @@ func FormatWifiMode(wifiMode int) string {
 		5: "802.11ac",
 		6: "802.11axa",
 		7: "802.11axg",
+		8: "802.11beg",
+		9: "802.11bea",
 	}
 	formatted, ok := mapping[wifiMode]
 	if !ok {
@@ -67,39 +69,29 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 	totals := map[string]int{}
 
 	for _, item := range clients {
+		connectionmode := "wired"
+		if item.Wireless {
+			connectionmode = "wireless"
+		}
 		vlanId := fmt.Sprintf("%.0f", item.VlanId)
 		port := fmt.Sprintf("%.0f", item.Port)
+		wifiMode := FormatWifiMode(int(item.WifiMode))
+		labels := []string{item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, connectionmode, wifiMode, item.ApName, item.Ssid, vlanId, port, item.SwitchMac}
 
 		if item.Wireless {
-			wifiMode := FormatWifiMode(int(item.WifiMode))
-
-			CollectWirelessMetrics := func(desc *prometheus.Desc, valueType prometheus.ValueType, value float64) {
-				ch <- prometheus.MustNewConstMetric(desc, valueType, value,
-					item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wireless", wifiMode, item.ApName, item.Ssid, vlanId)
-			}
-			CollectWirelessMetrics(c.omadaClientSignalPct, prometheus.GaugeValue, item.SignalLevel)
-			CollectWirelessMetrics(c.omadaClientSignalNoiseDbm, prometheus.GaugeValue, item.SignalNoise)
-			CollectWirelessMetrics(c.omadaClientRssiDbm, prometheus.GaugeValue, item.Rssi)
-			CollectWirelessMetrics(c.omadaClientTrafficDown, prometheus.CounterValue, item.TrafficDown)
-			CollectWirelessMetrics(c.omadaClientTrafficUp, prometheus.CounterValue, item.TrafficUp)
-			CollectWirelessMetrics(c.omadaClientTxRate, prometheus.GaugeValue, item.TxRate)
-			CollectWirelessMetrics(c.omadaClientRxRate, prometheus.GaugeValue, item.RxRate)
-
 			totals[wifiMode] += 1
-			ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity,
-				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wireless", wifiMode, item.ApName, item.Ssid, vlanId, "")
-
-			ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity,
-				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wireless", wifiMode, item.ApName, item.Ssid, vlanId, "")
-		}
-		if !item.Wireless {
+			ch <- prometheus.MustNewConstMetric(c.omadaClientSignalPct, prometheus.GaugeValue, item.SignalLevel, labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaClientSignalNoiseDbm, prometheus.GaugeValue, item.SignalNoise, labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaClientRssiDbm, prometheus.GaugeValue, item.Rssi, labels...)
+		} else {
 			totals["wired"] += 1
-			ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity,
-				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wired", "", "", "", vlanId, port)
-
-			ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity,
-				item.Name, item.Vendor, item.Ip, item.Mac, item.HostName, site, client.SiteId, "wired", "", "", "", vlanId, port)
 		}
+		ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficDown, prometheus.CounterValue, item.TrafficDown, labels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficUp, prometheus.CounterValue, item.TrafficUp, labels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaClientTxRate, prometheus.GaugeValue, item.TxRate, labels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaClientRxRate, prometheus.GaugeValue, item.RxRate, labels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity, labels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity, labels...)
 	}
 
 	for connectionModeFmt, v := range totals {
@@ -114,61 +106,60 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func NewClientCollector(c *api.Client) *clientCollector {
-	client_labels := []string{"client", "vendor", "ip", "mac", "host_name", "site", "site_id", "connection_mode", "wifi_mode", "ap_name", "ssid", "vlan_id"}
-	wired_client_labels := append(client_labels, "switch_port")
+	labels := []string{"client", "vendor", "ip", "mac", "host_name", "site", "site_id", "connection_mode", "wifi_mode", "ap_name", "ssid", "vlan_id", "switch_port", "switch_mac"}
 
 	return &clientCollector{
 		omadaClientDownloadActivityBytes: prometheus.NewDesc("omada_client_download_activity_bytes",
 			"The current download activity for the client in bytes.",
-			wired_client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientUploadActivityBytes: prometheus.NewDesc("omada_client_upload_activity_bytes",
 			"The current upload activity for the client in bytes.",
-			wired_client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientSignalPct: prometheus.NewDesc("omada_client_signal_pct",
 			"The signal quality for the wireless client in percent.",
-			client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientSignalNoiseDbm: prometheus.NewDesc("omada_client_snr_dbm",
 			"The signal to noise ratio for the wireless client in dBm.",
-			client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientRssiDbm: prometheus.NewDesc("omada_client_rssi_dbm",
 			"The RSSI for the wireless client in dBm.",
-			client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientTrafficDown: prometheus.NewDesc("omada_client_traffic_down_bytes",
 			"Total bytes received by wireless client.",
-			client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientTrafficUp: prometheus.NewDesc("omada_client_traffic_up_bytes",
 			"Total bytes sent by wireless client.",
-			client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientTxRate: prometheus.NewDesc("omada_client_tx_rate",
 			"TX rate of wireless client.",
-			client_labels,
+			labels,
 			nil,
 		),
 
 		omadaClientRxRate: prometheus.NewDesc("omada_client_rx_rate",
 			"RX rate of wireless client.",
-			client_labels,
+			labels,
 			nil,
 		),
 

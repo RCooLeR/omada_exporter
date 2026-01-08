@@ -82,6 +82,12 @@ func getPortByLinkSpeed(ls float64) float64 {
 		return 2500
 	case 5:
 		return 10000
+	case 6:
+		return 5000
+	case 7:
+		return 25000
+	case 8:
+		return 100000
 	}
 	return 0
 }

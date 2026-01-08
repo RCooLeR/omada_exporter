@@ -30,7 +30,7 @@ func (c *Client) GetVpn() ([]Vpn, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Bytes("data", body).Msg("Received data from VPN endpoint")
+	log.Debug().Bytes("data", body).Msg("Received data from VPN endpoint")
 
 	vpndata := vpnResponse{}
 	err = json.Unmarshal(body, &vpndata)

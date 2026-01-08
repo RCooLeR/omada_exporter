@@ -10,7 +10,7 @@
 
 ### 📈 Dashboard
 
-There's a [default dashboard in this repo](./dashboard.json), which is a good starting point for visualizing your metrics.
+There's a [default dashboard in this repo](docs/dashboards/dashboard.json), which is a good starting point for visualizing your metrics.
 
 You can also find it on [Grafana.com](https://grafana.com/grafana/dashboards/16343).
 
