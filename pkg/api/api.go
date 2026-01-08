@@ -7,7 +7,7 @@ import (
 	"net/http/cookiejar"
 	"time"
 
-	"github.com/charlie-haley/omada_exporter/pkg/config"
+	"github.com/RCooLeR/omada_exporter/pkg/config"
 	log "github.com/rs/zerolog/log"
 )
 

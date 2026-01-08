@@ -1,8 +1,8 @@
-module github.com/charlie-haley/omada_exporter
+module github.com/RCooLeR/omada_exporter
 
 go 1.23.0
 
-replace github.com/charlie-haley/omada_exporter => ./
+replace github.com/RCooLeR/omada_exporte => ./
 
 require (
 	github.com/goki/ki v1.1.17

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/charlie-haley/omada_exporter/cmd"
+	"github.com/RCooLeR/omada_exporter/cmd"
 )
 
 func main() {

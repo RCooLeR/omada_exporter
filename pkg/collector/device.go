@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"github.com/charlie-haley/omada_exporter/pkg/api"
+	"github.com/RCooLeR/omada_exporter/pkg/api"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )

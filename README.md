@@ -8,6 +8,8 @@
     Prometheus Exporter for TP-Link Omada Controller SDN. <br/>
 </p>
 
+>“RCooLeR/omada_exporter is a maintained fork of charlie-haley/omada_exporter with additional metrics and Open API support.”
+
 ### 📈 Dashboard
 
 There's a [default dashboard in this repo](docs/dashboards/dashboard.json), which is a good starting point for visualizing your metrics.
@@ -115,7 +117,7 @@ Add the following job to your `prometheus.yml` configuration:
       - targets: ['omada_exporter:9202']
 ```
 
-> Make sure `omada` resolves to your container or host running `omada_exporter`.
+> Make sure `omada_exporter` resolves to your container or host running `omada_exporter`.
 
 ### Environment Variables
 
