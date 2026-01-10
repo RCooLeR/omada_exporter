@@ -1,0 +1,1375 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 0,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 15,
+      "panels": [],
+      "title": "Omada",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bool_yes_no"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "binBps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link Bandwidth"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Mbits"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ISP Bandwidth"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Mbits"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 11,
+        "x": 0,
+        "y": 1
+      },
+      "id": 27,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Port"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_wan_internet_state{}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_wan_latency{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_isp_download_speed{} + omada_isp_upload_speed{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "expr": "omada_isp_status{}",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "ip",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Value #A": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "desc 1": true,
+              "device 1": true,
+              "device 2": true,
+              "device 3": true,
+              "device_mac 1": true,
+              "device_mac 2": true,
+              "device_mac 3": true,
+              "gateway_firmware_version 1": true,
+              "gateway_firmware_version 2": true,
+              "gateway_firmware_version 3": true,
+              "gateway_hw_version 1": true,
+              "gateway_hw_version 2": true,
+              "gateway_hw_version 3": true,
+              "gateway_ip 1": true,
+              "gateway_ip 2": true,
+              "gateway_ip 3": true,
+              "gateway_mac 1": true,
+              "gateway_mac 2": true,
+              "gateway_mac 3": true,
+              "gateway_model 1": true,
+              "gateway_model 2": true,
+              "gateway_model 3": true,
+              "gateway_name 1": true,
+              "gateway_name 2": true,
+              "gateway_name 3": true,
+              "gateway_show_model 1": true,
+              "gateway_show_model 2": true,
+              "gateway_show_model 3": true,
+              "gateway_site 1": true,
+              "gateway_site 2": true,
+              "gateway_site 3": true,
+              "gateway_site_id 1": true,
+              "gateway_site_id 2": true,
+              "gateway_site_id 3": true,
+              "gateway_status 1": true,
+              "gateway_status 2": true,
+              "gateway_status 3": true,
+              "gateway_type 1": true,
+              "gateway_type 2": true,
+              "gateway_type 3": true,
+              "gateway_uptime_seconds 1": true,
+              "gateway_uptime_seconds 2": true,
+              "gateway_version 1": true,
+              "gateway_version 2": true,
+              "gateway_version 3": true,
+              "gateway_version_upgrade 1": true,
+              "gateway_version_upgrade 2": true,
+              "instance 1": true,
+              "instance 2": true,
+              "instance 3": true,
+              "ip": false,
+              "ip 2": true,
+              "ip 3": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "load_balance": true,
+              "max_bandwidth": true,
+              "name 1": true,
+              "name 2": true,
+              "name 3": true,
+              "port 1": true,
+              "port 2": true,
+              "port 3": true,
+              "proto 1": true,
+              "proto 2": true,
+              "proto 3": true,
+              "site": true,
+              "site 1": true,
+              "site 2": true,
+              "site 3": true,
+              "site_id": true,
+              "site_id 1": true,
+              "site_id 2": true,
+              "site_id 3": true,
+              "type 1": true,
+              "type 2": true,
+              "type 3": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Time 1": 0,
+              "Time 2": 20,
+              "Time 3": 50,
+              "Value #A": 42,
+              "Value #B": 48,
+              "Value #C": 49,
+              "__name__ 1": 1,
+              "__name__ 2": 21,
+              "desc 1": 2,
+              "desc 2": 22,
+              "download_speed_set": 45,
+              "gateway_firmware_version 1": 3,
+              "gateway_firmware_version 2": 23,
+              "gateway_hw_version 1": 4,
+              "gateway_hw_version 2": 24,
+              "gateway_ip 1": 5,
+              "gateway_ip 2": 25,
+              "gateway_mac 1": 6,
+              "gateway_mac 2": 26,
+              "gateway_mac 3": 51,
+              "gateway_model 1": 7,
+              "gateway_model 2": 27,
+              "gateway_name 1": 8,
+              "gateway_name 2": 28,
+              "gateway_name 3": 52,
+              "gateway_show_model 1": 9,
+              "gateway_show_model 2": 29,
+              "gateway_site 1": 10,
+              "gateway_site 2": 30,
+              "gateway_site_id 1": 11,
+              "gateway_site_id 2": 31,
+              "gateway_status 1": 12,
+              "gateway_status 2": 32,
+              "gateway_status 3": 53,
+              "gateway_type 1": 13,
+              "gateway_type 2": 33,
+              "gateway_uptime_seconds 1": 62,
+              "gateway_uptime_seconds 2": 63,
+              "gateway_version 1": 14,
+              "gateway_version 2": 34,
+              "gateway_version_upgrade 1": 60,
+              "gateway_version_upgrade 2": 61,
+              "instance 1": 15,
+              "instance 2": 35,
+              "instance 3": 54,
+              "ip": 43,
+              "job 1": 16,
+              "job 2": 36,
+              "job 3": 55,
+              "load_balance": 46,
+              "max_bandwidth": 44,
+              "name 1": 17,
+              "name 2": 37,
+              "name 3": 56,
+              "port 1": 41,
+              "port 2": 38,
+              "port 3": 57,
+              "proto 1": 18,
+              "proto 2": 39,
+              "site": 58,
+              "site_id": 59,
+              "status": 47,
+              "type 1": 19,
+              "type 2": 40
+            },
+            "renameByName": {
+              "Value #A": "Connected",
+              "Value #B": "Latency",
+              "Value #C": "Speed",
+              "__name__ 1": "",
+              "__name__ 2": "",
+              "desc": "ISP",
+              "download_speed_set": "ISP Bandwidth",
+              "gateway_ip 1": "",
+              "gateway_model 1": "Gateway",
+              "gateway_show_model 1": "",
+              "gateway_version 1": "",
+              "ip": "IP",
+              "ip 1": "IP",
+              "load_balance": "Load balance",
+              "max_bandwidth": "Link Bandwidth",
+              "port 1": "Port",
+              "status": "Status",
+              "type 3": ""
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bool_yes_no"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value #C"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Speed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "binBps"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 13,
+        "x": 11,
+        "y": 1
+      },
+      "id": 29,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Port"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_vpn_status{}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_vpn_uptime{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_vpn_down_bytes{} + omada_vpn_up_bytes{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(rate(omada_vpn_down_bytes[5m]) + rate(omada_vpn_up_bytes[5m]))",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "D"
+        }
+      ],
+      "title": "",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "name",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "device 1": true,
+              "device 2": true,
+              "device 3": true,
+              "device_mac 1": true,
+              "device_mac 2": true,
+              "device_mac 3": true,
+              "instance": true,
+              "instance 1": true,
+              "instance 2": true,
+              "instance 3": true,
+              "instance 4": true,
+              "interface_name 1": true,
+              "interface_name 2": true,
+              "interface_name 3": true,
+              "ip 2": true,
+              "ip 3": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "job 3": true,
+              "job 4": true,
+              "local_ip 1": true,
+              "local_ip 2": true,
+              "local_ip 3": true,
+              "name 1": true,
+              "name 2": true,
+              "name 3": true,
+              "port 1": true,
+              "port 2": true,
+              "port 3": true,
+              "proto 1": true,
+              "proto 2": true,
+              "proto 3": true,
+              "purpose": true,
+              "remote_ip": false,
+              "remote_ip 2": true,
+              "remote_ip 3": true,
+              "remote_ip 4": true,
+              "site": true,
+              "site 1": true,
+              "site 2": true,
+              "site 3": true,
+              "site 4": true,
+              "site_id": true,
+              "site_id 1": true,
+              "site_id 2": true,
+              "site_id 3": true,
+              "site_id 4": true,
+              "type 1": true,
+              "type 2": true,
+              "type 3": true,
+              "vpn_id": true,
+              "vpn_mode 2": true,
+              "vpn_mode 3": true,
+              "vpn_mode 4": true,
+              "vpn_type": true,
+              "vpn_type 2": true,
+              "vpn_type 3": true,
+              "vpn_type 4": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "Value #A": "Enabled",
+              "Value #B": "Uptime",
+              "Value #C": "Total",
+              "Value #D": "Speed",
+              "__name__ 1": "",
+              "__name__ 2": "",
+              "desc": "ISP",
+              "ip 1": "IP",
+              "remote_ip 1": "Remote IP",
+              "site 1": "",
+              "site_id 3": "",
+              "type 3": ""
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 2,
+        "x": 0,
+        "y": 6
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(sum by (switch_port)(omada_port_power_watts{}))",
+          "legendFormat": "Total PoE Used",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 2,
+        "x": 2,
+        "y": 6
+      },
+      "id": 30,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum(omada_device_need_upgrade{})",
+          "legendFormat": "Firmware upgrades",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 1,
+        "x": 4,
+        "y": 6
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_site_alert_num{}",
+          "instant": true,
+          "legendFormat": "Alerts",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "binBps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 6,
+        "x": 5,
+        "y": 6
+      },
+      "id": 13,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 50,
+        "minVizHeight": 10,
+        "minVizWidth": 8,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "topk(10,\r\n  sum by(device_category, device_type,mac, ip,name) (\r\n    (rate(omada_client_traffic_up_bytes[3m]) + rate(omada_client_traffic_down_bytes[3m]))\r\n  )\r\n)",
+          "instant": true,
+          "legendFormat": "{{ device_type }} - {{name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Omada Clients",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Uptime"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "POE remain"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "watt"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 13,
+        "x": 11,
+        "y": 6
+      },
+      "id": 28,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "device"
+          }
+        ]
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_device_uptime_seconds{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_device_poe_remain_watts{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "ef95tr39us64gf"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "omada_controller_uptime_seconds{}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "mac",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Value": false,
+              "Value #A": true,
+              "Value #C": true,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "adopted_ap_and_switch_num": true,
+              "adopted_ap_num": true,
+              "adopted_olt_num": true,
+              "adopted_osg_num": true,
+              "adopted_osw_num": true,
+              "ap_and_switch_capacity": true,
+              "ap_capacity": true,
+              "device 2": true,
+              "deviceType": true,
+              "device_type": true,
+              "device_type 2": true,
+              "firmware_version": true,
+              "firmware_version 1": true,
+              "firmware_version 2": true,
+              "hw_version": true,
+              "hw_version 1": true,
+              "hw_version 2": true,
+              "instance": true,
+              "instance 1": true,
+              "instance 2": true,
+              "ip": true,
+              "ip 1": true,
+              "ip 2": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "mac": true,
+              "macAddress": true,
+              "model 2": true,
+              "name 1": true,
+              "name 2": true,
+              "olt_capacity": true,
+              "osg_capacity": true,
+              "osw_capacity": true,
+              "poe_support": true,
+              "portMode": true,
+              "portProtocol": true,
+              "port_number": true,
+              "share_ap_and_switch_capacity": true,
+              "show_model": true,
+              "show_model 1": true,
+              "show_model 2": true,
+              "site": true,
+              "site 1": true,
+              "site 2": true,
+              "site_id": true,
+              "site_id 1": true,
+              "site_id 2": true,
+              "status 2": true,
+              "total_power": true,
+              "type": true,
+              "type 1": true,
+              "type 2": true,
+              "uptime_seconds": false,
+              "version": true,
+              "version 1": true,
+              "version 2": true,
+              "version_upgrade 2": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Time": 11,
+              "Value #A": 7,
+              "Value #B": 4,
+              "Value #C": 34,
+              "__name__": 12,
+              "adopted_ap_and_switch_num": 23,
+              "adopted_ap_num": 24,
+              "adopted_olt_num": 25,
+              "adopted_osg_num": 26,
+              "adopted_osw_num": 27,
+              "ap_and_switch_capacity": 28,
+              "ap_capacity": 29,
+              "firmware_version": 13,
+              "hw_version": 14,
+              "instance": 15,
+              "ip": 16,
+              "job": 17,
+              "mac": 6,
+              "model": 1,
+              "name": 0,
+              "olt_capacity": 30,
+              "osg_capacity": 31,
+              "osw_capacity": 32,
+              "poe_support": 8,
+              "port_number": 9,
+              "share_ap_and_switch_capacity": 33,
+              "show_model": 18,
+              "site": 19,
+              "site_id": 20,
+              "status": 3,
+              "total_power": 10,
+              "type": 21,
+              "uptime_seconds": 5,
+              "version": 22,
+              "version_upgrade": 2
+            },
+            "renameByName": {
+              "Value": "Uptime",
+              "Value #A": "",
+              "Value #B": "POE remain",
+              "Value #C": "Uptime",
+              "device": "Device",
+              "mac": "",
+              "model": "Model",
+              "model 1": "Model",
+              "name 1": "Name",
+              "portID": "Port",
+              "portIP": "IP",
+              "portName": "ISP",
+              "show_model 1": "",
+              "site 1": "",
+              "status": "",
+              "status 1": "Status",
+              "total_power": "POE",
+              "uptime_seconds": "Uptime",
+              "version": "",
+              "version 1": "",
+              "version_upgrade": "Firmware",
+              "version_upgrade 1": "Version"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Model"
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Firmware": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Model": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "POE remain": {
+                "aggregations": [
+                  "max"
+                ],
+                "operation": "aggregate"
+              },
+              "Uptime": {
+                "aggregations": [
+                  "median"
+                ],
+                "operation": "aggregate"
+              },
+              "name": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "status": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "Model": "",
+              "POE remain (max)": "POE remain",
+              "Uptime (median)": "Uptime",
+              "name": "Name",
+              "status": "Status"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ef95tr39us64gf"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 5,
+        "x": 0,
+        "y": 9
+      },
+      "id": 12,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.3.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "    avg by (name, mac) (\r\n      avg_over_time(omada_device_cpu_percentage{}[3m])\r\n      )",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "{{name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Omada Device CPU",
+      "type": "bargauge"
+    }
+  ],
+  "preload": false,
+  "refresh": "10s",
+  "schemaVersion": 42,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "label": "node",
+        "name": "node",
+        "options": [],
+        "query": "",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-12h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Simple omada dashboard",
+  "uid": "ad5dtmf",
+  "version": 4
+}

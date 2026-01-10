@@ -1,41 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": [],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "8.5.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -58,20 +21,15 @@
       }
     ]
   },
+  "description": "A Prometheus dashboard for TP-Link Omada network metrics",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
-  "iteration": 1653675488671,
+  "id": 0,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -86,7 +44,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -99,7 +57,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "light-green",
@@ -123,6 +81,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -130,30 +89,34 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(avg by (switch_port)(omada_port_power_watts{site=\"$Site\"}))",
+          "expr": "sum(avg by (port)(omada_port_power_watts{}))",
           "instant": false,
           "interval": "",
           "legendFormat": "Total PoE Used",
           "refId": "A"
         }
       ],
+      "title": "",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "description": "",
       "fieldConfig": {
@@ -167,7 +130,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "light-green",
@@ -191,6 +154,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -198,15 +162,17 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "value_and_name"
+        "textMode": "value_and_name",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
           "exemplar": false,
           "expr": "omada_controller_uptime_seconds",
@@ -216,12 +182,13 @@
           "refId": "A"
         }
       ],
+      "title": "",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "description": "",
       "fieldConfig": {
@@ -235,7 +202,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               }
             ]
           },
@@ -255,6 +222,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -262,30 +230,35 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "value_and_name"
+        "textMode": "value_and_name",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
           "expr": "omada_controller_storage_available_bytes - omada_controller_storage_used_bytes",
+          "format": "time_series",
           "instant": true,
           "interval": "",
           "legendFormat": "Controller Free Storage",
           "refId": "A"
         }
       ],
+      "title": "",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -293,9 +266,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -304,6 +281,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -311,6 +289,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -326,7 +305,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -349,32 +328,38 @@
         "legend": {
           "calcs": [],
           "displayMode": "table",
-          "placement": "right"
+          "placement": "right",
+          "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (client,ip) (omada_client_download_activity_bytes{site=\"$Site\"}) > 0",
+          "expr": "sum by(device_category, device_type,mac, ip,name) (\r\n    (rate(omada_client_traffic_up_bytes[3m]) + rate(omada_client_traffic_down_bytes[3m])) > 0\r\n  )",
           "interval": "",
-          "legendFormat": "{{ client }} - {{ ip }}",
+          "legendFormat": "{{ device_type }} - {{name}}",
+          "range": true,
           "refId": "A"
         }
       ],
+      "title": "",
       "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -382,9 +367,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -393,6 +382,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -400,6 +390,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -417,7 +408,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -444,24 +435,28 @@
             "mean"
           ],
           "displayMode": "table",
-          "placement": "bottom"
+          "placement": "right",
+          "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "omada_device_cpu_percentage{site=\"$Site\"}",
+          "expr": "avg by (name,model, mac) (omada_device_cpu_percentage{})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_type}} - {{ ip }}",
+          "legendFormat": "{{ model }}",
           "refId": "A"
         }
       ],
@@ -471,7 +466,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -479,9 +474,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -490,6 +489,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -497,6 +497,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -514,7 +515,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -541,24 +542,29 @@
             "mean"
           ],
           "displayMode": "table",
-          "placement": "bottom"
+          "placement": "right",
+          "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "omada_device_mem_percentage{site=\"$Site\"}",
+          "expr": "avg by (name,model, mac) (omada_device_mem_percentage{})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_type}} - {{ ip }}",
+          "legendFormat": " {{ model }}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -567,10 +573,6 @@
     },
     {
       "collapsed": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -586,7 +588,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "description": "",
       "fieldConfig": {
@@ -600,7 +602,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "light-green",
@@ -624,6 +626,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -631,15 +634,17 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "value_and_name"
+        "textMode": "value_and_name",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
           "exemplar": false,
           "expr": "omada_device_uptime_seconds{mac=\"$Device\", site=\"$Site\"}",
@@ -649,12 +654,13 @@
           "refId": "A"
         }
       ],
+      "title": "",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "description": "",
       "fieldConfig": {
@@ -668,7 +674,7 @@
             "steps": [
               {
                 "color": "text",
-                "value": null
+                "value": 0
               }
             ]
           }
@@ -687,6 +693,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -694,30 +701,34 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "name"
+        "textMode": "name",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "omada_device_uptime_seconds{device=\"$Device\", site=\"$Site\"}",
+          "expr": "omada_device_uptime_seconds{mac=\"$Device\", site=\"$Site\"}",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_type}} | {{model}}",
+          "legendFormat": "{{ type }} - {{name}}",
           "refId": "A"
         }
       ],
+      "title": "",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -725,9 +736,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -736,6 +751,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -743,6 +759,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -760,7 +777,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -786,25 +803,29 @@
             "max",
             "mean"
           ],
-          "displayMode": "hidden",
-          "placement": "bottom"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
           "expr": "omada_device_cpu_percentage{mac=\"$Device\", site=\"$Site\"}",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_type}} - {{ ip }}",
+          "legendFormat": "{{ device_type }} - {{name}}",
           "refId": "A"
         }
       ],
@@ -814,7 +835,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -822,9 +843,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -833,6 +858,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -840,6 +866,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -857,7 +884,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -879,25 +906,29 @@
       "options": {
         "legend": {
           "calcs": [],
-          "displayMode": "hidden",
-          "placement": "bottom"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
           "expr": "omada_device_mem_percentage{mac=\"$Device\", site=\"$Site\"}",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_type}} - {{ ip }}",
+          "legendFormat": "{{ device_type }} - {{name}}",
           "refId": "A"
         }
       ],
@@ -907,7 +938,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "ef95tr39us64gf"
       },
       "fieldConfig": {
         "defaults": {
@@ -920,7 +951,7 @@
                 "0": {
                   "color": "gray",
                   "index": 0,
-                  "text": "Not connected"
+                  "text": "Disabled"
                 }
               },
               "type": "value"
@@ -932,19 +963,31 @@
             "steps": [
               {
                 "color": "transparent",
-                "value": null
+                "value": 0
               },
               {
                 "color": "light-red",
                 "value": 10
               },
               {
-                "color": "#EAB839",
+                "color": "orange",
                 "value": 100
               },
               {
-                "color": "light-green",
+                "color": "yellow",
                 "value": 1000
+              },
+              {
+                "color": "light-green",
+                "value": 2500
+              },
+              {
+                "color": "semi-dark-green",
+                "value": 5000
+              },
+              {
+                "color": "blue",
+                "value": 10000
               }
             ]
           },
@@ -964,6 +1007,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -971,84 +1015,87 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "text": {},
-        "textMode": "auto"
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "ef95tr39us64gf"
           },
+          "editorMode": "code",
           "exemplar": false,
-          "expr": "omada_port_link_speed_mbps{switch_mac=\"$Device\", site=\"$Site\"}",
+          "expr": "omada_port_link_speed_mbps{switch_mac=\"$Device\",switch_site=\"$Site\"}",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{switch_port}}",
+          "legendFormat": "{{port}}",
           "refId": "A"
         }
       ],
-      "transformations": [],
+      "title": "",
       "type": "stat"
     }
   ],
-  "refresh": false,
-  "schemaVersion": 36,
-  "style": "dark",
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
   "tags": [],
   "templating": {
     "list": [
       {
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "ef95tr39us64gf"
         },
-        "definition": "omada_device_need_upgrade{site=\"$Site\"}",
+        "definition": "omada_device_need_upgrade{}",
         "hide": 2,
         "includeAll": true,
         "multi": true,
         "name": "Device",
         "options": [],
         "query": {
-          "query": "omada_device_need_upgrade{site=\"$Site\"}",
-          "refId": "StandardVariableQuery"
+          "qryType": 4,
+          "query": "omada_device_need_upgrade{}",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "device_type=\"(?<text>[^\"]+)|mac=\"(?<value>[^\"]+).*",
-        "skipUrlSync": false,
-        "sort": 0,
+        "regex": "type=\"(?<text>[^\"]+)|mac=\"(?<value>[^\"]+).*",
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": "default",
           "value": "default"
         },
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "Datasource",
         "options": [],
         "query": "prometheus",
-        "queryValue": "",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
       },
       {
-        "current": {},
+        "current": {
+          "text": "",
+          "value": ""
+        },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "ef95tr39us64gf"
         },
         "definition": "label_values(omada_device_need_upgrade, site)",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "Site",
         "options": [],
         "query": {
@@ -1057,8 +1104,6 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -1071,6 +1116,5 @@
   "timezone": "",
   "title": "Omada Overview",
   "uid": "omada-overview",
-  "version": 32,
-  "weekStart": ""
+  "version": 8
 }

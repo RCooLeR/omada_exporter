@@ -4,6 +4,8 @@ go 1.23.0
 
 replace github.com/RCooLeR/omada_exporte => ./
 
+replace github.com/charlie-haley/omada_exporter => ./
+
 require (
 	github.com/goki/ki v1.1.17
 	github.com/prometheus/client_golang v1.23.2
