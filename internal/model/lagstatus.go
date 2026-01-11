@@ -7,6 +7,7 @@ type LagStatus struct {
 	Tx         float64 `json:"tx"`
 	RxRate     float64 `json:"rxRate"`
 	TxRate     float64 `json:"txRate"`
+	Ports      []int8  `json:"ports"`
 }
 
 func (ls *LagStatus) GetLinkStatus() string {
@@ -45,4 +46,16 @@ func (ls *LagStatus) GetLinkSpeed() int32 {
 	default:
 		return 0
 	}
+}
+func (ls *LagStatus) GetTotalLagSpeed(sw *Switch) int32 {
+	var speed int32
+	speed = 0
+	for _, port := range ls.Ports {
+		for _, swPort := range sw.Ports {
+			if port == swPort.Port {
+				speed += swPort.PortStatus.GetLinkSpeed()
+			}
+		}
+	}
+	return speed
 }

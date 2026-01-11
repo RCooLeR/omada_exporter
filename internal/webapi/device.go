@@ -50,7 +50,10 @@ func (c *Client) GetDevices() ([]model.DevicesInterface, error) {
 			if err != nil {
 				log.Error().Err(err).Msg("Error getting wans")
 			}
-
+			err = c.GetGatewayPorts(dev)
+			if err != nil {
+				log.Error().Err(err).Msg("Error getting gateway ports")
+			}
 		}
 	}
 

@@ -23,6 +23,9 @@ type Device struct {
 	NeedUpgrade    bool    `json:"needUpgrade"`
 	Download       float64 `json:"download"`
 	Upload         float64 `json:"upload"`
+	RxRate         float64 `json:"rxRate"`
+	TxRate         float64 `json:"txRate"`
+	Temp           float64 `json:"temp"`
 }
 
 type DeviceInterface interface {
@@ -44,6 +47,7 @@ type DeviceInterface interface {
 	GetNeedUpgrade() bool
 	GetDownload() float64
 	GetUpload() float64
+	GetTemp() float64
 }
 
 func (s *Device) GetType() string            { return s.Type }
@@ -117,6 +121,7 @@ func (s *Device) GetCpuUtilization() float64 { return s.CpuUtilization }
 func (s *Device) GetNeedUpgrade() bool       { return s.NeedUpgrade }
 func (s *Device) GetDownload() float64       { return s.Download }
 func (s *Device) GetUpload() float64         { return s.Upload }
+func (s *Device) GetTemp() float64           { return s.Temp }
 func (s *Device) GetVersionWithUpgrade() string {
 	if s.NeedUpgrade {
 		return s.Version + " ↑"

@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func (c *deviceCollector) collectOlt(ch chan<- prometheus.Metric, olt *model.Olt) error {
+func (c *DeviceCollector) collectOlt(ch chan<- prometheus.Metric, olt *model.Olt) error {
 
 	return nil
 }
