@@ -5,7 +5,7 @@ name: Release with GoReleaser
 on:
   push:
     tags:
-      - 'v*'  # Запуск только на теги вида v1.0.0 и т.п.
+      - 'v*'
 
 jobs:
   release:

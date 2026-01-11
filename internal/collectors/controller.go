@@ -75,13 +75,13 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 
 func NewControllerCollector(apiClient *api.Client) *controllerCollector {
 	labels := []string{
-		"name",
-		"model",
-		"version",
-		"version_upgrade",
-		"firmware_version",
-		"mac",
-		"ip",
+		"device_name",
+		"device_model",
+		"device_version",
+		"device_version_upgrade",
+		"device_firmware_version",
+		"device_mac",
+		"device_ip",
 		"ap_capacity",
 		"adopted_ap_num",
 		"osw_capacity",
@@ -93,7 +93,7 @@ func NewControllerCollector(apiClient *api.Client) *controllerCollector {
 		"ap_and_switch_capacity",
 		"adopted_ap_and_switch_num",
 		"share_ap_and_switch_capacity",
-		"uptime_seconds",
+		"device_uptime_seconds",
 		"site",
 		"site_id",
 	}

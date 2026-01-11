@@ -23,6 +23,8 @@ type Device struct {
 	NeedUpgrade    bool    `json:"needUpgrade"`
 	Download       float64 `json:"download"`
 	Upload         float64 `json:"upload"`
+	RxRate         float64 `json:"rxRate"`
+	TxRate         float64 `json:"txRate"`
 }
 
 type DeviceInterface interface {

@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 type PortStatus struct {
 	LinkStatus int8    `json:"linkStatus"`
 	LinkSpeed  int8    `json:"linkSpeed"`
@@ -50,4 +52,34 @@ func (ps *PortStatus) GetLinkSpeed() int32 {
 	default:
 		return 0
 	}
+}
+
+func (ps *PortStatus) GetLinkSpeedLabel() string {
+	label := ""
+	if ps.Poe {
+		label += "⚡ " + fmt.Sprintf("%.0f", ps.PoePower) + "w"
+	}
+	if "" != label {
+		label += "  "
+	}
+	if ps.LinkStatus == 0 {
+		return label + "⇅ -"
+	}
+	speedMap := map[int8]string{
+		0: "⇅ -",
+		1: "⇅ 10 Mbps",
+		2: "⇅ 100 Mbps",
+		3: "⇅ 1 Gbps",
+		4: "⇅ 2.5 Gbps",
+		5: "⇅ 10 Gbps",
+		6: "⇅ 5 Gbps",
+		7: "⇅ 25 Gbps",
+		8: "⇅ 100 Gbps",
+		9: "⇅ 40 Gbps",
+	}
+	speedLabel, ok := speedMap[ps.LinkSpeed]
+	if !ok {
+		speedLabel = "⇅ %"
+	}
+	return label + speedLabel
 }

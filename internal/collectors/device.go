@@ -11,13 +11,19 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
-type deviceCollector struct {
+type DeviceCollector struct {
 	omadaDeviceUptimeSeconds *prometheus.Desc
 	omadaDeviceCpuPercentage *prometheus.Desc
 	omadaDeviceMemPercentage *prometheus.Desc
 	omadaDeviceNeedUpgrade   *prometheus.Desc
 	omadaDeviceDownload      *prometheus.Desc
 	omadaDeviceUpload        *prometheus.Desc
+	//ports
+	omadaPortLinkStatus    *prometheus.Desc
+	omadaPortPowerWatts    *prometheus.Desc
+	omadaPortLinkSpeedMbps *prometheus.Desc
+	omadaPortLinkRx        *prometheus.Desc
+	omadaPortLinkTx        *prometheus.Desc
 	//gateway
 	omadaWanStatus        *prometheus.Desc
 	omadaWanInternetState *prometheus.Desc
@@ -27,15 +33,11 @@ type deviceCollector struct {
 	omadaWanLatency       *prometheus.Desc
 	//switch
 	omadaDevicePoeRemainWatts *prometheus.Desc
-	omadaPortLinkStatus       *prometheus.Desc
-	omadaPortPowerWatts       *prometheus.Desc
-	omadaPortLinkSpeedMbps    *prometheus.Desc
-	omadaPortLinkRx           *prometheus.Desc
-	omadaPortLinkTx           *prometheus.Desc
-	omadaLagLinkStatus        *prometheus.Desc
-	omadaLagLinkSpeedMbps     *prometheus.Desc
-	omadaLagLinkRx            *prometheus.Desc
-	omadaLagLinkTx            *prometheus.Desc
+	//lags
+	omadaLagLinkStatus    *prometheus.Desc
+	omadaLagLinkSpeedMbps *prometheus.Desc
+	omadaLagLinkRx        *prometheus.Desc
+	omadaLagLinkTx        *prometheus.Desc
 	//ap
 	omadaDeviceTxRate    *prometheus.Desc
 	omadaDeviceRxRate    *prometheus.Desc
@@ -53,30 +55,34 @@ type deviceCollector struct {
 	webClient *webapi.Client
 }
 
-func (c *deviceCollector) Describe(ch chan<- *prometheus.Desc) {
+func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDeviceUptimeSeconds
 	ch <- c.omadaDeviceCpuPercentage
 	ch <- c.omadaDeviceMemPercentage
 	ch <- c.omadaDeviceNeedUpgrade
 	ch <- c.omadaDeviceDownload
 	ch <- c.omadaDeviceUpload
+	//ports
+	ch <- c.omadaPortLinkStatus
+	ch <- c.omadaPortPowerWatts
+	ch <- c.omadaPortLinkSpeedMbps
+	ch <- c.omadaPortLinkRx
+	ch <- c.omadaPortLinkTx
+	//gateway
 	ch <- c.omadaWanStatus
 	ch <- c.omadaWanInternetState
 	ch <- c.omadaWanLinkSpeedMbps
 	ch <- c.omadaWanRxRate
 	ch <- c.omadaWanTxRate
 	ch <- c.omadaWanLatency
+	//switch
 	ch <- c.omadaDevicePoeRemainWatts
-	ch <- c.omadaPortLinkStatus
-	ch <- c.omadaPortPowerWatts
-	ch <- c.omadaPortLinkSpeedMbps
-	ch <- c.omadaPortLinkRx
-	ch <- c.omadaPortLinkTx
+	//lags
 	ch <- c.omadaLagLinkStatus
 	ch <- c.omadaLagLinkSpeedMbps
 	ch <- c.omadaLagLinkRx
 	ch <- c.omadaLagLinkTx
-
+	//ap
 	ch <- c.omadaDeviceTxRate
 	ch <- c.omadaDeviceRxRate
 	ch <- c.omadaDevice2gTxUtil
@@ -91,7 +97,7 @@ func (c *deviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDevice6gRxUtil
 }
 
-func (c *deviceCollector) collectDevice(ch chan<- prometheus.Metric, device model.DeviceInterface) error {
+func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device model.DeviceInterface) error {
 	labels := []string{
 		device.GetMac(),
 		device.GetType(),
@@ -105,7 +111,7 @@ func (c *deviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 		device.GetIp(),
 		device.GetName(),
 		device.GetStatus(),
-		fmt.Sprintf(fmt.Sprintf("%.0f", device.GetUptime())),
+		fmt.Sprintf("%.0f", device.GetUptime()),
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
 	}
@@ -118,7 +124,7 @@ func (c *deviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 	return nil
 }
 
-func (c *deviceCollector) Collect(ch chan<- prometheus.Metric) {
+func (c *DeviceCollector) Collect(ch chan<- prometheus.Metric) {
 	devices, err := c.webClient.GetDevices()
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get devices")
@@ -128,44 +134,64 @@ func (c *deviceCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, d := range devices {
 		switch item := d.(type) {
 		case *model.Gateway:
-			c.collectDevice(ch, item)
-			c.collectGateway(ch, item)
+			err = c.collectDevice(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect device")
+			}
+			err = c.collectGateway(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect gateway")
+			}
 		case *model.Switch:
-			c.collectDevice(ch, item)
-			c.collectSwitch(ch, item)
+			err = c.collectDevice(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect device")
+			}
+			err = c.collectSwitch(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect switch")
+			}
 		case *model.AccessPoint:
-			c.collectDevice(ch, item)
-			c.collectAccessPoint(ch, item)
+			err = c.collectDevice(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect device")
+			}
+			err := c.collectAccessPoint(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect access point")
+			}
 		case *model.Olt:
-			c.collectDevice(ch, item)
-			c.collectOlt(ch, item)
+			err = c.collectDevice(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect device")
+			}
+			err = c.collectOlt(ch, item)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to collect olt")
+			}
 		}
 	}
 }
 
-func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
+func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 	deviceLabels := []string{
-		"mac",
-		"type",
-		"subtype",
-		"model",
-		"show_model",
-		"version",
-		"version_upgrade",
-		"hw_version",
-		"firmware_version",
-		"ip",
-		"name",
-		"status",
-		"uptime_seconds",
+		"device_mac",
+		"device_type",
+		"device_subtype",
+		"device_model",
+		"device_show_model",
+		"device_version",
+		"device_version_upgrade",
+		"device_hw_version",
+		"device_firmware_version",
+		"device_ip",
+		"device_name",
+		"device_status",
+		"device_uptime_seconds",
 		"site",
 		"site_id",
 	}
-	gatewayWanLabels := make([]string, len(deviceLabels))
-	for i, label := range deviceLabels {
-		gatewayWanLabels[i] = "gateway_" + label
-	}
-	gatewayWanLabels = append(gatewayWanLabels,
+	gatewayWanLabels := append(deviceLabels,
 		"port",
 		"name",
 		"desc",
@@ -174,16 +200,11 @@ func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
 		"proto",
 	)
 	switchLabels := append(deviceLabels,
-		"poe_support",
-		"port_number",
-		"total_power",
+		"device_poe_support",
+		"device_port_number",
+		"device_total_power",
 	)
-
-	switchPortLabels := make([]string, len(switchLabels))
-	for i, label := range switchLabels {
-		switchPortLabels[i] = "switch_" + label
-	}
-	switchPortLabels = append(switchPortLabels,
+	devicePortLabels := append(deviceLabels,
 		"port",
 		"max_speed",
 		"name",
@@ -192,13 +213,10 @@ func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
 		"link_status",
 		"link_speed",
 		"poe",
+		"port_activity_label",
 	)
 
-	switchLagLabels := make([]string, len(switchLabels))
-	for i, label := range switchLabels {
-		switchLagLabels[i] = "switch_" + label
-	}
-	switchLagLabels = append(switchLagLabels,
+	switchLagLabels := append(deviceLabels,
 		"lag_id",
 		"lag_type",
 		"name",
@@ -208,32 +226,32 @@ func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
 	)
 
 	apLabels := append(deviceLabels,
-		"any_poe_enable",
-		"wireless_linked",
-		"wlan_group",
+		"device_any_poe_enable",
+		"device_wireless_linked",
+		"device_wlan_group",
 
-		"wp2g_mode",
-		"wp2g_tx_max_rate",
-		"wp2g_band_width",
+		"device_wp2g_mode",
+		"device_wp2g_tx_max_rate",
+		"device_wp2g_band_width",
 
-		"wp5g_mode",
-		"wp5g_tx_max_rate",
-		"wp5g_band_width",
+		"device_wp5g_mode",
+		"device_wp5g_tx_max_rate",
+		"device_wp5g_band_width",
 
-		"wp5g1_mode",
-		"wp5g1_tx_max_rate",
-		"wp5g1_band_width",
+		"device_wp5g1_mode",
+		"device_wp5g1_tx_max_rate",
+		"device_wp5g1_band_width",
 
-		"wp5g2_mode",
-		"wp5g2_tx_max_rate",
-		"wp5g2_band_width",
+		"device_wp5g2_mode",
+		"device_wp5g2_tx_max_rate",
+		"device_wp5g2_band_width",
 
-		"wp6g_mode",
-		"wp6g_tx_max_rate",
-		"wp6g_band_width",
+		"device_wp6g_mode",
+		"device_wp6g_tx_max_rate",
+		"device_wp6g_band_width",
 	)
 
-	return &deviceCollector{
+	return &DeviceCollector{
 		omadaDeviceUptimeSeconds: prometheus.NewDesc("omada_device_uptime_seconds",
 			"Uptime of the device.",
 			deviceLabels,
@@ -262,6 +280,43 @@ func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
 		omadaDeviceUpload: prometheus.NewDesc("omada_device_upload",
 			"Device upload traffic.",
 			deviceLabels,
+			nil,
+		),
+		//ap & switch
+		omadaDeviceTxRate: prometheus.NewDesc("omada_device_tx_rate",
+			"The tx rate of the device.",
+			deviceLabels,
+			nil,
+		),
+		omadaDeviceRxRate: prometheus.NewDesc("omada_device_rx_rate",
+			"The rx rate of the device.",
+			deviceLabels,
+			nil,
+		),
+		//ports
+		omadaPortLinkStatus: prometheus.NewDesc("omada_port_link_status",
+			"A boolean representing the link status of the port.",
+			devicePortLabels,
+			nil,
+		),
+		omadaPortPowerWatts: prometheus.NewDesc("omada_port_power_watts",
+			"The current PoE usage of the port in watts.",
+			devicePortLabels,
+			nil,
+		),
+		omadaPortLinkSpeedMbps: prometheus.NewDesc("omada_port_link_speed_mbps",
+			"Port link speed in mbps. This is the capability of the connection, not the active throughput.",
+			devicePortLabels,
+			nil,
+		),
+		omadaPortLinkRx: prometheus.NewDesc("omada_port_link_rx",
+			"Bytes recieved on a port.",
+			devicePortLabels,
+			nil,
+		),
+		omadaPortLinkTx: prometheus.NewDesc("omada_port_link_tx",
+			"Bytes transmitted on a port.",
+			devicePortLabels,
 			nil,
 		),
 		//gateway
@@ -301,32 +356,6 @@ func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
 			switchLabels,
 			nil,
 		),
-		//ports
-		omadaPortLinkStatus: prometheus.NewDesc("omada_port_link_status",
-			"A boolean representing the link status of the port.",
-			switchPortLabels,
-			nil,
-		),
-		omadaPortPowerWatts: prometheus.NewDesc("omada_port_power_watts",
-			"The current PoE usage of the port in watts.",
-			switchPortLabels,
-			nil,
-		),
-		omadaPortLinkSpeedMbps: prometheus.NewDesc("omada_port_link_speed_mbps",
-			"Port link speed in mbps. This is the capability of the connection, not the active throughput.",
-			switchPortLabels,
-			nil,
-		),
-		omadaPortLinkRx: prometheus.NewDesc("omada_port_link_rx",
-			"Bytes recieved on a port.",
-			switchPortLabels,
-			nil,
-		),
-		omadaPortLinkTx: prometheus.NewDesc("omada_port_link_tx",
-			"Bytes transmitted on a port.",
-			switchPortLabels,
-			nil,
-		),
 		//lag
 		omadaLagLinkStatus: prometheus.NewDesc("omada_lag_link_status",
 			"A boolean representing the link status of the lag.",
@@ -349,16 +378,6 @@ func NewDeviceCollector(apiClient *api.Client) *deviceCollector {
 			nil,
 		),
 		//ap
-		omadaDeviceTxRate: prometheus.NewDesc("omada_device_tx_rate",
-			"The tx rate of the device.",
-			apLabels,
-			nil,
-		),
-		omadaDeviceRxRate: prometheus.NewDesc("omada_device_rx_rate",
-			"The rx rate of the device.",
-			apLabels,
-			nil,
-		),
 		omadaDevice2gTxUtil: prometheus.NewDesc("omada_device_2g_tx_util",
 			"The tx rate of the device on 2.4Ghz.",
 			apLabels,

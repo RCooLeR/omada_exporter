@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func (c *deviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.Switch) error {
+func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.Switch) error {
 	labels := []string{
 		sw.GetMac(),
 		sw.GetType(),
@@ -25,12 +25,16 @@ func (c *deviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 		fmt.Sprintf(fmt.Sprintf("%.0f", sw.GetUptime())),
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
-		sw.GetPoeSupport(),
-		fmt.Sprintf("%d", sw.PortNumber),
-		fmt.Sprintf("%d", sw.TotalPower),
 	}
+	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, sw.TxRate, labels...)
+	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, sw.RxRate, labels...)
 	if sw.PoeSupport {
-		ch <- prometheus.MustNewConstMetric(c.omadaDevicePoeRemainWatts, prometheus.GaugeValue, sw.PoeRemain, labels...)
+		poeLabels := append(labels,
+			sw.GetPoeSupport(),
+			fmt.Sprintf("%d", sw.PortNumber),
+			fmt.Sprintf("%d", sw.TotalPower),
+		)
+		ch <- prometheus.MustNewConstMetric(c.omadaDevicePoeRemainWatts, prometheus.GaugeValue, sw.PoeRemain, poeLabels...)
 	}
 
 	for _, port := range sw.Ports {
@@ -43,6 +47,7 @@ func (c *deviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 			port.PortStatus.GetLinkStatus(),
 			fmt.Sprintf("%d", port.PortStatus.GetLinkSpeed()),
 			bools.ToString(port.PortStatus.Poe),
+			port.PortStatus.GetLinkSpeedLabel(),
 		)
 		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.PortStatus.LinkStatus), portLabels...)
 		if sw.PoeSupport {

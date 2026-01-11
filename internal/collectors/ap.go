@@ -8,8 +8,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func (c *deviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *model.AccessPoint) error {
-	labels := []string{
+func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *model.AccessPoint) error {
+	deviceLabels := []string{
 		ap.GetMac(),
 		ap.GetType(),
 		ap.GetSubtype(),
@@ -25,10 +25,12 @@ func (c *deviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		fmt.Sprintf(fmt.Sprintf("%.0f", ap.GetUptime())),
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
+	}
+	labels := append(deviceLabels,
 		bools.ToString(ap.AnyPoeEnable),
 		bools.ToString(ap.WirelessLinked),
 		ap.WlanGroup,
-	}
+	)
 	if ap.Wp2GHz != nil {
 		labels = append(labels,
 			ap.Wp2GHz.RdMode,
@@ -94,8 +96,8 @@ func (c *deviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		)
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, ap.TxRate, labels...)
-	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, ap.RxRate, labels...)
+	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, ap.TxRate, deviceLabels...)
+	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, ap.RxRate, deviceLabels...)
 	if ap.Wp2GHz != nil {
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice2gTxUtil, prometheus.GaugeValue, ap.Wp2GHz.TxUtilization, labels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice2gRxUtil, prometheus.GaugeValue, ap.Wp2GHz.RxUtilization, labels...)
