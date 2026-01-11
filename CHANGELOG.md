@@ -1,3 +1,10 @@
+## [2.0.1] - 2026-01-11
+### Fixed
+- match device label across metrics
+- fix some bugs in metrics calculation
+- added gateway temp
+- added label like "⚡ 9w ⇅ 2.5 Gbps" for ports
+
 ## [2.0.0] - 2026-01-10
 ### Changed
 - full refactoring of the App 🤦
