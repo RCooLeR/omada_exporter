@@ -32,6 +32,7 @@ func (c *Client) GetPortsAndLags(sw *model.Switch) error {
 
 	portdata := portResponse{}
 	err = json.Unmarshal(body, &portdata)
+	sw.Temp = portdata.Result.Temp
 	sw.TotalPower = portdata.Result.TotalPower
 	sw.Uplink = portdata.Result.Uplink
 	sw.RxRate = portdata.Result.RxRate
@@ -66,6 +67,7 @@ func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 	for i, p := range portdata.Result.Ports {
 		portdata.Result.Ports[i].MaxSpeed = portdata.GetMaxLinkSpeed(p.Port)
 	}
+	gw.Temp = portdata.Result.Temp
 	gw.Ports = portdata.Result.Ports
 	gw.RxRate = portdata.Result.RxRate
 	gw.TxRate = portdata.Result.TxRate
@@ -78,6 +80,7 @@ type portResponse struct {
 
 type gatewayResponse struct {
 	Result struct {
+		Temp        float64             `json:"temp"`
 		RxRate      float64             `json:"rxRate"`
 		TxRate      float64             `json:"txRate"`
 		PortConfigs []gatewayPortConfig `json:"portConfigs"`

@@ -18,6 +18,7 @@ type DeviceCollector struct {
 	omadaDeviceNeedUpgrade   *prometheus.Desc
 	omadaDeviceDownload      *prometheus.Desc
 	omadaDeviceUpload        *prometheus.Desc
+	omadaDeviceTemp          *prometheus.Desc
 	//ports
 	omadaPortLinkStatus    *prometheus.Desc
 	omadaPortPowerWatts    *prometheus.Desc
@@ -62,6 +63,7 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDeviceNeedUpgrade
 	ch <- c.omadaDeviceDownload
 	ch <- c.omadaDeviceUpload
+	ch <- c.omadaDeviceTemp
 	//ports
 	ch <- c.omadaPortLinkStatus
 	ch <- c.omadaPortPowerWatts
@@ -279,6 +281,11 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 		),
 		omadaDeviceUpload: prometheus.NewDesc("omada_device_upload",
 			"Device upload traffic.",
+			deviceLabels,
+			nil,
+		),
+		omadaDeviceTemp: prometheus.NewDesc("omada_device_temp",
+			"Device temperature.",
 			deviceLabels,
 			nil,
 		),

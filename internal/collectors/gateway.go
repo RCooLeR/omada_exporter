@@ -26,6 +26,7 @@ func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *m
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
 	}
+	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTemp, prometheus.CounterValue, gateway.GetTemp(), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, gateway.TxRate, labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, gateway.RxRate, labels...)
 	for _, wan := range gateway.Wans {

@@ -68,7 +68,7 @@ func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 			lag.GetPorts(),
 		)
 		ch <- prometheus.MustNewConstMetric(c.omadaLagLinkStatus, prometheus.GaugeValue, float64(lag.LagStatus.LinkStatus), lagLabels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaLagLinkSpeedMbps, prometheus.GaugeValue, float64(lag.LagStatus.GetLinkSpeed()), lagLabels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaLagLinkSpeedMbps, prometheus.GaugeValue, float64(lag.LagStatus.GetTotalLagSpeed(sw)), lagLabels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaLagLinkRx, prometheus.CounterValue, lag.LagStatus.Rx, lagLabels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaLagLinkTx, prometheus.CounterValue, lag.LagStatus.Tx, lagLabels...)
 	}
