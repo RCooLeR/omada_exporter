@@ -142,6 +142,13 @@ Add the following job to your `prometheus.yml` configuration:
 | OMADA_CLIENT_ID                 | Optional Client ID for Open API authentication (WAN & VPN metrics)                |
 | OMADA_SECRET_ID                 | Optional Secret ID for Open API authentication (WAN & VPN metrics)                |
 
+### PS
+
+Last tested on [OC200](https://www.omadanetworks.com/us/business-networking/omada-controller-hardware/oc200/), firmware 6.0.0.36 (ER8411,SG3428X-M2,SG3210XHP-M2,SG2210MP,EAP772-Outdoor,EAP650-Outdoor,EAP225-Outdoor,EAP235-Wall)
+
+OpenApi docs: [https://use1-omada-northbound.tplinkcloud.com/doc.html](https://use1-omada-northbound.tplinkcloud.com/doc.html)
+WebApi: no docs. Login to your controller and use Chrome debug tools  🤦
+
 ## 📊 Metrics
 
 | Name | Description | Type | Labels |
@@ -199,10 +206,3 @@ Add the following job to your `prometheus.yml` configuration:
 | omada_wan_rx_rate | Wan RX rate (KB/s) | bps | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_uptime_seconds device_version device_version_upgrade ip name port proto site site_id type |
 | omada_wan_status | The current status of the WAN connected/disconnected | value | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_uptime_seconds device_version device_version_upgrade ip name port proto site site_id type |
 | omada_wan_tx_rate | Wan TX rate (KB/s) | bps | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_uptime_seconds device_version device_version_upgrade ip name port proto site site_id type |
-
-### PS
-
-Last tested on [OC200](https://www.omadanetworks.com/us/business-networking/omada-controller-hardware/oc200/), firmware 6.0.0.36 (ER8411,SG3428X-M2,SG3210XHP-M2,SG2210MP,EAP772-Outdoor,EAP650-Outdoor,EAP225-Outdoor,EAP235-Wall)
-
-OpenApi docs: [https://use1-omada-northbound.tplinkcloud.com/doc.html](https://use1-omada-northbound.tplinkcloud.com/doc.html)
-WebApi: no docs. Login to your controller and use Chrome debug tools  🤦
