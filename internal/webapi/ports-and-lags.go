@@ -41,6 +41,31 @@ func (c *Client) GetPortsAndLags(sw *model.Switch) error {
 	sw.Lags = portdata.Result.Lags
 	return err
 }
+func (c *Client) GetApPorts(ap *model.AccessPoint) error {
+	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/eaps/%s/ports", c.Config.Host, c.OmadaCID, c.SiteId, ap.Mac)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.MakeLoggedInRequest(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	log.Info().Msg(fmt.Sprintf("Received data from ports endpoint for AP %s", ap.Mac))
+	log.Debug().Bytes("data", body).Msg("Received data from ports endpoint for AP")
+
+	portdata := apPortResponse{}
+	err = json.Unmarshal(body, &portdata)
+	ap.Ports = portdata.Result
+	return err
+}
 
 func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/gateways/%s", c.Config.Host, c.OmadaCID, c.SiteId, gw.Mac)
@@ -76,6 +101,9 @@ func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 
 type portResponse struct {
 	Result model.Switch `json:"result"`
+}
+type apPortResponse struct {
+	Result []model.AccessPointPort `json:"result"`
 }
 
 type gatewayResponse struct {

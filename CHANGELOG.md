@@ -1,3 +1,7 @@
+## [2.0.2] - 2026-01-19
+### Fixed
+- add Access Point port metrics for those having ports (Wall, desktop)
+
 ## [2.0.1] - 2026-01-11
 ### Fixed
 - match device label across metrics

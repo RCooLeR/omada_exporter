@@ -57,18 +57,6 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 			"",
 		)
 	}
-	if ap.Wp5GHz_1 != nil {
-		labels = append(labels,
-			ap.Wp5GHz.RdMode,
-			fmt.Sprintf("%d", ap.Wp5GHz_1.MaxTxRate),
-			ap.Wp5GHz_1.BandWidth,
-		)
-	} else {
-		labels = append(labels,
-			"",
-			"",
-			"")
-	}
 	if ap.Wp5GHz_2 != nil {
 		labels = append(labels,
 			ap.Wp5GHz.RdMode,
@@ -98,6 +86,24 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, ap.TxRate, deviceLabels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, ap.RxRate, deviceLabels...)
+	for _, port := range ap.Ports {
+		portLabels := append(deviceLabels,
+			port.Id,
+			fmt.Sprintf("%d", port.GetLinkSpeed()),
+			port.Name,
+			"Copper",
+			"switching",
+			port.GetLinkStatus(),
+			fmt.Sprintf("%d", port.GetLinkSpeed()),
+			bools.ToString(port.Poe),
+			port.GetLinkSpeedLabel(),
+		)
+		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.LinkStatus), portLabels...)
+		if port.PoePower > 0 {
+			ch <- prometheus.MustNewConstMetric(c.omadaPortPowerWatts, prometheus.GaugeValue, port.PoePower, portLabels...)
+		}
+		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkSpeedMbps, prometheus.GaugeValue, float64(port.GetLinkSpeed()), portLabels...)
+	}
 	if ap.Wp2GHz != nil {
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice2gTxUtil, prometheus.GaugeValue, ap.Wp2GHz.TxUtilization, labels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice2gRxUtil, prometheus.GaugeValue, ap.Wp2GHz.RxUtilization, labels...)
@@ -105,10 +111,6 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 	if ap.Wp5GHz != nil {
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice5gTxUtil, prometheus.GaugeValue, ap.Wp5GHz.TxUtilization, labels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice5gRxUtil, prometheus.GaugeValue, ap.Wp5GHz.RxUtilization, labels...)
-	}
-	if ap.Wp5GHz_1 != nil {
-		ch <- prometheus.MustNewConstMetric(c.omadaDevice5g1TxUtil, prometheus.GaugeValue, ap.Wp5GHz_1.TxUtilization, labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaDevice5g1RxUtil, prometheus.GaugeValue, ap.Wp5GHz_1.RxUtilization, labels...)
 	}
 	if ap.Wp5GHz_2 != nil {
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice5g2TxUtil, prometheus.GaugeValue, ap.Wp5GHz_2.TxUtilization, labels...)
