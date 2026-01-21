@@ -46,8 +46,6 @@ type DeviceCollector struct {
 	omadaDevice2gRxUtil  *prometheus.Desc
 	omadaDevice5gTxUtil  *prometheus.Desc
 	omadaDevice5gRxUtil  *prometheus.Desc
-	omadaDevice5g1TxUtil *prometheus.Desc
-	omadaDevice5g1RxUtil *prometheus.Desc
 	omadaDevice5g2TxUtil *prometheus.Desc
 	omadaDevice5g2RxUtil *prometheus.Desc
 	omadaDevice6gTxUtil  *prometheus.Desc
@@ -91,8 +89,6 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDevice2gRxUtil
 	ch <- c.omadaDevice5gTxUtil
 	ch <- c.omadaDevice5gRxUtil
-	ch <- c.omadaDevice5g1TxUtil
-	ch <- c.omadaDevice5g1RxUtil
 	ch <- c.omadaDevice5g2TxUtil
 	ch <- c.omadaDevice5g2RxUtil
 	ch <- c.omadaDevice6gTxUtil
@@ -239,10 +235,6 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 		"device_wp5g_mode",
 		"device_wp5g_tx_max_rate",
 		"device_wp5g_band_width",
-
-		"device_wp5g1_mode",
-		"device_wp5g1_tx_max_rate",
-		"device_wp5g1_band_width",
 
 		"device_wp5g2_mode",
 		"device_wp5g2_tx_max_rate",
@@ -402,16 +394,6 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 		),
 		omadaDevice5gRxUtil: prometheus.NewDesc("omada_device_5g_rx_util",
 			"The tx rate of the device on 5Ghz.",
-			apLabels,
-			nil,
-		),
-		omadaDevice5g1TxUtil: prometheus.NewDesc("omada_device_5g1_tx_util",
-			"The tx rate of the device on 5Ghz 1.",
-			apLabels,
-			nil,
-		),
-		omadaDevice5g1RxUtil: prometheus.NewDesc("omada_device_5g1_rx_util",
-			"The tx rate of the device on 5Ghz 1.",
 			apLabels,
 			nil,
 		),

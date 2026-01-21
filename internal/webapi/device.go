@@ -45,6 +45,13 @@ func (c *Client) GetDevices() ([]model.DevicesInterface, error) {
 			if err != nil {
 				log.Error().Err(err).Msg("Error getting ports and lags")
 			}
+		case *model.AccessPoint:
+			if dev.DeviceMisc.LanPortsNum > 0 {
+				err := c.GetApPorts(dev)
+				if err != nil {
+					log.Error().Err(err).Msg("Error getting ports and lags")
+				}
+			}
 		case *model.Gateway:
 			err := openClient.GetWans(dev)
 			if err != nil {
