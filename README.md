@@ -3,10 +3,10 @@
 ![docker-publish](https://github.com/RCooLeR/omada_exporter/actions/workflows/release.yml/badge.svg)
 
 <p align="center" style="text-align: center">
-    <img src="./docs/images/logo-dark-mode.svg#gh-dark-mode-only" width="70%"><br/>
-    <img src="./docs/images/logo-light-mode.svg#gh-light-mode-only" width="70%"><br/>
-    Prometheus Exporter for TP-Link Omada Controller SDN. <br/>
+    <img src="./docs/images/omada.png" width="70%">
 </p>
+
+# Prometheus Exporter for TP-Link Omada Controller SDN.
 
 >“RCooLeR/omada_exporter is a maintained fork of charlie-haley/omada_exporter with additional metrics and Open API support.”
 
