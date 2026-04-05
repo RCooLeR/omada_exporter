@@ -1,8 +1,6 @@
 package collector
 
 import (
-	"fmt"
-
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/webapi"
@@ -62,12 +60,14 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDeviceDownload
 	ch <- c.omadaDeviceUpload
 	ch <- c.omadaDeviceTemp
-	//ports
-	ch <- c.omadaPortLinkStatus
-	ch <- c.omadaPortPowerWatts
-	ch <- c.omadaPortLinkSpeedMbps
-	ch <- c.omadaPortLinkRx
-	ch <- c.omadaPortLinkTx
+	if c.trackPortMetrics() {
+		//ports
+		ch <- c.omadaPortLinkStatus
+		ch <- c.omadaPortPowerWatts
+		ch <- c.omadaPortLinkSpeedMbps
+		ch <- c.omadaPortLinkRx
+		ch <- c.omadaPortLinkTx
+	}
 	//gateway
 	ch <- c.omadaWanStatus
 	ch <- c.omadaWanInternetState
@@ -95,6 +95,32 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDevice6gRxUtil
 }
 
+func (c *DeviceCollector) trackPortMetrics() bool {
+	return trackPortMetrics(c.webClient.Client)
+}
+
+func (c *DeviceCollector) includePortActivityLabel() bool {
+	return includePortActivityLabel(c.webClient.Client)
+}
+
+func (c *DeviceCollector) buildPortLabels(baseLabels []string, port, maxSpeed, name, portType, operation, linkStatus, linkSpeed, poe, activity string) []string {
+	labels := append([]string{}, baseLabels...)
+	labels = append(labels,
+		port,
+		maxSpeed,
+		name,
+		portType,
+		operation,
+		linkStatus,
+		linkSpeed,
+		poe,
+	)
+	if c.includePortActivityLabel() {
+		labels = append(labels, activity)
+	}
+	return labels
+}
+
 func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device model.DeviceInterface) error {
 	labels := []string{
 		device.GetMac(),
@@ -109,7 +135,6 @@ func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 		device.GetIp(),
 		device.GetName(),
 		device.GetStatus(),
-		fmt.Sprintf("%.0f", device.GetUptime()),
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
 	}
@@ -185,7 +210,6 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 		"device_ip",
 		"device_name",
 		"device_status",
-		"device_uptime_seconds",
 		"site",
 		"site_id",
 	}
@@ -211,8 +235,10 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 		"link_status",
 		"link_speed",
 		"poe",
-		"port_activity_label",
 	)
+	if includePortActivityLabel(apiClient) {
+		devicePortLabels = append(devicePortLabels, "port_activity_label")
+	}
 
 	switchLagLabels := append(deviceLabels,
 		"lag_id",

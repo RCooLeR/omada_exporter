@@ -22,7 +22,6 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		ap.GetIp(),
 		ap.GetName(),
 		ap.GetStatus(),
-		fmt.Sprintf(fmt.Sprintf("%.0f", ap.GetUptime())),
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
 	}
@@ -86,23 +85,26 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, ap.TxRate, deviceLabels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, ap.RxRate, deviceLabels...)
-	for _, port := range ap.Ports {
-		portLabels := append(deviceLabels,
-			port.Id,
-			fmt.Sprintf("%d", port.GetLinkSpeed()),
-			port.Name,
-			"Copper",
-			"switching",
-			port.GetLinkStatus(),
-			fmt.Sprintf("%d", port.GetLinkSpeed()),
-			bools.ToString(port.Poe),
-			port.GetLinkSpeedLabel(),
-		)
-		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.LinkStatus), portLabels...)
-		if port.PoePower > 0 {
-			ch <- prometheus.MustNewConstMetric(c.omadaPortPowerWatts, prometheus.GaugeValue, port.PoePower, portLabels...)
+	if c.trackPortMetrics() {
+		for _, port := range ap.Ports {
+			portLabels := c.buildPortLabels(
+				deviceLabels,
+				port.Id,
+				fmt.Sprintf("%d", port.GetLinkSpeed()),
+				port.Name,
+				"Copper",
+				"switching",
+				port.GetLinkStatus(),
+				fmt.Sprintf("%d", port.GetLinkSpeed()),
+				bools.ToString(port.Poe),
+				port.GetLinkSpeedLabel(),
+			)
+			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.LinkStatus), portLabels...)
+			if port.PoePower > 0 {
+				ch <- prometheus.MustNewConstMetric(c.omadaPortPowerWatts, prometheus.GaugeValue, port.PoePower, portLabels...)
+			}
+			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkSpeedMbps, prometheus.GaugeValue, float64(port.GetLinkSpeed()), portLabels...)
 		}
-		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkSpeedMbps, prometheus.GaugeValue, float64(port.GetLinkSpeed()), portLabels...)
 	}
 	if ap.Wp2GHz != nil {
 		ch <- prometheus.MustNewConstMetric(c.omadaDevice2gTxUtil, prometheus.GaugeValue, ap.Wp2GHz.TxUtilization, labels...)

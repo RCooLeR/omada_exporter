@@ -1,9 +1,16 @@
+## [2.0.3] - 2026-01-19
+### Changed
+- removed device_uptime_seconds from device labels (thanks to [@lauer](https://github.com/lauer) for reporting)
+- updated dependencies
+- re-auth on auth/request failures after controller restart
+- added config/env toggles for optional port activity label, per-port metrics, and per-client metrics
+
 ## [2.0.2] - 2026-01-19
 ### Fixed
 - add Access Point port metrics for those having ports (Wall, desktop)
 
 ## [2.0.1] - 2026-01-11
-### Fixed
+### Changed
 - match device label across metrics
 - fix some bugs in metrics calculation
 - added gateway temp

@@ -53,7 +53,6 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 		fmt.Sprintf("%d", controller.DeviceCapacity.ApAndSwitchCapacity),
 		fmt.Sprintf("%d", controller.DeviceCapacity.AdoptedApAndSwitchNum),
 		bools.ToString(controller.DeviceCapacity.ShareApAndSwitchCapacity),
-		fmt.Sprintf(fmt.Sprintf("%.0f", controller.Uptime/1000)),
 		site,
 		client.SiteId,
 	}
@@ -93,7 +92,6 @@ func NewControllerCollector(apiClient *api.Client) *controllerCollector {
 		"ap_and_switch_capacity",
 		"adopted_ap_and_switch_num",
 		"share_ap_and_switch_capacity",
-		"device_uptime_seconds",
 		"site",
 		"site_id",
 	}

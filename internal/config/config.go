@@ -11,6 +11,9 @@ type Config struct {
 	LogLevel                 string
 	Timeout                  int
 	Insecure                 bool
+	IncludePortActivityLabel bool
+	TrackPortMetrics         bool
+	TrackClientMetrics       bool
 	GoCollectorDisabled      bool
 	ProcessCollectorDisabled bool
 }
