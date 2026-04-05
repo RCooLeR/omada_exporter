@@ -34,6 +34,9 @@ func Start() {
 		&cli.StringFlag{Destination: &conf.LogLevel, Name: "log-level", Value: "error", Usage: "Application log level.", EnvVars: []string{"LOG_LEVEL"}},
 		&cli.IntFlag{Destination: &conf.Timeout, Name: "timeout", Value: 15, Usage: "Timeout when making requests to the Omada Controller.", EnvVars: []string{"OMADA_REQUEST_TIMEOUT"}},
 		&cli.BoolFlag{Destination: &conf.Insecure, Name: "insecure", Value: false, Usage: "Whether to skip verifying the SSL certificate on the controller.", EnvVars: []string{"OMADA_INSECURE"}},
+		&cli.BoolFlag{Destination: &conf.IncludePortActivityLabel, Name: "include-port-activity-label", Value: true, Usage: "Include the port_activity_label label on port metrics.", EnvVars: []string{"OMADA_INCLUDE_PORT_ACTIVITY_LABEL"}},
+		&cli.BoolFlag{Destination: &conf.TrackPortMetrics, Name: "track-port-metrics", Value: true, Usage: "Export per-port metrics.", EnvVars: []string{"OMADA_TRACK_PORT_METRICS"}},
+		&cli.BoolFlag{Destination: &conf.TrackClientMetrics, Name: "track-client-metrics", Value: true, Usage: "Export per-client metrics.", EnvVars: []string{"OMADA_TRACK_CLIENT_METRICS"}},
 		&cli.BoolFlag{Destination: &conf.GoCollectorDisabled, Name: "disable-go-collector", Value: true, Usage: "Disable Go collector metrics.", EnvVars: []string{"OMADA_DISABLE_GO_COLLECTOR"}},
 		&cli.BoolFlag{Destination: &conf.ProcessCollectorDisabled, Name: "disable-process-collector", Value: true, Usage: "Disable process collector metrics.", EnvVars: []string{"OMADA_DISABLE_PROCESS_COLLECTOR"}},
 	}

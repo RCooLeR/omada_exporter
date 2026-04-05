@@ -22,7 +22,6 @@ func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 		sw.GetIp(),
 		sw.GetName(),
 		sw.GetStatus(),
-		fmt.Sprintf(fmt.Sprintf("%.0f", sw.GetUptime())),
 		c.webClient.Client.Config.Site,
 		c.webClient.SiteId,
 	}
@@ -37,25 +36,28 @@ func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 		ch <- prometheus.MustNewConstMetric(c.omadaDevicePoeRemainWatts, prometheus.GaugeValue, sw.PoeRemain, poeLabels...)
 	}
 
-	for _, port := range sw.Ports {
-		portLabels := append(labels,
-			fmt.Sprintf("%d", port.Port),
-			fmt.Sprintf("%d", port.GetMaxSpeed()),
-			port.Name,
-			port.GetType(),
-			port.Operation,
-			port.PortStatus.GetLinkStatus(),
-			fmt.Sprintf("%d", port.PortStatus.GetLinkSpeed()),
-			bools.ToString(port.PortStatus.Poe),
-			port.PortStatus.GetLinkSpeedLabel(),
-		)
-		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.PortStatus.LinkStatus), portLabels...)
-		if sw.PoeSupport {
-			ch <- prometheus.MustNewConstMetric(c.omadaPortPowerWatts, prometheus.GaugeValue, port.PortStatus.PoePower, portLabels...)
+	if c.trackPortMetrics() {
+		for _, port := range sw.Ports {
+			portLabels := c.buildPortLabels(
+				labels,
+				fmt.Sprintf("%d", port.Port),
+				fmt.Sprintf("%d", port.GetMaxSpeed()),
+				port.Name,
+				port.GetType(),
+				port.Operation,
+				port.PortStatus.GetLinkStatus(),
+				fmt.Sprintf("%d", port.PortStatus.GetLinkSpeed()),
+				bools.ToString(port.PortStatus.Poe),
+				port.PortStatus.GetLinkSpeedLabel(),
+			)
+			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.PortStatus.LinkStatus), portLabels...)
+			if sw.PoeSupport {
+				ch <- prometheus.MustNewConstMetric(c.omadaPortPowerWatts, prometheus.GaugeValue, port.PortStatus.PoePower, portLabels...)
+			}
+			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkSpeedMbps, prometheus.GaugeValue, float64(port.PortStatus.GetLinkSpeed()), portLabels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkRx, prometheus.CounterValue, port.PortStatus.Rx, portLabels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkTx, prometheus.CounterValue, port.PortStatus.Tx, portLabels...)
 		}
-		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkSpeedMbps, prometheus.GaugeValue, float64(port.PortStatus.GetLinkSpeed()), portLabels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkRx, prometheus.CounterValue, port.PortStatus.Rx, portLabels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaPortLinkTx, prometheus.CounterValue, port.PortStatus.Tx, portLabels...)
 	}
 
 	for _, lag := range sw.Lags {

@@ -1,5 +1,5 @@
 # --- Stage 1: Build the Go binary ---
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26.1-alpine AS builder
 
 # Install git and CA certs (if needed for Go modules)
 RUN apk add --no-cache git ca-certificates
@@ -20,7 +20,7 @@ RUN go mod download
 RUN go build -o omada-exporter
 
 # --- Stage 2: Create a lightweight image with the binary only ---
-FROM alpine:3.14
+FROM alpine:3.23
 
 # Add CA certs for HTTPS support
 RUN apk add --no-cache ca-certificates

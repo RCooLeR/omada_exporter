@@ -25,16 +25,22 @@ type clientCollector struct {
 }
 
 func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.omadaClientDownloadActivityBytes
-	ch <- c.omadaClientUploadActivityBytes
-	ch <- c.omadaClientSignalPct
-	ch <- c.omadaClientSignalNoiseDbm
-	ch <- c.omadaClientRssiDbm
-	ch <- c.omadaClientTrafficDown
-	ch <- c.omadaClientTrafficUp
-	ch <- c.omadaClientTxRate
-	ch <- c.omadaClientRxRate
+	if c.trackClientMetrics() {
+		ch <- c.omadaClientDownloadActivityBytes
+		ch <- c.omadaClientUploadActivityBytes
+		ch <- c.omadaClientSignalPct
+		ch <- c.omadaClientSignalNoiseDbm
+		ch <- c.omadaClientRssiDbm
+		ch <- c.omadaClientTrafficDown
+		ch <- c.omadaClientTrafficUp
+		ch <- c.omadaClientTxRate
+		ch <- c.omadaClientRxRate
+	}
 	ch <- c.omadaClientConnectedTotal
+}
+
+func (c *clientCollector) trackClientMetrics() bool {
+	return trackClientMetrics(c.client.Client)
 }
 
 func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
@@ -76,18 +82,22 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 			item.Ssid,
 		}
 
-		ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficDown, prometheus.CounterValue, item.TrafficDown, labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficUp, prometheus.CounterValue, item.TrafficUp, labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity, labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity, labels...)
+		if c.trackClientMetrics() {
+			ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficDown, prometheus.CounterValue, item.TrafficDown, labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficUp, prometheus.CounterValue, item.TrafficUp, labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaClientDownloadActivityBytes, prometheus.GaugeValue, item.Activity, labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaClientUploadActivityBytes, prometheus.GaugeValue, item.UploadActivity, labels...)
+		}
 
 		if item.Wireless {
 			totals[item.GetWifiMode()] += 1
-			ch <- prometheus.MustNewConstMetric(c.omadaClientRssiDbm, prometheus.GaugeValue, item.Rssi, labels...)
-			ch <- prometheus.MustNewConstMetric(c.omadaClientSignalPct, prometheus.GaugeValue, item.SignalLevel, labels...)
-			ch <- prometheus.MustNewConstMetric(c.omadaClientSignalNoiseDbm, prometheus.GaugeValue, item.SignalNoise, labels...)
-			ch <- prometheus.MustNewConstMetric(c.omadaClientTxRate, prometheus.GaugeValue, item.TxRate, labels...)
-			ch <- prometheus.MustNewConstMetric(c.omadaClientRxRate, prometheus.GaugeValue, item.RxRate, labels...)
+			if c.trackClientMetrics() {
+				ch <- prometheus.MustNewConstMetric(c.omadaClientRssiDbm, prometheus.GaugeValue, item.Rssi, labels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaClientSignalPct, prometheus.GaugeValue, item.SignalLevel, labels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaClientSignalNoiseDbm, prometheus.GaugeValue, item.SignalNoise, labels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaClientTxRate, prometheus.GaugeValue, item.TxRate, labels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaClientRxRate, prometheus.GaugeValue, item.RxRate, labels...)
+			}
 		} else {
 			totals["wired"] += 1
 		}

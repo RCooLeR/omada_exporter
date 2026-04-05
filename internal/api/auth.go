@@ -101,6 +101,12 @@ func (c *Client) Login() error {
 	if err != nil {
 		return err
 	}
+	if logindata.ErrorCode != 0 {
+		return fmt.Errorf("web login failed with error code %d: %s", logindata.ErrorCode, logindata.Msg)
+	}
+	if logindata.Result.Token == "" {
+		return fmt.Errorf("web login succeeded without a token")
+	}
 	log.Info().Msg(fmt.Sprintf("Login with username %s successful", c.Config.Username))
 	c.token = logindata.Result.Token
 	return nil
@@ -131,6 +137,12 @@ func (c *Client) LoginOpenApi() error {
 	err = json.Unmarshal(body, &logindata)
 	if err != nil {
 		return err
+	}
+	if logindata.ErrorCode != 0 {
+		return fmt.Errorf("OpenApi authentication failed with error code %d: %s", logindata.ErrorCode, logindata.Msg)
+	}
+	if logindata.Result.AccessToken == "" {
+		return fmt.Errorf("OpenApi authentication succeeded without an access token")
 	}
 	log.Info().Msg("OpenApi authentication successful")
 	c.accessToken = logindata.Result.AccessToken
@@ -163,6 +175,12 @@ func (c *Client) RefreshOpenApiToken() error {
 	if err != nil {
 		return err
 	}
+	if logindata.ErrorCode != 0 {
+		return fmt.Errorf("OpenApi token refresh failed with error code %d: %s", logindata.ErrorCode, logindata.Msg)
+	}
+	if logindata.Result.AccessToken == "" {
+		return fmt.Errorf("OpenApi token refresh succeeded without an access token")
+	}
 	log.Info().Msg("OpenApi Access Token refresh successful")
 	c.accessToken = logindata.Result.AccessToken
 	c.refreshToken = logindata.Result.RefreshToken
@@ -171,7 +189,9 @@ func (c *Client) RefreshOpenApiToken() error {
 }
 
 type loginResponse struct {
-	Result struct {
+	ErrorCode int    `json:"errorCode"`
+	Msg       string `json:"msg"`
+	Result    struct {
 		Token        string `json:"token"`
 		AccessToken  string `json:"accessToken"`
 		TokenType    string `json:"tokenType"`
@@ -184,4 +204,13 @@ type loginStatus struct {
 	Result    struct {
 		Login bool `json:"login"`
 	} `json:"result"`
+}
+
+func (c *Client) RefreshOmadaContext() error {
+	cid, err := c.getCid()
+	if err != nil {
+		return err
+	}
+	c.OmadaCID = cid
+	return nil
 }
