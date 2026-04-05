@@ -1,4 +1,4 @@
-## [2.0.3] - 2026-01-19
+## [2.0.3] - 2026-04-05
 ### Changed
 - removed device_uptime_seconds from device labels (thanks to [@lauer](https://github.com/lauer) for reporting)
 - updated dependencies
