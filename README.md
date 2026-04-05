@@ -151,7 +151,7 @@ Add the following job to your `prometheus.yml` configuration:
 
 ### PS
 
-Last tested on [OC200](https://www.omadanetworks.com/us/business-networking/omada-controller-hardware/oc200/), firmware 6.2.0.12 (ER8411,SG3428X-M2,SG3210XHP-M2,SG2210MP,EAP772-Outdoor,EAP650-Outdoor,EAP225-Outdoor,EAP235-Wall)
+Last tested on [OC200](https://www.omadanetworks.com/us/business-networking/omada-controller-hardware/oc200/), firmware 6.2.0.12 (ER8411, SG3428X-M2, SG3210XHP-M2, SG2210MP, EAP772-Outdoor, EAP650-Outdoor, EAP225-Outdoor, EAP725-Wall)
 
 OpenApi docs: [https://use1-omada-northbound.tplinkcloud.com/doc.html](https://use1-omada-northbound.tplinkcloud.com/doc.html)
 WebApi: no docs. Login to your controller and use Chrome debug tools  🤦
