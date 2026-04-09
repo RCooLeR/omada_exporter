@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,18 +12,26 @@ import (
 )
 
 func (c *Client) GetNetworkClients() ([]model.NetworkClient, error) {
-	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
-	req, err := http.NewRequest("GET", url, nil)
+	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
+	requestBody, err := json.Marshal(clientRequest{
+		Filters: clientFilters{
+			Active: true,
+		},
+		Sorts:                 map[string]any{},
+		HideHealthUnsupported: true,
+		Page:                  1,
+		PageSize:              1000,
+		Scope:                 1,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	q := req.URL.Query()
-	q.Add("page", "1")
-	q.Add("pageSize", "1000")
-	q.Add("filters.active", "true")
-
-	req.URL.RawQuery = q.Encode()
+	req, err := http.NewRequest("POST", url, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json;charset=UTF-8")
 
 	resp, err := c.MakeOpenApiRequest(req)
 	if err != nil {
@@ -47,4 +56,17 @@ type clientResponse struct {
 	Result struct {
 		Data []model.NetworkClient `json:"data"`
 	} `json:"result"`
+}
+
+type clientRequest struct {
+	Filters               clientFilters  `json:"filters"`
+	Sorts                 map[string]any `json:"sorts"`
+	HideHealthUnsupported bool           `json:"hideHealthUnsupported"`
+	Page                  int            `json:"page"`
+	PageSize              int            `json:"pageSize"`
+	Scope                 int            `json:"scope"`
+}
+
+type clientFilters struct {
+	Active bool `json:"active"`
 }

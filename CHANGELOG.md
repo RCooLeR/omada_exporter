@@ -1,3 +1,7 @@
+## [2.0.4] - 2026-04-09
+### Changed
+- Fix pulling info for clients (starting to fail after upgrading controller to 6.2.0.17)
+
 ## [2.0.3] - 2026-04-05
 ### Changed
 - removed device_uptime_seconds from device labels (thanks to [@lauer](https://github.com/lauer) for reporting)
