@@ -1,8 +1,8 @@
 # --- Stage 1: Build the Go binary ---
-FROM golang:1.26.1-alpine AS builder
+FROM golang:1.26.2-alpine AS builder
 
 # Install git and CA certs (if needed for Go modules)
-RUN apk add --no-cache git ca-certificates
+RUN apk upgrade --no-cache && apk add --no-cache git ca-certificates
 
 # Set working directory inside the container
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN go build -o omada-exporter
 FROM alpine:3.23
 
 # Add CA certs for HTTPS support
-RUN apk add --no-cache ca-certificates
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates
 
 # Copy binary from builder stage
 COPY --from=builder /app/omada-exporter /usr/bin/omada-exporter
