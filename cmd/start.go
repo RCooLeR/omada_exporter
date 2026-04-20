@@ -39,6 +39,16 @@ func Start() {
 		&cli.BoolFlag{Destination: &conf.TrackClientMetrics, Name: "track-client-metrics", Value: true, Usage: "Export per-client metrics.", EnvVars: []string{"OMADA_TRACK_CLIENT_METRICS"}},
 		&cli.BoolFlag{Destination: &conf.GoCollectorDisabled, Name: "disable-go-collector", Value: true, Usage: "Disable Go collector metrics.", EnvVars: []string{"OMADA_DISABLE_GO_COLLECTOR"}},
 		&cli.BoolFlag{Destination: &conf.ProcessCollectorDisabled, Name: "disable-process-collector", Value: true, Usage: "Disable process collector metrics.", EnvVars: []string{"OMADA_DISABLE_PROCESS_COLLECTOR"}},
+		&cli.BoolFlag{Destination: &conf.MQTTEnabled, Name: "mqtt-enabled", Value: false, Usage: "Enable Home Assistant MQTT discovery publishing.", EnvVars: []string{"OMADA_MQTT_ENABLED"}},
+		&cli.StringFlag{Destination: &conf.MQTTBroker, Name: "mqtt-broker", Value: "tcp://localhost:1883", Usage: "MQTT broker URL, for example tcp://homeassistant.local:1883.", EnvVars: []string{"OMADA_MQTT_BROKER"}},
+		&cli.StringFlag{Destination: &conf.MQTTUsername, Name: "mqtt-username", Value: "", Usage: "MQTT username.", EnvVars: []string{"OMADA_MQTT_USER"}},
+		&cli.StringFlag{Destination: &conf.MQTTPassword, Name: "mqtt-password", Value: "", Usage: "MQTT password.", EnvVars: []string{"OMADA_MQTT_PASS"}},
+		&cli.StringFlag{Destination: &conf.MQTTClientID, Name: "mqtt-client-id", Value: "omada_exporter", Usage: "MQTT client id.", EnvVars: []string{"OMADA_MQTT_CLIENT_ID"}},
+		&cli.StringFlag{Destination: &conf.MQTTTopicPrefix, Name: "mqtt-topic-prefix", Value: "omada_exporter", Usage: "MQTT state topic prefix.", EnvVars: []string{"OMADA_MQTT_TOPIC_PREFIX"}},
+		&cli.StringFlag{Destination: &conf.MQTTDiscoveryPrefix, Name: "mqtt-discovery-prefix", Value: "homeassistant", Usage: "Home Assistant MQTT discovery prefix.", EnvVars: []string{"OMADA_MQTT_DISCOVERY_PREFIX"}},
+		&cli.IntFlag{Destination: &conf.MQTTInterval, Name: "mqtt-interval", Value: 60, Usage: "MQTT publish interval in seconds.", EnvVars: []string{"OMADA_MQTT_INTERVAL"}},
+		&cli.BoolFlag{Destination: &conf.MQTTRetain, Name: "mqtt-retain", Value: true, Usage: "Publish MQTT discovery and state messages as retained.", EnvVars: []string{"OMADA_MQTT_RETAIN"}},
+		&cli.IntFlag{Destination: &conf.MQTTExpireAfter, Name: "mqtt-expire-after", Value: 180, Usage: "Home Assistant sensor expire_after value in seconds. Set 0 to disable.", EnvVars: []string{"OMADA_MQTT_EXPIRE_AFTER"}},
 	}
 	app.Commands = []*cli.Command{
 		{Name: "version", Aliases: []string{"v"}, Usage: "prints the current version.",

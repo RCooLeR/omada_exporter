@@ -108,6 +108,17 @@ GLOBAL OPTIONS:
    --track-client-metrics       Export per-client metrics. (default: true) [$OMADA_TRACK_CLIENT_METRICS]
    --disable-go-collector       Disable Go collector metrics. (default: true) [$OMADA_DISABLE_GO_COLLECTOR]
    --disable-process-collector  Disable process collector metrics. (default: true) [$OMADA_DISABLE_PROCESS_COLLECTOR]
+   --mqtt-enabled               Enable Home Assistant MQTT discovery publishing. (default: false) [$OMADA_MQTT_ENABLED]
+   --mqtt-broker value          MQTT broker URL, for example tcp://homeassistant.local:1883. (default: "tcp://localhost:1883") [$OMADA_MQTT_BROKER]
+   --mqtt-username value        MQTT username. [$OMADA_MQTT_USER]
+   --mqtt-password value        MQTT password. [$OMADA_MQTT_PASS]
+   --mqtt-client-id value       MQTT client id. (default: "omada_exporter") [$OMADA_MQTT_CLIENT_ID]
+   --mqtt-topic-prefix value    MQTT state topic prefix. (default: "omada_exporter") [$OMADA_MQTT_TOPIC_PREFIX]
+   --mqtt-discovery-prefix value
+                                Home Assistant MQTT discovery prefix. (default: "homeassistant") [$OMADA_MQTT_DISCOVERY_PREFIX]
+   --mqtt-interval value        MQTT publish interval in seconds. (default: 60) [$OMADA_MQTT_INTERVAL]
+   --mqtt-retain                Publish MQTT discovery and state messages as retained. (default: true) [$OMADA_MQTT_RETAIN]
+   --mqtt-expire-after value    Home Assistant sensor expire_after value in seconds. Set 0 to disable. (default: 180) [$OMADA_MQTT_EXPIRE_AFTER]
    --help, -h                   show help (default: false)
    --version, -v                print the version (default: false)
 ```
@@ -129,6 +140,11 @@ Add the following job to your `prometheus.yml` configuration:
 
 > Make sure `omada_exporter` resolves to your container or host running `omada_exporter`.
 
+### Home Assistant MQTT
+
+Home Assistant MQTT Discovery can be enabled with `OMADA_MQTT_ENABLED=true`.
+See [ha.md](ha.md) for setup, Docker Compose examples, published entity coverage, and MQTT topic details.
+
 ### Environment Variables
 
 | Variable                        | Purpose                                                                           |
@@ -148,6 +164,16 @@ Add the following job to your `prometheus.yml` configuration:
 | LOG_LEVEL                       | Application log level. (default: "error")                                         |
 | OMADA_CLIENT_ID                 | Optional Client ID for Open API authentication (WAN & VPN metrics)                |
 | OMADA_SECRET_ID                 | Optional Secret ID for Open API authentication (WAN & VPN metrics)                |
+| OMADA_MQTT_ENABLED              | Enable Home Assistant MQTT discovery publishing. (default: false)                 |
+| OMADA_MQTT_BROKER               | MQTT broker URL, for example `tcp://homeassistant.local:1883`.                    |
+| OMADA_MQTT_USER                 | MQTT username.                                                                    |
+| OMADA_MQTT_PASS                 | MQTT password.                                                                    |
+| OMADA_MQTT_CLIENT_ID            | MQTT client id. (default: `omada_exporter`)                                       |
+| OMADA_MQTT_TOPIC_PREFIX         | MQTT state topic prefix. (default: `omada_exporter`)                              |
+| OMADA_MQTT_DISCOVERY_PREFIX     | Home Assistant MQTT discovery prefix. (default: `homeassistant`)                  |
+| OMADA_MQTT_INTERVAL             | MQTT publish interval in seconds. (default: 60)                                   |
+| OMADA_MQTT_RETAIN               | Publish MQTT discovery and state messages as retained. (default: true)            |
+| OMADA_MQTT_EXPIRE_AFTER         | Home Assistant sensor expire_after in seconds. Set 0 to disable. (default: 180)   |
 
 ### PS
 

@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
+	"github.com/RCooLeR/omada_exporter/internal/hamqtt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -48,6 +50,18 @@ func runExporter(c *cli.Context) error {
 		reg := prometheus.NewRegistry()
 		reg.MustRegister(c)
 		http.Handle(fmt.Sprintf("/metrics/%s", name), promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	}
+
+	if conf.MQTTEnabled {
+		publisher, err := hamqtt.NewPublisher(client, initCollectors(client))
+		if err != nil {
+			return err
+		}
+		go func() {
+			if err := publisher.Run(context.Background()); err != nil && err != context.Canceled {
+				log.Error().Err(err).Msg("home assistant mqtt publisher stopped")
+			}
+		}()
 	}
 
 	log.Info().Msg(fmt.Sprintf("listening on :%s", conf.Port))

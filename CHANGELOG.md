@@ -1,3 +1,9 @@
+## [2.1.0] - 2026-04-20
+### Added
+- Home Assistant MQTT Discovery support with configurable broker, discovery prefix, state prefix, publish interval, retained messages, and sensor expiration.
+- MQTT entities for existing Omada metrics, including controller, alerts, devices, WAN, ports, LAGs, AP radios, clients, VPN, VPN stats, ISP, and active client device trackers.
+- `ha.md` with Home Assistant MQTT setup, Docker Compose example, topic examples, and published entity coverage.
+
 ## [2.0.4] - 2026-04-09
 ### Changed
 - Fix pulling info for clients (starting to fail after upgrading controller to 6.2.0.17)

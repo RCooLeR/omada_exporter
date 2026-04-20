@@ -16,4 +16,14 @@ type Config struct {
 	TrackClientMetrics       bool
 	GoCollectorDisabled      bool
 	ProcessCollectorDisabled bool
+	MQTTEnabled              bool
+	MQTTBroker               string
+	MQTTUsername             string
+	MQTTPassword             string
+	MQTTClientID             string
+	MQTTTopicPrefix          string
+	MQTTDiscoveryPrefix      string
+	MQTTInterval             int
+	MQTTRetain               bool
+	MQTTExpireAfter          int
 }
