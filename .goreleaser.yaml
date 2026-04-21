@@ -33,8 +33,9 @@ release:
 
 dockers:
   - image_templates:
-      - rcooler/omada_exporter:{{ .Tag }}
+      - rcooler/omada_exporter:{{ .Version }}
       - rcooler/omada_exporter:latest
+      - rcooler/omada-exporter:{{ .Version }}
       - rcooler/omada-exporter:latest
     dockerfile: Dockerfile
     build_flag_templates:
