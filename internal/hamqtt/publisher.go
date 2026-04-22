@@ -27,6 +27,7 @@ type Publisher struct {
 	availabilityTopic string
 	published         map[string]struct{}
 	knownClients      map[string]clientTracker
+	metricSamples     map[string]metricSample
 	mu                sync.Mutex
 }
 
@@ -49,6 +50,16 @@ type entity struct {
 	Device         map[string]any
 }
 
+type metricSample struct {
+	Value      float64
+	ObservedAt time.Time
+}
+
+type publishContext struct {
+	vpnIDByModeTypeName map[string]string
+	vpnIDByName         map[string]string
+}
+
 var slugPattern = regexp.MustCompile(`[^a-z0-9_]+`)
 
 func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector) (*Publisher, error) {
@@ -66,6 +77,7 @@ func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector
 		availabilityTopic: prefix + "/status",
 		published:         map[string]struct{}{},
 		knownClients:      map[string]clientTracker{},
+		metricSamples:     map[string]metricSample{},
 	}, nil
 }
 
@@ -121,6 +133,8 @@ func (p *Publisher) publishAll() {
 		return
 	}
 
+	now := time.Now().UTC()
+	ctx := buildPublishContext(families)
 	seenClients := map[string]clientTracker{}
 	for _, family := range families {
 		for _, metric := range family.Metric {
@@ -130,9 +144,10 @@ func (p *Publisher) publishAll() {
 			}
 
 			labels := metricLabels(metric)
-			ent := p.newMetricEntity(family, labels)
+			ent := p.newMetricEntity(family, labels, ctx)
 			p.publishDiscovery(ent, family.GetType())
-			p.publishMetricState(ent, value)
+			p.publishMetricState(ent, value, now)
+			p.publishDerivedMetricState(family.GetName(), labels, value, now, ctx)
 
 			if tracker, ok := p.clientTracker(family.GetName(), labels); ok {
 				seenClients[trackerID(labels["mac"])] = tracker
@@ -192,12 +207,12 @@ func (p *Publisher) publishDiscovery(ent entity, metricType dto.MetricType) {
 	p.publishJSON(ent.DiscoveryTopic, config, p.client.Config.MQTTRetain)
 }
 
-func (p *Publisher) publishMetricState(ent entity, value float64) {
+func (p *Publisher) publishMetricState(ent entity, value float64, observedAt time.Time) {
 	payload := map[string]any{
 		"value":        metricPayloadValue(value),
 		"metric":       ent.MetricName,
 		"help":         ent.Help,
-		"last_updated": time.Now().UTC().Format(time.RFC3339),
+		"last_updated": observedAt.Format(time.RFC3339),
 	}
 	for k, v := range ent.Labels {
 		payload[k] = v
@@ -205,7 +220,21 @@ func (p *Publisher) publishMetricState(ent entity, value float64) {
 	p.publishJSON(ent.StateTopic, payload, p.client.Config.MQTTRetain)
 }
 
-func (p *Publisher) newMetricEntity(family *dto.MetricFamily, labels map[string]string) entity {
+func (p *Publisher) publishDerivedMetricState(metricName string, labels map[string]string, value float64, observedAt time.Time, ctx publishContext) {
+	derivedMetricName, help, ok := derivedMetric(metricName)
+	if !ok {
+		return
+	}
+
+	sampleKey := objectID(metricName, labels)
+	rate := p.recordRateSample(sampleKey, value, observedAt)
+
+	ent := p.newDerivedEntity(derivedMetricName, help, labels, ctx)
+	p.publishDiscovery(ent, dto.MetricType_GAUGE)
+	p.publishMetricState(ent, rate, observedAt)
+}
+
+func (p *Publisher) newMetricEntity(family *dto.MetricFamily, labels map[string]string, ctx publishContext) entity {
 	metricName := family.GetName()
 	component := "sensor"
 	if isBinaryMetric(metricName) {
@@ -226,7 +255,26 @@ func (p *Publisher) newMetricEntity(family *dto.MetricFamily, labels map[string]
 		MetricName:     metricName,
 		Help:           family.GetHelp(),
 		Labels:         labels,
-		Device:         deviceInfo(p.client, metricName, labels),
+		Device:         deviceInfo(p.client, metricName, deviceLabels(metricName, labels, ctx)),
+	}
+}
+
+func (p *Publisher) newDerivedEntity(metricName, help string, labels map[string]string, ctx publishContext) entity {
+	objectID := objectID(metricName, labels)
+	discoveryPrefix := topicPrefix(p.client.Config.MQTTDiscoveryPrefix)
+	statePrefix := topicPrefix(p.client.Config.MQTTTopicPrefix)
+
+	return entity{
+		Component:      "sensor",
+		ObjectID:       objectID,
+		UniqueID:       "omada_exporter_" + objectID,
+		Name:           friendlyMetricName(metricName, labels),
+		DiscoveryTopic: fmt.Sprintf("%s/sensor/omada_exporter/%s/config", discoveryPrefix, objectID),
+		StateTopic:     fmt.Sprintf("%s/entities/%s/state", statePrefix, objectID),
+		MetricName:     metricName,
+		Help:           help,
+		Labels:         labels,
+		Device:         deviceInfo(p.client, metricName, deviceLabels(metricName, labels, ctx)),
 	}
 }
 
@@ -457,13 +505,17 @@ func friendlyMetricName(metricName string, labels map[string]string) string {
 func objectID(metricName string, labels map[string]string) string {
 	stable := []string{metricName}
 
-	for _, key := range []string{"site_id", "site", "device_mac", "mac", "gateway_mac", "vpn_id", "storage_name", "upgrade_channel", "port", "lag_id"} {
+	for _, key := range []string{"site_id", "site", "device_mac", "mac", "gateway_mac", "storage_name", "upgrade_channel", "port", "lag_id"} {
 		if value := labels[key]; value != "" {
 			stable = append(stable, key+"_"+value)
 		}
 	}
 
-	if labels["device_mac"] == "" && labels["mac"] == "" && labels["gateway_mac"] == "" && labels["vpn_id"] == "" {
+	if metricName == "omada_vpn_status" && labels["vpn_id"] != "" {
+		stable = append(stable, "vpn_id_"+labels["vpn_id"])
+	}
+
+	if labels["device_mac"] == "" && labels["mac"] == "" && labels["gateway_mac"] == "" && !(metricName == "omada_vpn_status" && labels["vpn_id"] != "") {
 		for _, key := range []string{"interface_name", "local_ip", "remote_ip", "connection_mode", "wifi_mode", "ssid", "name"} {
 			if value := labels[key]; value != "" {
 				stable = append(stable, key+"_"+value)
@@ -625,4 +677,110 @@ func copyLabels(labels map[string]string) map[string]string {
 		copied[key] = value
 	}
 	return copied
+}
+
+func buildPublishContext(families []*dto.MetricFamily) publishContext {
+	modeTypeNameCounts := map[string]int{}
+	modeTypeNameIDs := map[string]string{}
+	nameCounts := map[string]int{}
+	nameIDs := map[string]string{}
+
+	for _, family := range families {
+		if family.GetName() != "omada_vpn_status" {
+			continue
+		}
+		for _, metric := range family.Metric {
+			labels := metricLabels(metric)
+			vpnID := strings.TrimSpace(labels["vpn_id"])
+			if vpnID == "" {
+				continue
+			}
+
+			modeTypeNameKey := vpnLookupKey(labels["name"], labels["vpn_mode"], labels["vpn_type"])
+			if modeTypeNameKey != "" {
+				modeTypeNameCounts[modeTypeNameKey]++
+				modeTypeNameIDs[modeTypeNameKey] = vpnID
+			}
+
+			nameKey := slug(labels["name"])
+			if nameKey != "" {
+				nameCounts[nameKey]++
+				nameIDs[nameKey] = vpnID
+			}
+		}
+	}
+
+	return publishContext{
+		vpnIDByModeTypeName: uniqueLookup(modeTypeNameCounts, modeTypeNameIDs),
+		vpnIDByName:         uniqueLookup(nameCounts, nameIDs),
+	}
+}
+
+func uniqueLookup(counts map[string]int, values map[string]string) map[string]string {
+	lookup := make(map[string]string, len(values))
+	for key, value := range values {
+		if counts[key] == 1 && value != "" {
+			lookup[key] = value
+		}
+	}
+	return lookup
+}
+
+func deviceLabels(metricName string, labels map[string]string, ctx publishContext) map[string]string {
+	if !strings.HasPrefix(metricName, "omada_vpn_") || labels["vpn_id"] != "" {
+		return labels
+	}
+
+	vpnID := ctx.vpnIDByModeTypeName[vpnLookupKey(labels["name"], labels["vpn_mode"], labels["vpn_type"])]
+	if vpnID == "" {
+		vpnID = ctx.vpnIDByName[slug(labels["name"])]
+	}
+	if vpnID == "" {
+		return labels
+	}
+
+	enriched := copyLabels(labels)
+	enriched["vpn_id"] = vpnID
+	return enriched
+}
+
+func vpnLookupKey(name, mode, vpnType string) string {
+	parts := []string{slug(name), slug(mode), slug(vpnType)}
+	if parts[0] == "" {
+		return ""
+	}
+	return strings.Join(parts, "|")
+}
+
+func derivedMetric(metricName string) (string, string, bool) {
+	switch metricName {
+	case "omada_vpn_down_bytes":
+		return "omada_vpn_down_speed", "VPN downlink speed in bits per second", true
+	case "omada_vpn_up_bytes":
+		return "omada_vpn_up_speed", "VPN uplink speed in bits per second", true
+	default:
+		return "", "", false
+	}
+}
+
+func (p *Publisher) recordRateSample(sampleKey string, value float64, observedAt time.Time) float64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	previous, ok := p.metricSamples[sampleKey]
+	p.metricSamples[sampleKey] = metricSample{
+		Value:      value,
+		ObservedAt: observedAt,
+	}
+
+	if !ok || !observedAt.After(previous.ObservedAt) || value < previous.Value {
+		return 0
+	}
+
+	deltaSeconds := observedAt.Sub(previous.ObservedAt).Seconds()
+	if deltaSeconds <= 0 {
+		return 0
+	}
+
+	return (value - previous.Value) * 8 / deltaSeconds
 }

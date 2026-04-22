@@ -1,0 +1,14 @@
+resources:
+  - url: /local/omada-network-card.js?v=1
+    type: module
+
+views:
+  - title: Omada
+    path: omada
+    panel: true
+    cards:
+      - type: custom:omada-network-card
+        site: Zahidna
+        logo_mode: auto
+        device_limit: 100
+        client_limit: 200

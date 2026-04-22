@@ -20,7 +20,7 @@ Coverage includes:
 - AP radio utilization for 2.4 GHz, 5 GHz, 5 GHz-2, and 6 GHz where supported.
 - Client traffic, activity, RSSI, signal, SNR, RX/TX rate, SSID, AP, switch, gateway, VLAN, vendor, hostname, and connection details.
 - MQTT `device_tracker` entities for active clients.
-- VPN status, mode, type, remote IP, tunnel uptime, and traffic.
+- VPN status, mode, type, remote IP, tunnel uptime, traffic, and derived download/upload speeds.
 - ISP status, gateway, port, load balancing, max bandwidth, download speed, and upload speed.
 
 Prometheus labels are attached to each Home Assistant entity as JSON attributes, so Home Assistant keeps the detailed Omada metadata without creating separate entities for every label.
@@ -152,4 +152,5 @@ Client attributes are JSON and include Omada details such as IP, hostname, vendo
 - Discovery and state messages are retained by default so entities survive Home Assistant and broker restarts.
 - Retained MQTT messages can leave old Home Assistant entities after hardware is removed or topic prefixes are changed. Clear the old retained discovery topics if that happens.
 - The exporter publishes binary sensors for known boolean metrics such as port link status, LAG link status, ISP online status, VPN status, and upgrade availability.
+- VPN MQTT entities are grouped onto the same Home Assistant device when status and tunnel stats can be matched to the same Omada VPN.
 - Everything else is published as a sensor with units where the metric name clearly identifies the unit.
