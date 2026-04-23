@@ -378,6 +378,7 @@ export class OmadaNetworkCard extends LitElement {
           <tbody>
             ${this._model!.isps.map((row) => {
               const wan = this.findWanFor(row);
+              const ispName = this.ispDisplayName(row, wan);
               const isUp = (row.metrics.omada_isp_status ?? wan?.metrics.omada_wan_status ?? 0) > 0;
               const latency = wan?.metrics.omada_wan_latency ?? 0;
               const speed = wan?.metrics.omada_wan_link_speed_mbps ?? 0;
@@ -385,7 +386,7 @@ export class OmadaNetworkCard extends LitElement {
               const tx = (wan?.metrics.omada_wan_tx_rate ?? 0) * 1024;
               return html`
                 <tr>
-                  <td>${row.name}</td>
+                  <td>${ispName}</td>
                   <td>${String(row.attrs.ip ?? "-")}</td>
                   <td><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</td>
                   <td>${formatLatency(latency)}</td>
@@ -918,6 +919,10 @@ export class OmadaNetworkCard extends LitElement {
 
   private findWanFor(row: LinkRow): LinkRow | undefined {
     return this._model?.wans.find((wan) => wan.name === row.name || String(wan.attrs.port) === String(row.attrs.port));
+  }
+
+  private ispDisplayName(row: LinkRow, wan?: LinkRow): string {
+    return String(wan?.attrs.desc ?? row.attrs.desc ?? row.name ?? "-") || "-";
   }
 
   private syncCharts(): void {
