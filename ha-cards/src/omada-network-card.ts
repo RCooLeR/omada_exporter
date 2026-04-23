@@ -71,8 +71,6 @@ export class OmadaNetworkCard extends LitElement {
       box-shadow: 0 24px 56px rgba(0, 0, 0, 0.28);
     }
     .frame {
-      height: min(82vh, 1080px);
-      min-height: min(82vh, 1080px);
       aspect-ratio: 16 / 9;
       display: grid;
       grid-template-rows: auto 1fr;
