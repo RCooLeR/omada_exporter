@@ -6,13 +6,20 @@
     <img src="./docs/images/omada.png" width="70%">
 </p>
 
-# Prometheus Exporter for TP-Link Omada Controller SDN.
+## Prometheus exporter and Home Assistant MQTT publisher for TP-Link Omada Controller SDN
 
->“RCooLeR/omada_exporter is a maintained fork of charlie-haley/omada_exporter with additional metrics and Open API support.”
+`RCooLeR/omada_exporter` is a maintained fork of `charlie-haley/omada_exporter` with additional metrics, OpenAPI support, and Home Assistant MQTT integration.
 
-### 📈 Dashboard
+The exporter can use the same Omada data source to produce:
 
-There are [default dashboards in this repo](docs/dashboards/), which is a good starting point for visualizing your metrics.
+- Prometheus metrics on `/metrics` for Prometheus, Grafana, and alerting.
+- Home Assistant MQTT Discovery entities and client trackers for MQTT-driven dashboards and automations.
+
+Both outputs can run at the same time.
+
+## Grafana Dashboards
+
+There are [default dashboards in this repo](docs/dashboards/), which are a good starting point for Prometheus and Grafana users.
 
 You can also find it on [Grafana.com](https://grafana.com/grafana/dashboards/16343).
 
@@ -31,12 +38,12 @@ You can also find it on [Grafana.com](https://grafana.com/grafana/dashboards/163
 
 ### Omada Authentication Setup
 
-- OpenAPI Client – Created via: `Settings -> Platform Integration`.
+- OpenAPI Client - created via `Settings -> Platform Integration`.
   Assign admin role for full API access.
-- Service User – Create under: `Account section` at `Global level`.
+- Service User - create under `Account section` at `Global level`.
   Assign viewer role for read-only access.
 
-### 🚀 Docker Run Example
+### Docker Run Example
 
 ```bash
 docker run -d \
@@ -47,10 +54,19 @@ docker run -d \
     -e OMADA_SITE='Default' \
     -e OMADA_CLIENT_ID='' \
     -e OMADA_SECRET_ID='' \
-    chhaley/omada_exporter
+    rcooler/omada_exporter:latest
 ```
 
-### 📦 Docker Compose Example
+To also publish Home Assistant MQTT entities, add:
+
+```bash
+-e OMADA_MQTT_ENABLED='true' \
+-e OMADA_MQTT_BROKER='tcp://homeassistant.local:1883' \
+-e OMADA_MQTT_USER='omada_exporter' \
+-e OMADA_MQTT_PASS='mqtt-password'
+```
+
+### Docker Compose Example
 
 ```yaml
 services:
@@ -66,12 +82,19 @@ services:
       OMADA_SITE: "Default"
       OMADA_CLIENT_ID: ""
       OMADA_SECRET_ID: ""
+      OMADA_MQTT_ENABLED: "true"
+      OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"
+      OMADA_MQTT_USER: "omada_exporter"
+      OMADA_MQTT_PASS: "mqtt-password"
+      OMADA_MQTT_DISCOVERY_PREFIX: "homeassistant"
     restart: unless-stopped
 ```
 
-### 🖥️ Command Line
+### Command Line
 
 [You can download the latest binary release here.](https://github.com/RCooLeR/omada_exporter/releases/latest)
+
+The binary always exposes Prometheus metrics and can optionally publish the same data to Home Assistant through MQTT.
 
 ```
 NAME:
@@ -123,10 +146,19 @@ GLOBAL OPTIONS:
    --version, -v                print the version (default: false)
 ```
 
-## ⚙️ Configuration
+The help output still uses the original Prometheus-focused description, but the MQTT flags above are part of the main binary and supported together with `/metrics`.
 
+## Outputs and Configuration
 
-### 📡 Prometheus Scrape Job Example
+### Home Assistant MQTT
+
+Set `OMADA_MQTT_ENABLED=true` to enable Home Assistant MQTT Discovery publishing.
+
+See [ha.md](ha.md) for Home Assistant setup, Docker Compose examples, published entity coverage, MQTT topic details, and usage notes.
+
+Custom Lovelace cards that consume those MQTT-backed entities are documented in [ha-cards/README.md](ha-cards/README.md).
+
+### Prometheus Scrape Job Example
 
 Add the following job to your `prometheus.yml` configuration:
 
@@ -140,12 +172,9 @@ Add the following job to your `prometheus.yml` configuration:
 
 > Make sure `omada_exporter` resolves to your container or host running `omada_exporter`.
 
-### Home Assistant MQTT
-
-Home Assistant MQTT Discovery can be enabled with `OMADA_MQTT_ENABLED=true`.
-See [ha.md](ha.md) for setup, Docker Compose examples, published entity coverage, and MQTT topic details.
-
 ### Environment Variables
+
+Prometheus `/metrics` is always available. MQTT publishing is optional and can run in parallel with Prometheus scraping.
 
 | Variable                        | Purpose                                                                           |
 |---------------------------------|-----------------------------------------------------------------------------------|
@@ -175,12 +204,12 @@ See [ha.md](ha.md) for setup, Docker Compose examples, published entity coverage
 | OMADA_MQTT_RETAIN               | Publish MQTT discovery and state messages as retained. (default: true)            |
 | OMADA_MQTT_EXPIRE_AFTER         | Home Assistant sensor expire_after in seconds. Set 0 to disable. (default: 180)   |
 
-### PS
+### Notes
 
 Last tested on [OC200](https://www.omadanetworks.com/us/business-networking/omada-controller-hardware/oc200/), firmware 6.2.0.17 (ER8411, SG3428X-M2, SG3210XHP-M2, SG2210MP, EAP772-Outdoor, EAP650-Outdoor, EAP225-Outdoor, EAP725-Wall)
 
-OpenApi docs: [https://use1-omada-northbound.tplinkcloud.com/doc.html](https://use1-omada-northbound.tplinkcloud.com/doc.html)
-WebApi: no docs. Login to your controller and use Chrome debug tools  🤦
+OpenAPI docs: [https://use1-omada-northbound.tplinkcloud.com/doc.html](https://use1-omada-northbound.tplinkcloud.com/doc.html)
+Web API: no official docs. Login to your controller and inspect requests in browser developer tools.
 
 ## 📊 Metrics
 

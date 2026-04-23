@@ -1,8 +1,15 @@
 # Home Assistant MQTT
 
-`omada_exporter` can publish Home Assistant MQTT Discovery entities while keeping the existing Prometheus exporter enabled.
+`omada_exporter` supports Home Assistant through MQTT Discovery while keeping the Prometheus exporter enabled.
+
+Use this when you want Omada data in Home Assistant dashboards, automations, and Lovelace cards without losing Prometheus and Grafana support.
 
 The MQTT integration is read-only from the Omada side. The exporter only reads Omada API data and publishes MQTT discovery/state messages. It does not subscribe to Home Assistant commands and does not change Omada configuration.
+
+## Related Docs
+
+- Main project overview and Prometheus setup: [README.md](README.md)
+- Home Assistant Lovelace cards for these entities: [ha-cards/README.md](ha-cards/README.md)
 
 ## What Gets Published
 
@@ -32,6 +39,7 @@ Prometheus labels are attached to each Home Assistant entity as JSON attributes,
 3. Make sure MQTT Discovery is enabled. The default discovery prefix is `homeassistant`.
 4. Create MQTT credentials for `omada_exporter`.
 5. Start `omada_exporter` with MQTT enabled.
+6. Optionally keep Prometheus scraping enabled as well; both outputs can run together.
 
 Home Assistant MQTT docs:
 
@@ -48,6 +56,8 @@ Use read-only Omada credentials where possible:
 Some metrics come from Omada OpenAPI. If `OMADA_CLIENT_ID` and `OMADA_SECRET_ID` are not valid, client, WAN, VPN, VPN stats, and ISP MQTT entities may be missing or unavailable.
 
 ## Docker Compose Example
+
+This example exposes Prometheus metrics on port `9202` and publishes Home Assistant entities to MQTT from the same container.
 
 ```yaml
 services:
@@ -79,6 +89,8 @@ services:
 ```
 
 ## Environment Variables
+
+These variables only affect the MQTT and Home Assistant side. Core Omada and Prometheus options are documented in [README.md](README.md).
 
 | Variable | Default | Purpose |
 |---|---:|---|
@@ -149,6 +161,7 @@ Client attributes are JSON and include Omada details such as IP, hostname, vendo
 
 ## Notes
 
+- Prometheus `/metrics` stays available when MQTT publishing is enabled.
 - Discovery and state messages are retained by default so entities survive Home Assistant and broker restarts.
 - Retained MQTT messages can leave old Home Assistant entities after hardware is removed or topic prefixes are changed. Clear the old retained discovery topics if that happens.
 - The exporter publishes binary sensors for known boolean metrics such as port link status, LAG link status, ISP online status, VPN status, and upgrade availability.

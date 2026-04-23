@@ -1,6 +1,11 @@
 # Omada Home Assistant Cards
 
-Custom Lovelace cards for `omada_exporter`.
+Custom Lovelace cards for `omada_exporter` Home Assistant entities published over MQTT.
+
+These cards are an optional Home Assistant UI layer on top of the exporter:
+
+- Project overview and Prometheus setup: [README.md](../README.md)
+- MQTT and Home Assistant setup: [ha.md](../ha.md)
 
 ## Cards
 
@@ -29,6 +34,8 @@ Output:
 - `dist/omada-network-card.js`
 
 ## Home Assistant
+
+Prerequisite: configure `omada_exporter` MQTT publishing first so Home Assistant has the entities these cards expect.
 
 Resource:
 

@@ -1,3 +1,7 @@
+## [Unreleased]
+### Docs
+- Update README and related docs to present `omada_exporter` as both a Prometheus exporter and a Home Assistant MQTT integration.
+
 ## [2.1.0] - 2026-04-20
 ### Added
 - Home Assistant MQTT Discovery support with configurable broker, discovery prefix, state prefix, publish interval, retained messages, and sensor expiration.
