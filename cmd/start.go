@@ -33,6 +33,7 @@ func Start() {
 		&cli.StringFlag{Destination: &conf.Site, Name: "site", Value: "Default", Usage: "Omada site to scrape metrics from.", EnvVars: []string{"OMADA_SITE"}},
 		&cli.StringFlag{Destination: &conf.LogLevel, Name: "log-level", Value: "error", Usage: "Application log level.", EnvVars: []string{"LOG_LEVEL"}},
 		&cli.IntFlag{Destination: &conf.Timeout, Name: "timeout", Value: 15, Usage: "Timeout when making requests to the Omada Controller.", EnvVars: []string{"OMADA_REQUEST_TIMEOUT"}},
+		&cli.IntFlag{Destination: &conf.CacheTTL, Name: "cache-ttl", Value: 5, Usage: "Cache Omada API fetch results for this many seconds. Set 0 to disable.", EnvVars: []string{"OMADA_CACHE_TTL"}},
 		&cli.BoolFlag{Destination: &conf.Insecure, Name: "insecure", Value: false, Usage: "Whether to skip verifying the SSL certificate on the controller.", EnvVars: []string{"OMADA_INSECURE"}},
 		&cli.BoolFlag{Destination: &conf.IncludePortActivityLabel, Name: "include-port-activity-label", Value: true, Usage: "Include the port_activity_label label on port metrics.", EnvVars: []string{"OMADA_INCLUDE_PORT_ACTIVITY_LABEL"}},
 		&cli.BoolFlag{Destination: &conf.TrackPortMetrics, Name: "track-port-metrics", Value: true, Usage: "Export per-port metrics.", EnvVars: []string{"OMADA_TRACK_PORT_METRICS"}},

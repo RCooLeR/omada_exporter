@@ -6,12 +6,17 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
 	"github.com/rs/zerolog/log"
 )
 
 func (c *Client) GetDevices() ([]model.DevicesInterface, error) {
+	return api.FetchCached(c.Client, "webapi:devices", c.getDevicesFresh)
+}
+
+func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 	//hack for keeping logic in separate dirs
 	openClient := &openapi.Client{
 		Client: c.Client,

@@ -7,11 +7,16 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	log "github.com/rs/zerolog/log"
 )
 
 func (c *Client) GetAlert() (*model.Alert, error) {
+	return api.FetchCached(c.Client, "webapi:alert", c.getAlertFresh)
+}
+
+func (c *Client) getAlertFresh() (*model.Alert, error) {
 	url := fmt.Sprintf("%s/%s/api/v2/sites/alert-count", c.Config.Host, c.OmadaCID)
 	jsonStr := []byte(fmt.Sprintf(`{"siteIds":["%s"]}`, c.SiteId))
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))

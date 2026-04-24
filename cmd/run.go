@@ -44,8 +44,10 @@ func runExporter(c *cli.Context) error {
 		return err
 	}
 
+	collectors := initCollectors(client)
+
 	// register omada collectors
-	for name, c := range initCollectors(client) {
+	for name, c := range collectors {
 		prometheus.MustRegister(c)
 		reg := prometheus.NewRegistry()
 		reg.MustRegister(c)
@@ -53,7 +55,7 @@ func runExporter(c *cli.Context) error {
 	}
 
 	if conf.MQTTEnabled {
-		publisher, err := hamqtt.NewPublisher(client, initCollectors(client))
+		publisher, err := hamqtt.NewPublisher(client, collectors)
 		if err != nil {
 			return err
 		}

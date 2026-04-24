@@ -7,11 +7,16 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/rs/zerolog/log"
 )
 
 func (c *Client) GetNetworkClients() ([]model.NetworkClient, error) {
+	return api.FetchCached(c.Client, "openapi:clients", c.getNetworkClientsFresh)
+}
+
+func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
 	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
 	requestBody, err := json.Marshal(clientRequest{
 		Filters: clientFilters{

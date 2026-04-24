@@ -120,4 +120,10 @@ export interface DashboardModel {
   isps: LinkRow[];
   vpns: LinkRow[];
   wans: LinkRow[];
+  deviceByKey: Map<string, DeviceRecord>;
+  deviceByMac: Map<string, DeviceRecord>;
+  portByDeviceMacAndPort: Map<string, PortRecord>;
+  clientByKey: Map<string, ClientRecord>;
+  wanByName: Map<string, LinkRow>;
+  wanByPort: Map<string, LinkRow>;
 }

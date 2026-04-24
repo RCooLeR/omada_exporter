@@ -11,6 +11,8 @@ import type {
 } from "./ha-types";
 import { toNumber } from "./format";
 
+const dashboardModelCache = new WeakMap<HomeAssistant["states"], Map<string, DashboardModel>>();
+
 function getMetric(entity: HassEntity): string {
   return String(entity.attributes.metric ?? "");
 }
@@ -602,12 +604,40 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     Array.from(isps.values())[0]?.attrs.site?.toString() ||
     "Omada";
 
+  const ispList = Array.from(isps.values()).sort((left, right) => left.name.localeCompare(right.name));
+  const vpnList = Array.from(vpns.values()).sort((left, right) => left.name.localeCompare(right.name));
+  const wanList = Array.from(wans.values()).sort((left, right) => left.name.localeCompare(right.name));
+
   return {
     siteSummary: summaryFrom(deviceList, clientList, siteName),
     devices: deviceList,
     clients: clientList,
-    isps: Array.from(isps.values()).sort((left, right) => left.name.localeCompare(right.name)),
-    vpns: Array.from(vpns.values()).sort((left, right) => left.name.localeCompare(right.name)),
-    wans: Array.from(wans.values()).sort((left, right) => left.name.localeCompare(right.name))
+    isps: ispList,
+    vpns: vpnList,
+    wans: wanList,
+    deviceByKey: new Map(deviceList.map((device) => [device.key, device])),
+    deviceByMac,
+    portByDeviceMacAndPort,
+    clientByKey: new Map(clientList.map((client) => [client.key, client])),
+    wanByName: new Map(wanList.map((wan) => [wan.name, wan])),
+    wanByPort: new Map(wanList.map((wan) => [String(wan.attrs.port), wan]))
   };
+}
+
+export function getDashboardModel(hass: HomeAssistant, siteFilter?: string): DashboardModel {
+  const cacheKey = siteFilter ?? "";
+  let cacheBySite = dashboardModelCache.get(hass.states);
+  if (!cacheBySite) {
+    cacheBySite = new Map<string, DashboardModel>();
+    dashboardModelCache.set(hass.states, cacheBySite);
+  }
+
+  const cached = cacheBySite.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const model = buildDashboardModel(hass, siteFilter);
+  cacheBySite.set(cacheKey, model);
+  return model;
 }

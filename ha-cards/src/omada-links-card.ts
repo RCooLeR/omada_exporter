@@ -1,7 +1,8 @@
 import { css, html, LitElement } from "lit";
+import { repeat } from "lit/directives/repeat.js";
 import type { DashboardModel, HomeAssistant, LinkRow, LovelaceCardConfig } from "./ha-types";
 import { formatBytes, formatLatency, formatRateBytes, formatSpeedMbps, formatUptimeMinutes } from "./format";
-import { buildDashboardModel } from "./model";
+import { getDashboardModel } from "./model";
 
 declare global {
   interface Window {
@@ -132,7 +133,7 @@ export class OmadaLinksCard extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("hass") && this.hass) {
-      this._model = buildDashboardModel(this.hass, this._config?.site);
+      this._model = getDashboardModel(this.hass, this._config?.site);
     }
   }
 
@@ -170,7 +171,7 @@ export class OmadaLinksCard extends LitElement {
             </tr>
           </thead>
           <tbody>
-            ${this._model!.isps.map((row) => {
+            ${repeat(this._model!.isps, (row) => row.key, (row) => {
               const wan = this.findWanFor(row);
               const ispName = this.ispDisplayName(row, wan);
               const isUp = (row.metrics.omada_isp_status ?? wan?.metrics.omada_wan_status ?? 0) > 0;
@@ -210,7 +211,7 @@ export class OmadaLinksCard extends LitElement {
             </tr>
           </thead>
           <tbody>
-            ${this._model!.vpns.map((row) => {
+            ${repeat(this._model!.vpns, (row) => row.key, (row) => {
               const isUp = (row.metrics.omada_vpn_status ?? 0) > 0;
               const uptime = row.metrics.omada_vpn_uptime ?? 0;
               const total = (row.metrics.omada_vpn_up_bytes ?? 0) + (row.metrics.omada_vpn_down_bytes ?? 0);
@@ -233,7 +234,11 @@ export class OmadaLinksCard extends LitElement {
   }
 
   private findWanFor(row: LinkRow): LinkRow | undefined {
-    return this._model?.wans.find((wan) => wan.name === row.name || String(wan.attrs.port) === String(row.attrs.port));
+    if (!this._model) {
+      return undefined;
+    }
+
+    return this._model.wanByName.get(row.name) ?? this._model.wanByPort.get(String(row.attrs.port));
   }
 
   private ispDisplayName(row: LinkRow, wan?: LinkRow): string {

@@ -6,11 +6,16 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	log "github.com/rs/zerolog/log"
 )
 
 func (c *Client) GetVpn() ([]model.Vpn, error) {
+	return api.FetchCached(c.Client, "openapi:vpn", c.getVpnFresh)
+}
+
+func (c *Client) getVpnFresh() ([]model.Vpn, error) {
 	if c.Config.ClientId == "" || c.Config.SecretId == "" {
 		return nil, fmt.Errorf("ClientId and SecretId are required parameters.")
 	}

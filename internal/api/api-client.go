@@ -9,10 +9,12 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/singleflight"
 )
 
 type Client struct {
@@ -24,6 +26,9 @@ type Client struct {
 	accessToken          string
 	refreshToken         string
 	accessTokenExpiresAt time.Time
+	cacheMu              sync.RWMutex
+	requestCache         map[string]cacheEntry
+	requestGroup         singleflight.Group
 }
 
 func createHttpClient(insecure bool, timeout int) (*http.Client, error) {
@@ -52,8 +57,9 @@ func Configure(c *config.Config) (*Client, error) {
 	}
 
 	client := &Client{
-		Config:     c,
-		httpClient: httpClient,
+		Config:       c,
+		httpClient:   httpClient,
+		requestCache: map[string]cacheEntry{},
 	}
 	cid, err := client.getCid()
 	if err != nil {
@@ -236,6 +242,7 @@ func (c *Client) reauthenticateWebSession() error {
 		return err
 	}
 	c.SiteId = *siteID
+	c.invalidateRequestCache()
 	return nil
 }
 
@@ -336,7 +343,11 @@ func (c *Client) reauthenticateOpenAPISession() error {
 	c.accessToken = ""
 	c.refreshToken = ""
 	c.accessTokenExpiresAt = time.Time{}
-	return c.LoginOpenApi()
+	if err := c.LoginOpenApi(); err != nil {
+		return err
+	}
+	c.invalidateRequestCache()
+	return nil
 }
 
 func (c *Client) MakeOpenApiRequest(req *http.Request) (*http.Response, error) {

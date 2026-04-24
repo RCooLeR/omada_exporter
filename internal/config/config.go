@@ -10,6 +10,7 @@ type Config struct {
 	Site                     string
 	LogLevel                 string
 	Timeout                  int
+	CacheTTL                 int
 	Insecure                 bool
 	IncludePortActivityLabel bool
 	TrackPortMetrics         bool

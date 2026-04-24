@@ -6,11 +6,16 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	log "github.com/rs/zerolog/log"
 )
 
 func (c *Client) GetController() (*model.Controller, error) {
+	return api.FetchCached(c.Client, "webapi:controller", c.getControllerFresh)
+}
+
+func (c *Client) getControllerFresh() (*model.Controller, error) {
 	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, c.OmadaCID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

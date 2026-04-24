@@ -6,11 +6,16 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	log "github.com/rs/zerolog/log"
 )
 
 func (c *Client) GetIsp() ([]model.Isp, error) {
+	return api.FetchCached(c.Client, "openapi:isp", c.getIspFresh)
+}
+
+func (c *Client) getIspFresh() ([]model.Isp, error) {
 	if c.Config.ClientId == "" || c.Config.SecretId == "" {
 		return nil, fmt.Errorf("ClientId and SecretId are required parameters.")
 	}
