@@ -1,4 +1,12 @@
 ## [Unreleased]
+
+## [2.1.1] - 2026-04-24
+### Added
+- Home Assistant custom cards in `ha-cards/`, including Omada network and links cards, build tooling, and example dashboard configs.
+### Changed
+- Add client-side API request caching with a configurable TTL to reduce repeated Omada requests and improve collector/API performance.
+- Optimize Home Assistant custom cards with better filtering, visible-record handling, and more efficient list rendering for large device and client datasets.
+- Improve ISP display names in Home Assistant custom cards with fallback formatting.
 ### Docs
 - Update README and related docs to present `omada_exporter` as both a Prometheus exporter and a Home Assistant MQTT integration.
 
