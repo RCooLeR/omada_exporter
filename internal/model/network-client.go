@@ -7,7 +7,7 @@ import (
 type NetworkClient struct {
 	Mac            string `json:"mac"`
 	Ip             string `json:"ip"`
-	VlanId         int8   `json:"vid"`
+	VlanId         int32  `json:"vid"`
 	ConnectType    int8   `json:"connect_type"`
 	Name           string `json:"name"`
 	SystemName     string `json:"systemName"`

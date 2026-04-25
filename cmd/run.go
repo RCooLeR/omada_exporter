@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/hamqtt"
@@ -14,6 +15,25 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
+
+type healthState struct {
+	ready atomic.Bool
+}
+
+func (h *healthState) livez(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+}
+
+func (h *healthState) readyz(w http.ResponseWriter, _ *http.Request) {
+	if !h.ready.Load() {
+		http.Error(w, "not ready", http.StatusServiceUnavailable)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ready"))
+}
 
 func runExporter(c *cli.Context) error {
 	// set log level
@@ -43,6 +63,8 @@ func runExporter(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	mux := http.NewServeMux()
+	health := &healthState{}
 
 	collectors := initCollectors(client)
 
@@ -51,7 +73,7 @@ func runExporter(c *cli.Context) error {
 		prometheus.MustRegister(c)
 		reg := prometheus.NewRegistry()
 		reg.MustRegister(c)
-		http.Handle(fmt.Sprintf("/metrics/%s", name), promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+		mux.Handle(fmt.Sprintf("/metrics/%s", name), promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	}
 
 	if conf.MQTTEnabled {
@@ -66,14 +88,22 @@ func runExporter(c *cli.Context) error {
 		}()
 	}
 
+	mux.HandleFunc("/healthz", health.livez)
+	mux.HandleFunc("/readyz", health.readyz)
 	log.Info().Msg(fmt.Sprintf("listening on :%s", conf.Port))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`<html>
     <head>
 	<title>Omada exporter<</title>
 	</head>
     	<body>
 			<h1>Omada exporter</h1>
+			<p>
+				<a href="/healthz">Health</a>
+			</p>
+			<p>
+				<a href="/readyz">Ready</a>
+			</p>
 			<p>
 				<a href="/metrics">Metrics</a>
 			</p>
@@ -102,8 +132,10 @@ func runExporter(c *cli.Context) error {
     </html>`))
 	})
 
-	http.Handle("/metrics", promhttp.Handler())
-	err = http.ListenAndServe(fmt.Sprintf(":%s", conf.Port), nil)
+	mux.Handle("/metrics", promhttp.Handler())
+	health.ready.Store(true)
+
+	err = http.ListenAndServe(fmt.Sprintf(":%s", conf.Port), mux)
 	if err != nil {
 		return err
 	}

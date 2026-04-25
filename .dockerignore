@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.gitattributes
+.gitignore
+docs
+.goreleaser.yaml
+ha-cards
+*.md
+LICENSE
+Makefile

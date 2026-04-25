@@ -31,5 +31,8 @@ COPY --from=builder /app/omada-exporter /usr/bin/omada-exporter
 # Set executable permissions (just in case)
 RUN chmod +x /usr/bin/omada-exporter
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q -T 5 -O /dev/null "http://127.0.0.1:${OMADA_PORT:-9202}/healthz" || exit 1
+
 # Command to run
 ENTRYPOINT ["/usr/bin/omada-exporter"]
