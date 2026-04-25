@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [2.1.2] - 2026-04-25
+### Added
+- Add Docker container health checks with dedicated `/healthz` and `/readyz` endpoints.
+### Fixed
+- Accept larger client VLAN IDs from the Omada API by widening `NetworkClient.vid`, preventing JSON unmarshal failures for values like `999`.
+
 ## [2.1.1] - 2026-04-24
 ### Added
 - Home Assistant custom cards in `ha-cards/`, including Omada network and links cards, build tooling, and example dashboard configs.
