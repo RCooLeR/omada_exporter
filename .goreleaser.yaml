@@ -14,10 +14,11 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w
+      - -s -w -X github.com/RCooLeR/omada_exporter/cmd.version={{ .Version }}
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -31,17 +32,17 @@ release:
     owner: RCooLeR
     name: omada_exporter
   draft: false
-  prerelease: false
 
-dockers:
-  - image_templates:
-      - rcooler/omada_exporter:{{ .Version }}
-      - rcooler/omada_exporter:latest
-      - rcooler/omada-exporter:{{ .Version }}
-      - rcooler/omada-exporter:latest
-    dockerfile: Dockerfile
-    build_flag_templates:
-      - "--platform=linux/amd64"
-    goos: linux
-    goarch: amd64
-    skip_push: false
+dockers_v2:
+  - id: omada_exporter
+    ids:
+      - omada_exporter
+    dockerfile: Dockerfile.goreleaser
+    images:
+      - rcooler/omada_exporter
+      - rcooler/omada-exporter
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
