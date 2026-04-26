@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
+	"github.com/RCooLeR/omada_exporter/internal/debugdump"
 	"github.com/RCooLeR/omada_exporter/internal/hamqtt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -62,6 +63,17 @@ func runExporter(c *cli.Context) error {
 	client, err := api.Configure(&conf)
 	if err != nil {
 		return err
+	}
+	if conf.DumpResponsesDir != "" {
+		if err := debugdump.DumpResponses(client, conf.DumpResponsesDir); err != nil {
+			return err
+		}
+		if conf.DumpResponsesOnly {
+			log.Info().Str("dir", conf.DumpResponsesDir).Msg("response dump complete")
+			return nil
+		}
+	} else if conf.DumpResponsesOnly {
+		return fmt.Errorf("dump-responses-only requires dump-responses-dir")
 	}
 	mux := http.NewServeMux()
 	health := &healthState{}

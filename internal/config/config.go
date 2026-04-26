@@ -12,6 +12,8 @@ type Config struct {
 	Timeout                  int
 	CacheTTL                 int
 	Insecure                 bool
+	DumpResponsesDir         string
+	DumpResponsesOnly        bool
 	IncludePortActivityLabel bool
 	TrackPortMetrics         bool
 	TrackClientMetrics       bool

@@ -35,6 +35,8 @@ func Start() {
 		&cli.IntFlag{Destination: &conf.Timeout, Name: "timeout", Value: 15, Usage: "Timeout when making requests to the Omada Controller.", EnvVars: []string{"OMADA_REQUEST_TIMEOUT"}},
 		&cli.IntFlag{Destination: &conf.CacheTTL, Name: "cache-ttl", Value: 5, Usage: "Cache Omada API fetch results for this many seconds. Set 0 to disable.", EnvVars: []string{"OMADA_CACHE_TTL"}},
 		&cli.BoolFlag{Destination: &conf.Insecure, Name: "insecure", Value: false, Usage: "Whether to skip verifying the SSL certificate on the controller.", EnvVars: []string{"OMADA_INSECURE"}},
+		&cli.StringFlag{Destination: &conf.DumpResponsesDir, Name: "dump-responses-dir", Value: "", Usage: "Temporary debug mode. Write Omada webapi/openapi responses to this directory.", EnvVars: []string{"OMADA_DUMP_RESPONSES_DIR"}},
+		&cli.BoolFlag{Destination: &conf.DumpResponsesOnly, Name: "dump-responses-only", Value: false, Usage: "Exit after writing response dumps. Requires dump-responses-dir.", EnvVars: []string{"OMADA_DUMP_RESPONSES_ONLY"}},
 		&cli.BoolFlag{Destination: &conf.IncludePortActivityLabel, Name: "include-port-activity-label", Value: true, Usage: "Include the port_activity_label label on port metrics.", EnvVars: []string{"OMADA_INCLUDE_PORT_ACTIVITY_LABEL"}},
 		&cli.BoolFlag{Destination: &conf.TrackPortMetrics, Name: "track-port-metrics", Value: true, Usage: "Export per-port metrics.", EnvVars: []string{"OMADA_TRACK_PORT_METRICS"}},
 		&cli.BoolFlag{Destination: &conf.TrackClientMetrics, Name: "track-client-metrics", Value: true, Usage: "Export per-client metrics.", EnvVars: []string{"OMADA_TRACK_CLIENT_METRICS"}},
