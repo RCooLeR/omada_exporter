@@ -84,6 +84,8 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 			item.ApName,
 			item.GetWifiMode(),
 			item.Ssid,
+			site,
+			client.SiteId,
 		}
 
 		if c.trackClientMetrics() {
@@ -146,6 +148,8 @@ func NewClientCollector(apiClient *api.Client) *clientCollector {
 		"ap_name",
 		"wifi_mode",
 		"ssid",
+		"site",
+		"site_id",
 	}
 
 	return &clientCollector{
