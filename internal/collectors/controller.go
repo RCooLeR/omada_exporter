@@ -10,6 +10,7 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// controllerCollector collects and exports controller metrics.
 type controllerCollector struct {
 	omadaControllerUptimeSeconds           *prometheus.Desc
 	omadaControllerStorageUsedBytes        *prometheus.Desc
@@ -18,6 +19,7 @@ type controllerCollector struct {
 	client                                 *webapi.Client
 }
 
+// Describe sends the collector metric descriptors to Prometheus.
 func (c *controllerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaControllerUptimeSeconds
 	ch <- c.omadaControllerStorageUsedBytes
@@ -25,6 +27,7 @@ func (c *controllerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaControllerStorageUpgradeAvailable
 }
 
+// Collect fetches current data and emits Prometheus metrics.
 func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
 	config := c.client.Config
@@ -72,6 +75,7 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 
 }
 
+// NewControllerCollector builds the Prometheus descriptors used to export controller metrics.
 func NewControllerCollector(apiClient *api.Client) *controllerCollector {
 	labels := []string{
 		"device_name",

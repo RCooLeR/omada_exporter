@@ -2,6 +2,7 @@ package model
 
 import "fmt"
 
+// PortStatus represents live status for a device port.
 type PortStatus struct {
 	LinkStatus int8    `json:"linkStatus"`
 	LinkSpeed  int8    `json:"linkSpeed"`
@@ -13,6 +14,7 @@ type PortStatus struct {
 	TxRate     float64 `json:"txRate"`
 }
 
+// GetLinkStatus maps the numeric port status to a readable link state.
 func (ps *PortStatus) GetLinkStatus() string {
 	switch ps.LinkStatus {
 	case 0:
@@ -24,6 +26,8 @@ func (ps *PortStatus) GetLinkStatus() string {
 	}
 }
 
+// GetLinkSpeed converts the encoded negotiated port speed to Mbps and returns
+// 0 when the port is disconnected.
 func (ps *PortStatus) GetLinkSpeed() int32 {
 	if 0 == ps.LinkStatus {
 		return 0
@@ -54,6 +58,7 @@ func (ps *PortStatus) GetLinkSpeed() int32 {
 	}
 }
 
+// GetLinkSpeedLabel formats the port link speed and PoE draw as a display label.
 func (ps *PortStatus) GetLinkSpeedLabel() string {
 	label := ""
 	if ps.Poe {

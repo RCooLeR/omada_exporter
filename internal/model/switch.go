@@ -1,5 +1,6 @@
 package model
 
+// Switch represents a managed switch with uplink, port, LAG, and PoE telemetry.
 type Switch struct {
 	Device
 	Uplink Uplink `json:"uplink"`
@@ -14,6 +15,7 @@ type Switch struct {
 	PoeRemain float64 `json:"poeRemain"`
 }
 
+// GetPoeSupport converts the PoE support flag to a Yes or No label.
 func (sw *Switch) GetPoeSupport() string {
 	switch sw.PoeSupport {
 	case true:

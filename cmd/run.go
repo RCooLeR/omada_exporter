@@ -16,15 +16,18 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// healthState tracks exporter readiness for the health endpoints.
 type healthState struct {
 	ready atomic.Bool
 }
 
+// livez reports that the process is alive.
 func (h *healthState) livez(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
+// readyz reports whether the exporter has finished startup.
 func (h *healthState) readyz(w http.ResponseWriter, _ *http.Request) {
 	if !h.ready.Load() {
 		http.Error(w, "not ready", http.StatusServiceUnavailable)
@@ -35,6 +38,7 @@ func (h *healthState) readyz(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ready"))
 }
 
+// runExporter configures the exporter and starts the HTTP server.
 func runExporter(c *cli.Context) error {
 	// set log level
 	level, err := zerolog.ParseLevel(conf.LogLevel)

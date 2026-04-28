@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// IsLoggedIn reports whether the current web session is still authenticated.
 func (c *Client) IsLoggedIn() (bool, error) {
 	url := fmt.Sprintf("%s/%s/api/v2/loginStatus", c.Config.Host, c.OmadaCID)
 	req, err := http.NewRequest("GET", url, nil)
@@ -41,7 +42,7 @@ func (c *Client) IsLoggedIn() (bool, error) {
 	return loginstatus.Result.Login, err
 }
 
-// one of the "quirks" of the omada API - it requires a CID to be part of the path
+// getCid fetches the controller ID required for login requests.
 func (c *Client) getCid() (string, error) {
 	url := fmt.Sprintf("%s/api/info", c.Config.Host)
 	req, err := http.NewRequest("GET", url, nil)
@@ -75,6 +76,7 @@ func (c *Client) getCid() (string, error) {
 	return infoResponse.Result.OmadaCID, nil
 }
 
+// Login authenticates the web session against the Omada controller.
 func (c *Client) Login() error {
 
 	url := fmt.Sprintf("%s/%s/api/v2/login", c.Config.Host, c.OmadaCID)
@@ -112,6 +114,7 @@ func (c *Client) Login() error {
 	return nil
 }
 
+// LoginOpenApi authenticates against the Omada Open API.
 func (c *Client) LoginOpenApi() error {
 
 	url := fmt.Sprintf("%s/openapi/authorize/token?grant_type=client_credentials", c.Config.Host)
@@ -150,6 +153,8 @@ func (c *Client) LoginOpenApi() error {
 	c.accessTokenExpiresAt = time.Now().Add(time.Duration(logindata.Result.ExpiresIn-5) * time.Second)
 	return nil
 }
+
+// RefreshOpenApiToken refreshes the Open API access token.
 func (c *Client) RefreshOpenApiToken() error {
 	url := fmt.Sprintf("%s/openapi/authorize/token?client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token", c.Config.Host, c.Config.ClientId, c.Config.SecretId, c.refreshToken)
 	req, err := http.NewRequest("POST", url, nil)
@@ -188,6 +193,7 @@ func (c *Client) RefreshOpenApiToken() error {
 	return nil
 }
 
+// loginResponse represents the API response for login.
 type loginResponse struct {
 	ErrorCode int    `json:"errorCode"`
 	Msg       string `json:"msg"`
@@ -199,6 +205,8 @@ type loginResponse struct {
 		RefreshToken string `json:"refreshToken"`
 	} `json:"result"`
 }
+
+// loginStatus stores login status data.
 type loginStatus struct {
 	ErrorCode int `json:"errorCode"`
 	Result    struct {
@@ -206,6 +214,7 @@ type loginStatus struct {
 	} `json:"result"`
 }
 
+// RefreshOmadaContext refreshes cached Omada session and site context data.
 func (c *Client) RefreshOmadaContext() error {
 	cid, err := c.getCid()
 	if err != nil {

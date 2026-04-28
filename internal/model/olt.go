@@ -1,5 +1,6 @@
 package model
 
+// Olt represents OLT data returned by Omada.
 type Olt struct {
 	Device
 	Up       float64 `json:"up"`

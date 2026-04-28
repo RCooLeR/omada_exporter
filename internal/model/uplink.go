@@ -1,5 +1,6 @@
 package model
 
+// Uplink represents the current uplink details reported for a device.
 type Uplink struct {
 	LinkSpeed int8   `json:"linkSpeed"`
 	IP        string `json:"ip"`
@@ -8,6 +9,7 @@ type Uplink struct {
 	Type      string `json:"type"`
 }
 
+// GetLinkSpeed converts the encoded uplink speed to Mbps.
 func (up *Uplink) GetLinkSpeed() int32 {
 	switch up.LinkSpeed {
 	case 0:

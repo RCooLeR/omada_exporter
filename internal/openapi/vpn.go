@@ -11,10 +11,13 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// GetVpn returns cached VPN summary data loaded from the Open API.
 func (c *Client) GetVpn() ([]model.Vpn, error) {
 	return api.FetchCached(c.Client, "openapi:vpn", c.getVpnFresh)
 }
 
+// getVpnFresh fetches VPN summary data from the Open API and decodes the
+// returned tunnel list for the current site.
 func (c *Client) getVpnFresh() ([]model.Vpn, error) {
 	if c.Config.ClientId == "" || c.Config.SecretId == "" {
 		return nil, fmt.Errorf("ClientId and SecretId are required parameters.")
@@ -44,6 +47,7 @@ func (c *Client) getVpnFresh() ([]model.Vpn, error) {
 	return vpndata.Result.Data, err
 }
 
+// vpnResponse represents the Open API response for VPN data.
 type vpnResponse struct {
 	Result struct {
 		Data []model.Vpn `json:"data"`

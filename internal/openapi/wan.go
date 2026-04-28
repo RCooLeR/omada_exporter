@@ -10,6 +10,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// GetWans fetches WAN status data for the provided gateway from the Open API,
+// decodes the response, and stores the resulting WAN list on gw.Wans.
 func (c *Client) GetWans(gw *model.Gateway) error {
 	if c.Config.ClientId == "" || c.Config.SecretId == "" {
 		return fmt.Errorf("ClientId and SecretId are required parameters.")
@@ -39,6 +41,7 @@ func (c *Client) GetWans(gw *model.Gateway) error {
 	return err
 }
 
+// wanResponse wraps the Open API payload returned by the gateway WAN status endpoint.
 type wanResponse struct {
 	Result []model.Wan `json:"result"`
 }

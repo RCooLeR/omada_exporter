@@ -1,5 +1,6 @@
 package config
 
+// Config stores the exporter configuration values.
 type Config struct {
 	Host                     string
 	Username                 string

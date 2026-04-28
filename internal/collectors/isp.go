@@ -9,6 +9,7 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// ispCollector collects and exports ISP metrics.
 type ispCollector struct {
 	omadaIspStatus        *prometheus.Desc
 	omadaIspDownloadSpeed *prometheus.Desc
@@ -16,11 +17,14 @@ type ispCollector struct {
 	client                *openapi.Client
 }
 
+// Describe sends the collector metric descriptors to Prometheus.
 func (c *ispCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaIspStatus
 	ch <- c.omadaIspDownloadSpeed
 	ch <- c.omadaIspUploadSpeed
 }
+
+// Collect fetches current data and emits Prometheus metrics.
 func (c *ispCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
 	config := c.client.Config
@@ -53,6 +57,7 @@ func (c *ispCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// NewISPCollector builds the Prometheus descriptors used to export ISP metrics.
 func NewISPCollector(apiClient *api.Client) *ispCollector {
 	labels := []string{
 		"gateway_name",

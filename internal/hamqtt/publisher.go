@@ -20,6 +20,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Publisher publishes collected metrics to Home Assistant over MQTT.
 type Publisher struct {
 	client            *api.Client
 	registry          *prometheus.Registry
@@ -31,12 +32,14 @@ type Publisher struct {
 	mu                sync.Mutex
 }
 
+// clientTracker stores MQTT topics and labels for a tracked client.
 type clientTracker struct {
 	StateTopic      string
 	AttributesTopic string
 	Labels          map[string]string
 }
 
+// entity describes a Home Assistant entity generated from a metric.
 type entity struct {
 	Component      string
 	ObjectID       string
@@ -50,11 +53,13 @@ type entity struct {
 	Device         map[string]any
 }
 
+// metricSample stores the last observed metric value and timestamp.
 type metricSample struct {
 	Value      float64
 	ObservedAt time.Time
 }
 
+// publishContext stores lookup data used while publishing MQTT entities.
 type publishContext struct {
 	vpnIDByModeTypeName map[string]string
 	vpnIDByName         map[string]string
@@ -62,6 +67,7 @@ type publishContext struct {
 
 var slugPattern = regexp.MustCompile(`[^a-z0-9_]+`)
 
+// NewPublisher creates an MQTT publisher for the configured collectors.
 func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector) (*Publisher, error) {
 	registry := prometheus.NewRegistry()
 	for name, collector := range collectors {
@@ -81,6 +87,7 @@ func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector
 	}, nil
 }
 
+// Run connects to MQTT and publishes metric updates on a schedule.
 func (p *Publisher) Run(ctx context.Context) error {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(normalizeBroker(p.client.Config.MQTTBroker))
@@ -126,6 +133,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 	}
 }
 
+// publishAll gathers metrics and publishes discovery and state updates.
 func (p *Publisher) publishAll() {
 	families, err := p.registry.Gather()
 	if err != nil {
@@ -158,6 +166,7 @@ func (p *Publisher) publishAll() {
 	p.publishClientTrackers(seenClients)
 }
 
+// publishDiscovery publishes Home Assistant discovery data for a metric entity.
 func (p *Publisher) publishDiscovery(ent entity, metricType dto.MetricType) {
 	p.mu.Lock()
 	if _, ok := p.published[ent.DiscoveryTopic]; ok {
@@ -207,6 +216,7 @@ func (p *Publisher) publishDiscovery(ent entity, metricType dto.MetricType) {
 	p.publishJSON(ent.DiscoveryTopic, config, p.client.Config.MQTTRetain)
 }
 
+// publishMetricState publishes the current state payload for an entity.
 func (p *Publisher) publishMetricState(ent entity, value float64, observedAt time.Time) {
 	payload := map[string]any{
 		"value":        metricPayloadValue(value),
@@ -220,6 +230,7 @@ func (p *Publisher) publishMetricState(ent entity, value float64, observedAt tim
 	p.publishJSON(ent.StateTopic, payload, p.client.Config.MQTTRetain)
 }
 
+// publishDerivedMetricState publishes derived values calculated from a metric.
 func (p *Publisher) publishDerivedMetricState(metricName string, labels map[string]string, value float64, observedAt time.Time, ctx publishContext) {
 	derivedMetricName, help, ok := derivedMetric(metricName)
 	if !ok {
@@ -234,6 +245,7 @@ func (p *Publisher) publishDerivedMetricState(metricName string, labels map[stri
 	p.publishMetricState(ent, rate, observedAt)
 }
 
+// newMetricEntity builds a Home Assistant entity description from a metric family.
 func (p *Publisher) newMetricEntity(family *dto.MetricFamily, labels map[string]string, ctx publishContext) entity {
 	metricName := family.GetName()
 	component := "sensor"
@@ -259,6 +271,7 @@ func (p *Publisher) newMetricEntity(family *dto.MetricFamily, labels map[string]
 	}
 }
 
+// newDerivedEntity builds a Home Assistant entity description for a derived metric.
 func (p *Publisher) newDerivedEntity(metricName, help string, labels map[string]string, ctx publishContext) entity {
 	objectID := objectID(metricName, labels)
 	discoveryPrefix := topicPrefix(p.client.Config.MQTTDiscoveryPrefix)
@@ -278,6 +291,7 @@ func (p *Publisher) newDerivedEntity(metricName, help string, labels map[string]
 	}
 }
 
+// clientTracker returns tracker metadata for metrics that represent clients.
 func (p *Publisher) clientTracker(metricName string, labels map[string]string) (clientTracker, bool) {
 	if !strings.HasPrefix(metricName, "omada_client_") || labels["mac"] == "" {
 		return clientTracker{}, false
@@ -292,6 +306,7 @@ func (p *Publisher) clientTracker(metricName string, labels map[string]string) (
 	}, true
 }
 
+// publishClientTrackers publishes discovery and state updates for tracked clients.
 func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 	for id, tracker := range seen {
 		p.publishClientTrackerDiscovery(id, tracker)
@@ -319,6 +334,7 @@ func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 	}
 }
 
+// publishClientTrackerDiscovery publishes Home Assistant discovery data for a client tracker.
 func (p *Publisher) publishClientTrackerDiscovery(id string, tracker clientTracker) {
 	discoveryTopic := fmt.Sprintf("%s/device_tracker/omada_exporter/%s/config", topicPrefix(p.client.Config.MQTTDiscoveryPrefix), id)
 
@@ -354,6 +370,7 @@ func (p *Publisher) publishClientTrackerDiscovery(id string, tracker clientTrack
 	p.publishJSON(discoveryTopic, config, p.client.Config.MQTTRetain)
 }
 
+// publishJSON marshals a payload and publishes it as JSON.
 func (p *Publisher) publishJSON(topic string, payload any, retained bool) {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -363,6 +380,7 @@ func (p *Publisher) publishJSON(topic string, payload any, retained bool) {
 	p.publishBytes(topic, body, retained)
 }
 
+// publishBytes publishes a raw MQTT payload.
 func (p *Publisher) publishBytes(topic string, payload []byte, retained bool) {
 	if p.mqtt == nil || !p.mqtt.IsConnected() {
 		return
@@ -377,6 +395,7 @@ func (p *Publisher) publishBytes(topic string, payload []byte, retained bool) {
 	}
 }
 
+// metricValue extracts a numeric value from a Prometheus metric.
 func metricValue(metric *dto.Metric) (float64, bool) {
 	if metric.Gauge != nil {
 		return metric.Gauge.GetValue(), true
@@ -390,6 +409,7 @@ func metricValue(metric *dto.Metric) (float64, bool) {
 	return 0, false
 }
 
+// metricPayloadValue converts a metric value into a JSON-friendly payload.
 func metricPayloadValue(value float64) any {
 	const (
 		maxInt64AsFloat = float64(1<<63 - 1)
@@ -401,6 +421,7 @@ func metricPayloadValue(value float64) any {
 	return value
 }
 
+// metricLabels builds a label map from a Prometheus metric.
 func metricLabels(metric *dto.Metric) map[string]string {
 	labels := make(map[string]string, len(metric.Label))
 	for _, label := range metric.Label {
@@ -409,6 +430,7 @@ func metricLabels(metric *dto.Metric) map[string]string {
 	return labels
 }
 
+// isBinaryMetric reports whether the metric should be published as a binary sensor.
 func isBinaryMetric(name string) bool {
 	switch name {
 	case "omada_controller_upgrade_available",
@@ -416,24 +438,27 @@ func isBinaryMetric(name string) bool {
 		"omada_port_link_status",
 		"omada_lag_link_status",
 		"omada_isp_status",
-		"omada_vpn_status":
+		"omada_vpn_status",
+		"omada_site_to_site_vpn_peer_status":
 		return true
 	default:
 		return false
 	}
 }
 
+// binaryDeviceClass returns the Home Assistant device class for a binary metric.
 func binaryDeviceClass(name string) string {
 	switch name {
 	case "omada_controller_upgrade_available", "omada_device_need_upgrade":
 		return "problem"
-	case "omada_port_link_status", "omada_lag_link_status", "omada_isp_status", "omada_vpn_status":
+	case "omada_port_link_status", "omada_lag_link_status", "omada_isp_status", "omada_vpn_status", "omada_site_to_site_vpn_peer_status":
 		return "connectivity"
 	default:
 		return ""
 	}
 }
 
+// sensorHints returns Home Assistant metadata hints for a metric.
 func sensorHints(name string, metricType dto.MetricType) map[string]any {
 	hints := map[string]any{}
 	lower := strings.ToLower(name)
@@ -473,6 +498,7 @@ func sensorHints(name string, metricType dto.MetricType) map[string]any {
 	return hints
 }
 
+// friendlyMetricName builds a readable entity name for a metric.
 func friendlyMetricName(metricName string, labels map[string]string) string {
 	base := strings.TrimPrefix(metricName, "omada_")
 	parts := strings.Split(base, "_")
@@ -502,6 +528,7 @@ func friendlyMetricName(metricName string, labels map[string]string) string {
 	return name
 }
 
+// objectID builds a stable Home Assistant object identifier for a metric.
 func objectID(metricName string, labels map[string]string) string {
 	stable := []string{metricName}
 
@@ -514,9 +541,18 @@ func objectID(metricName string, labels map[string]string) string {
 	if metricName == "omada_vpn_status" && labels["vpn_id"] != "" {
 		stable = append(stable, "vpn_id_"+labels["vpn_id"])
 	}
+	if strings.HasPrefix(metricName, "omada_site_to_site_vpn_") && labels["vpn_id"] != "" {
+		stable = append(stable, "vpn_id_"+labels["vpn_id"])
+	}
+	if labels["tunnel_id"] != "" {
+		stable = append(stable, "tunnel_id_"+labels["tunnel_id"])
+	}
+	if labels["peer_id"] != "" {
+		stable = append(stable, "peer_id_"+labels["peer_id"])
+	}
 
 	if labels["device_mac"] == "" && labels["mac"] == "" && labels["gateway_mac"] == "" && !(metricName == "omada_vpn_status" && labels["vpn_id"] != "") {
-		for _, key := range []string{"interface_name", "local_ip", "remote_ip", "connection_mode", "wifi_mode", "ssid", "name"} {
+		for _, key := range []string{"interface_name", "local_ip", "remote_ip", "connection_mode", "wifi_mode", "ssid", "name", "peer_name"} {
 			if value := labels[key]; value != "" {
 				stable = append(stable, key+"_"+value)
 			}
@@ -526,6 +562,7 @@ func objectID(metricName string, labels map[string]string) string {
 	return slug(strings.Join(stable, "_")) + "_" + shortHash(stable)
 }
 
+// shortHash returns a short hash for the provided values.
 func shortHash(values []string) string {
 	parts := append([]string{}, values...)
 	sort.Strings(parts)
@@ -537,6 +574,7 @@ func shortHash(values []string) string {
 	return hex.EncodeToString(h.Sum(nil))[:10]
 }
 
+// slug converts a string into a Home Assistant safe slug.
 func slug(value string) string {
 	value = strings.ToLower(value)
 	value = strings.ReplaceAll(value, "-", "_")
@@ -558,6 +596,7 @@ func slug(value string) string {
 	return value
 }
 
+// topicPrefix normalizes the MQTT topic prefix.
 func topicPrefix(prefix string) string {
 	prefix = strings.Trim(prefix, "/")
 	if prefix == "" {
@@ -566,6 +605,7 @@ func topicPrefix(prefix string) string {
 	return prefix
 }
 
+// normalizeBroker normalizes the MQTT broker address.
 func normalizeBroker(broker string) string {
 	if strings.Contains(broker, "://") {
 		return broker
@@ -573,6 +613,7 @@ func normalizeBroker(broker string) string {
 	return "tcp://" + broker
 }
 
+// deviceInfo builds Home Assistant device metadata for a metric.
 func deviceInfo(client *api.Client, metricName string, labels map[string]string) map[string]any {
 	if strings.HasPrefix(metricName, "omada_client_") && labels["mac"] != "" {
 		device := map[string]any{
@@ -638,6 +679,7 @@ func deviceInfo(client *api.Client, metricName string, labels map[string]string)
 	})
 }
 
+// compactDevice removes empty values from Home Assistant device metadata.
 func compactDevice(device map[string]any) map[string]any {
 	for key, value := range device {
 		switch typed := value.(type) {
@@ -654,14 +696,17 @@ func compactDevice(device map[string]any) map[string]any {
 	return device
 }
 
+// clientName returns the display name for a client label set.
 func clientName(labels map[string]string) string {
 	return firstNonEmpty(labels["name"], labels["host_name"], labels["system_name"], labels["ip"], labels["mac"], "Omada Client")
 }
 
+// trackerID builds the tracker identifier for a client MAC address.
 func trackerID(mac string) string {
 	return slug(strings.ReplaceAll(strings.ToLower(mac), ":", "_"))
 }
 
+// firstNonEmpty returns the first non-empty string in the provided values.
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {
@@ -671,6 +716,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+// copyLabels returns a shallow copy of a metric label map.
 func copyLabels(labels map[string]string) map[string]string {
 	copied := make(map[string]string, len(labels))
 	for key, value := range labels {
@@ -679,6 +725,7 @@ func copyLabels(labels map[string]string) map[string]string {
 	return copied
 }
 
+// buildPublishContext builds lookup data used while publishing related metrics.
 func buildPublishContext(families []*dto.MetricFamily) publishContext {
 	modeTypeNameCounts := map[string]int{}
 	modeTypeNameIDs := map[string]string{}
@@ -716,6 +763,7 @@ func buildPublishContext(families []*dto.MetricFamily) publishContext {
 	}
 }
 
+// uniqueLookup returns values that are unique within the provided counts.
 func uniqueLookup(counts map[string]int, values map[string]string) map[string]string {
 	lookup := make(map[string]string, len(values))
 	for key, value := range values {
@@ -726,6 +774,7 @@ func uniqueLookup(counts map[string]int, values map[string]string) map[string]st
 	return lookup
 }
 
+// deviceLabels returns the labels used to identify the owning device for a metric.
 func deviceLabels(metricName string, labels map[string]string, ctx publishContext) map[string]string {
 	if !strings.HasPrefix(metricName, "omada_vpn_") || labels["vpn_id"] != "" {
 		return labels
@@ -744,6 +793,7 @@ func deviceLabels(metricName string, labels map[string]string, ctx publishContex
 	return enriched
 }
 
+// vpnLookupKey builds a lookup key for VPN-related metrics.
 func vpnLookupKey(name, mode, vpnType string) string {
 	parts := []string{slug(name), slug(mode), slug(vpnType)}
 	if parts[0] == "" {
@@ -752,17 +802,23 @@ func vpnLookupKey(name, mode, vpnType string) string {
 	return strings.Join(parts, "|")
 }
 
+// derivedMetric returns the derived metric definition for a source metric.
 func derivedMetric(metricName string) (string, string, bool) {
 	switch metricName {
 	case "omada_vpn_down_bytes":
 		return "omada_vpn_down_speed", "VPN downlink speed in bits per second", true
 	case "omada_vpn_up_bytes":
 		return "omada_vpn_up_speed", "VPN uplink speed in bits per second", true
+	case "omada_site_to_site_vpn_peer_down_bytes":
+		return "omada_site_to_site_vpn_peer_down_speed", "Site-to-site VPN peer downlink speed in bits per second", true
+	case "omada_site_to_site_vpn_peer_up_bytes":
+		return "omada_site_to_site_vpn_peer_up_speed", "Site-to-site VPN peer uplink speed in bits per second", true
 	default:
 		return "", "", false
 	}
 }
 
+// recordRateSample stores a metric sample and returns its calculated rate.
 func (p *Publisher) recordRateSample(sampleKey string, value float64, observedAt time.Time) float64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()

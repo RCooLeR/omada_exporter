@@ -1,5 +1,6 @@
 package model
 
+// Controller represents controller identity, capacity, storage, and upgrade data.
 type Controller struct {
 	Name              string  `json:"name"`
 	MacAddress        string  `json:"macAddress"`
@@ -30,12 +31,15 @@ type Controller struct {
 	UpgradeList []ControllerUpdate `json:"upgradeList"`
 }
 
+// ControllerUpdate represents one available controller update channel.
 type ControllerUpdate struct {
 	Channel         int    `json:"channel"`
 	UpdateAvailable bool   `json:"update"`
 	LatestVersion   string `json:"latestVersion,omitempty"`
 }
 
+// GetVersionWithUpgrade appends the first available upgrade channel to the
+// controller version string.
 func (c *Controller) GetVersionWithUpgrade() string {
 	version := c.ControllerVersion
 	for _, upgrade := range c.UpgradeList {
@@ -46,6 +50,8 @@ func (c *Controller) GetVersionWithUpgrade() string {
 	}
 	return version
 }
+
+// GetChannel maps the numeric update channel code to a readable label.
 func (cu *ControllerUpdate) GetChannel() string {
 	switch cu.Channel {
 	case 0:

@@ -13,6 +13,7 @@ var version = "2.1.2"
 
 var conf = config.Config{}
 
+// Start configures and runs the CLI application.
 func Start() {
 	app := cli.NewApp()
 	app.Name = "omada_exporter"

@@ -4,6 +4,7 @@ import (
 	"strings"
 )
 
+// NetworkClient represents a client device connected to the Omada network.
 type NetworkClient struct {
 	Mac            string `json:"mac"`
 	Ip             string `json:"ip"`
@@ -43,9 +44,12 @@ type NetworkClient struct {
 	TxRate      float64 `json:"txRate"`
 }
 
+// GetName returns the trimmed client name reported by Omada.
 func (s *NetworkClient) GetName() string {
 	return strings.TrimSpace(s.Name)
 }
+
+// GetWifiMode maps the Wi-Fi mode code to a readable 802.11 standard label.
 func (c *NetworkClient) GetWifiMode() string {
 	mapping := map[int8]string{
 		0: "802.11a",
@@ -66,6 +70,7 @@ func (c *NetworkClient) GetWifiMode() string {
 	return formatted
 }
 
+// GetConnectType maps the connection type code to a wired or wireless client label.
 func (c *NetworkClient) GetConnectType() string {
 	switch c.ConnectType {
 	case 0:

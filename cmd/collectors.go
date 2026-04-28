@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// collectors returns the full complement of configured collectors.
+// initCollectors builds the Prometheus collectors map for the API client.
 func initCollectors(client *api.Client) map[string]prometheus.Collector {
 	return map[string]prometheus.Collector{
 		"controller": collector.NewControllerCollector(client),

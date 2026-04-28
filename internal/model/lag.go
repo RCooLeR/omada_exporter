@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Lag represents a link aggregation group on a switch.
 type Lag struct {
 	LagId     int8      `json:"lagId"`
 	LagType   int8      `json:"lagType"`
@@ -13,6 +14,7 @@ type Lag struct {
 	LagStatus LagStatus `json:"lagStatus"`
 }
 
+// GetLagType maps the numeric LAG mode to a readable aggregation type.
 func (l *Lag) GetLagType() string {
 	switch l.LagType {
 	case 1:
@@ -27,6 +29,7 @@ func (l *Lag) GetLagType() string {
 	return "Unknown"
 }
 
+// GetPorts formats the member port numbers as a comma-separated list.
 func (l *Lag) GetPorts() string {
 	strs := make([]string, len(l.Ports))
 	for i, p := range l.Ports {

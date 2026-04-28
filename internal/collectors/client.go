@@ -10,6 +10,7 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// clientCollector collects and exports client metrics.
 type clientCollector struct {
 	omadaClientDownloadActivityBytes *prometheus.Desc
 	omadaClientUploadActivityBytes   *prometheus.Desc
@@ -24,6 +25,7 @@ type clientCollector struct {
 	client                           *openapi.Client
 }
 
+// Describe sends the collector metric descriptors to Prometheus.
 func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
 	if c.trackClientMetrics() {
 		ch <- c.omadaClientDownloadActivityBytes
@@ -39,10 +41,12 @@ func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaClientConnectedTotal
 }
 
+// trackClientMetrics reports whether client metrics.
 func (c *clientCollector) trackClientMetrics() bool {
 	return trackClientMetrics(c.client.Client)
 }
 
+// Collect fetches current data and emits Prometheus metrics.
 func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
 	config := c.client.Config
@@ -114,6 +118,7 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// NewClientCollector builds the Prometheus descriptors used to export client metrics.
 func NewClientCollector(apiClient *api.Client) *clientCollector {
 	labels := []string{
 		"mac",

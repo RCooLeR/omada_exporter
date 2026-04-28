@@ -11,10 +11,14 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// GetIsp returns cached ISP load data and includes the gateway metadata copied
+// from the Open API response for each ISP entry.
 func (c *Client) GetIsp() ([]model.Isp, error) {
 	return api.FetchCached(c.Client, "openapi:isp", c.getIspFresh)
 }
 
+// getIspFresh loads ISP dashboard data from the Open API and flattens the
+// per-gateway response into a single ISP slice with gateway fields filled in.
 func (c *Client) getIspFresh() ([]model.Isp, error) {
 	if c.Config.ClientId == "" || c.Config.SecretId == "" {
 		return nil, fmt.Errorf("ClientId and SecretId are required parameters.")
@@ -53,6 +57,7 @@ func (c *Client) getIspFresh() ([]model.Isp, error) {
 	return result, err
 }
 
+// ispResponse represents the Open API response for ISP data.
 type ispResponse struct {
 	Result struct {
 		Data []struct {

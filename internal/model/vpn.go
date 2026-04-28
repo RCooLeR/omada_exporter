@@ -1,5 +1,6 @@
 package model
 
+// Vpn represents VPN summary information returned by the Omada Open API.
 type Vpn struct {
 	Id       string `json:"id"`
 	Name     string `json:"name"`
@@ -10,6 +11,7 @@ type Vpn struct {
 	Status   bool   `json:"status"`
 }
 
+// GetPurpose maps the VPN purpose code to a site-to-site or client-to-site label.
 func (v *Vpn) GetPurpose() string {
 	switch v.Purpose {
 	case 0:
@@ -19,26 +21,13 @@ func (v *Vpn) GetPurpose() string {
 	}
 	return ""
 }
-func (v *Vpn) GetVpnMode() string {
-	switch v.VpnMode {
-	case 0:
-		return "Server"
-	case 1:
-		return "Client"
-	}
-	return ""
-}
-func (v *Vpn) GetVpnType() string {
-	switch v.VpnType {
-	case 0:
-		return "L2TP"
-	case 1:
-		return "PPTP"
-	case 2:
-		return "IPSec"
-	case 3:
 
-		return "OpenVPN"
-	}
-	return ""
+// GetVpnMode converts the VPN mode code to a readable role label.
+func (v *Vpn) GetVpnMode() string {
+	return vpnModeString(v.VpnMode)
+}
+
+// GetVpnType converts the VPN type code to a readable protocol label.
+func (v *Vpn) GetVpnType() string {
+	return vpnTypeString(v.VpnType)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// collectAccessPoint emits metrics for the access point.
 func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *model.AccessPoint) error {
 	deviceLabels := []string{
 		ap.GetMac(),

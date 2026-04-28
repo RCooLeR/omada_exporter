@@ -1,5 +1,6 @@
 package model
 
+// LagStatus represents runtime status for a link aggregation group.
 type LagStatus struct {
 	LinkStatus int8    `json:"linkStatus"`
 	LinkSpeed  int8    `json:"linkSpeed"`
@@ -10,6 +11,7 @@ type LagStatus struct {
 	Ports      []int8  `json:"ports"`
 }
 
+// GetLinkStatus maps the LAG link status code to a readable state label.
 func (ls *LagStatus) GetLinkStatus() string {
 	switch ls.LinkStatus {
 	case 0:
@@ -21,6 +23,7 @@ func (ls *LagStatus) GetLinkStatus() string {
 	}
 }
 
+// GetLinkSpeed converts the encoded LAG link speed to Mbps.
 func (ls *LagStatus) GetLinkSpeed() int32 {
 	switch ls.LinkSpeed {
 	case 0:
@@ -47,6 +50,8 @@ func (ls *LagStatus) GetLinkSpeed() int32 {
 		return 0
 	}
 }
+
+// GetTotalLagSpeed sums the negotiated speeds of the switch ports that belong to the LAG.
 func (ls *LagStatus) GetTotalLagSpeed(sw *Switch) int32 {
 	var speed int32
 	speed = 0

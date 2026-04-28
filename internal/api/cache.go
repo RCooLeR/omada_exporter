@@ -5,11 +5,13 @@ import (
 	"time"
 )
 
+// cacheEntry stores a cached value and its expiration time.
 type cacheEntry struct {
 	value     any
 	expiresAt time.Time
 }
 
+// cacheTTL returns the request cache lifetime configured for the client.
 func (c *Client) cacheTTL() time.Duration {
 	if c == nil || c.Config == nil || c.Config.CacheTTL <= 0 {
 		return 0
@@ -18,12 +20,14 @@ func (c *Client) cacheTTL() time.Duration {
 	return time.Duration(c.Config.CacheTTL) * time.Second
 }
 
+// invalidateRequestCache clears cached request results.
 func (c *Client) invalidateRequestCache() {
 	c.cacheMu.Lock()
 	c.requestCache = map[string]cacheEntry{}
 	c.cacheMu.Unlock()
 }
 
+// FetchCached returns a cached value or fetches, stores, and returns a fresh one.
 func FetchCached[T any](client *Client, key string, fetch func() (T, error)) (T, error) {
 	var zero T
 	ttl := client.cacheTTL()

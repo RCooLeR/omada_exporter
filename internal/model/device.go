@@ -3,6 +3,8 @@ package model
 type DevicesInterface interface {
 	GetType() string
 }
+
+// Device stores the common inventory and telemetry fields shared by Omada devices.
 type Device struct {
 	//Labels
 	Mac             string `json:"mac"`
@@ -50,16 +52,37 @@ type DeviceInterface interface {
 	GetTemp() float64
 }
 
-func (s *Device) GetType() string            { return s.Type }
-func (s *Device) GetMac() string             { return s.Mac }
-func (s *Device) GetName() string            { return s.Name }
-func (s *Device) GetSubtype() string         { return s.Subtype }
-func (s *Device) GetModel() string           { return s.Model }
-func (s *Device) GetShowModel() string       { return s.ShowModel }
-func (s *Device) GetVersion() string         { return s.Version }
-func (s *Device) GetHwVersion() string       { return s.HwVersion }
+// GetType returns the Omada device type used to distinguish concrete models.
+func (s *Device) GetType() string { return s.Type }
+
+// GetMac returns the device MAC address.
+func (s *Device) GetMac() string { return s.Mac }
+
+// GetName returns the device display name.
+func (s *Device) GetName() string { return s.Name }
+
+// GetSubtype returns the controller-specific device subtype.
+func (s *Device) GetSubtype() string { return s.Subtype }
+
+// GetModel returns the hardware model identifier.
+func (s *Device) GetModel() string { return s.Model }
+
+// GetShowModel returns the user-facing model name reported by Omada.
+func (s *Device) GetShowModel() string { return s.ShowModel }
+
+// GetVersion returns the primary device software version string.
+func (s *Device) GetVersion() string { return s.Version }
+
+// GetHwVersion returns the hardware revision string.
+func (s *Device) GetHwVersion() string { return s.HwVersion }
+
+// GetFirmwareVersion returns the firmware version string.
 func (s *Device) GetFirmwareVersion() string { return s.FirmwareVersion }
-func (s *Device) GetIp() string              { return s.IP }
+
+// GetIp returns the management IP address.
+func (s *Device) GetIp() string { return s.IP }
+
+// GetStatus maps the numeric device status code to a human-readable state label.
 func (s *Device) GetStatus() string {
 	switch s.Status {
 	case 0:
@@ -115,13 +138,29 @@ func (s *Device) GetStatus() string {
 	}
 	return ""
 }
-func (s *Device) GetUptime() float64         { return s.Uptime }
+
+// GetUptime returns the device uptime value reported by Omada.
+func (s *Device) GetUptime() float64 { return s.Uptime }
+
+// GetMemUtilization returns the current memory utilization percentage.
 func (s *Device) GetMemUtilization() float64 { return s.MemUtilization }
+
+// GetCpuUtilization returns the current CPU utilization percentage.
 func (s *Device) GetCpuUtilization() float64 { return s.CpuUtilization }
-func (s *Device) GetNeedUpgrade() bool       { return s.NeedUpgrade }
-func (s *Device) GetDownload() float64       { return s.Download }
-func (s *Device) GetUpload() float64         { return s.Upload }
-func (s *Device) GetTemp() float64           { return s.Temp }
+
+// GetNeedUpgrade reports whether Omada marks the device as having an available upgrade.
+func (s *Device) GetNeedUpgrade() bool { return s.NeedUpgrade }
+
+// GetDownload returns the current downstream throughput value.
+func (s *Device) GetDownload() float64 { return s.Download }
+
+// GetUpload returns the current upstream throughput value.
+func (s *Device) GetUpload() float64 { return s.Upload }
+
+// GetTemp returns the current device temperature reading.
+func (s *Device) GetTemp() float64 { return s.Temp }
+
+// GetVersionWithUpgrade appends an upgrade marker when Omada reports a pending upgrade.
 func (s *Device) GetVersionWithUpgrade() string {
 	if s.NeedUpgrade {
 		return s.Version + " ↑"

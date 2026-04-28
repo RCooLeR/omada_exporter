@@ -10,6 +10,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// GetPortsAndLags fetches switch details from the Web API and copies the
+// decoded port, LAG, uplink, traffic, power, and temperature fields onto sw.
 func (c *Client) GetPortsAndLags(sw *model.Switch) error {
 	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/switches/%s", c.Config.Host, c.OmadaCID, c.SiteId, sw.Mac)
 	req, err := http.NewRequest("GET", url, nil)
@@ -41,6 +43,9 @@ func (c *Client) GetPortsAndLags(sw *model.Switch) error {
 	sw.Lags = portdata.Result.Lags
 	return err
 }
+
+// GetApPorts fetches the LAN port list for the provided access point and stores
+// the decoded ports on ap.
 func (c *Client) GetApPorts(ap *model.AccessPoint) error {
 	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/eaps/%s/ports", c.Config.Host, c.OmadaCID, c.SiteId, ap.Mac)
 	req, err := http.NewRequest("GET", url, nil)
@@ -67,6 +72,8 @@ func (c *Client) GetApPorts(ap *model.AccessPoint) error {
 	return err
 }
 
+// GetGatewayPorts fetches gateway port telemetry, derives each port's maximum
+// supported speed from the capability list, and stores the result on gw.
 func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/gateways/%s", c.Config.Host, c.OmadaCID, c.SiteId, gw.Mac)
 	req, err := http.NewRequest("GET", url, nil)
@@ -99,13 +106,17 @@ func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 	return err
 }
 
+// portResponse wraps the Web API payload returned for switch details.
 type portResponse struct {
 	Result model.Switch `json:"result"`
 }
+
+// apPortResponse wraps the Web API payload returned for access point LAN ports.
 type apPortResponse struct {
 	Result []model.AccessPointPort `json:"result"`
 }
 
+// gatewayResponse wraps the Web API payload returned for gateway port details.
 type gatewayResponse struct {
 	Result struct {
 		Temp        float64             `json:"temp"`
@@ -116,14 +127,19 @@ type gatewayResponse struct {
 	} `json:"result"`
 }
 
+// gatewayPortConfig stores per-port capability data used to derive max speed.
 type gatewayPortConfig struct {
 	Port     int8      `json:"port"`
 	PortCaps []PortCap `json:"portCap"`
 }
+
+// PortCap represents one advertised speed capability for a gateway port.
 type PortCap struct {
 	LinkSpeed int8
 }
 
+// GetMaxLinkSpeed scans the configured capabilities for a port and returns the
+// fastest supported link speed in Mbps.
 func (ps *gatewayResponse) GetMaxLinkSpeed(port int8) int32 {
 	maxSpeed := 0
 	for _, conf := range ps.Result.PortConfigs {

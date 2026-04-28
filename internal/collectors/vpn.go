@@ -8,14 +8,18 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// vpnCollector collects and exports VPN metrics.
 type vpnCollector struct {
 	omadaVpnStatus *prometheus.Desc
 	client         *openapi.Client
 }
 
+// Describe sends the collector metric descriptors to Prometheus.
 func (c *vpnCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaVpnStatus
 }
+
+// Collect fetches current data and emits Prometheus metrics.
 func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
 	config := c.client.Config
@@ -33,6 +37,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// NewVpnCollector builds the Prometheus descriptors used to export VPN summary metrics.
 func NewVpnCollector(apiClient *api.Client) *vpnCollector {
 	labels := []string{"vpn_id", "name", "purpose", "vpn_mode", "vpn_type", "remote_ip", "site", "site_id"}
 

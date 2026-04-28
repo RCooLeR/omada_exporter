@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// collectGateway emits metrics for the gateway.
 func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *model.Gateway) error {
 	labels := []string{
 		gateway.GetMac(),

@@ -7,16 +7,17 @@ import (
 	"net/http"
 )
 
-// there's no nice way of fetching the site ID from the `Viewer` role
-// calling the user endpoint seems to return a list of sites for the user
+// getSiteId returns the site identifier for the configured site name.
 func (c *Client) getSiteId(name string) (*string, error) {
 	return c.getSiteIdWithRequest(name, c.MakeLoggedInRequest)
 }
 
+// getSiteIdFromCurrentSession returns the site identifier from the current session data.
 func (c *Client) getSiteIdFromCurrentSession(name string) (*string, error) {
 	return c.getSiteIdWithRequest(name, c.makeRequest)
 }
 
+// getSiteIdWithRequest resolves the site identifier using the provided request function.
 func (c *Client) getSiteIdWithRequest(name string, requestFn func(*http.Request) (*http.Response, error)) (*string, error) {
 	url := fmt.Sprintf("%s/%s/api/v2/users/current", c.Config.Host, c.OmadaCID)
 	req, err := http.NewRequest("GET", url, nil)
@@ -50,6 +51,7 @@ func (c *Client) getSiteIdWithRequest(name string, requestFn func(*http.Request)
 	return nil, fmt.Errorf("failed to find site with name %s", name)
 }
 
+// userResponse represents the API response for user.
 type userResponse struct {
 	Result struct {
 		Privilege struct {

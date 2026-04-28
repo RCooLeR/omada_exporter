@@ -4,7 +4,7 @@ import (
 	"github.com/RCooLeR/omada_exporter/internal/api"
 )
 
-// hack for keeping logic in separate dirs
+// Client wraps the shared API client for Omada Open API calls.
 type Client struct {
 	*api.Client
 }

@@ -1,5 +1,6 @@
 package model
 
+// Wan represents a gateway WAN interface with link, protocol, and traffic data.
 type Wan struct {
 	//Labels
 	Port          int8   `json:"port"`
@@ -17,6 +18,8 @@ type Wan struct {
 	Latency int8    `json:"latency"`
 }
 
+// GetLinkSpeed converts the encoded WAN link speed to Mbps and returns 0 when
+// the interface is not active.
 func (w *Wan) GetLinkSpeed() int32 {
 	if 0 == w.Status {
 		return 0
@@ -46,6 +49,8 @@ func (w *Wan) GetLinkSpeed() int32 {
 		return 0
 	}
 }
+
+// GetStatus maps the WAN administrative status code to a readable label.
 func (wan *Wan) GetStatus() string {
 	switch wan.Status {
 	case 0:
@@ -56,6 +61,8 @@ func (wan *Wan) GetStatus() string {
 		return "Unknown"
 	}
 }
+
+// GetType maps the WAN interface type code to its configured role label.
 func (wan *Wan) GetType() string {
 	switch wan.Type {
 	case 0:

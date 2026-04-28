@@ -12,10 +12,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// GetNetworkClients returns cached network client inventory loaded from the Open API.
 func (c *Client) GetNetworkClients() ([]model.NetworkClient, error) {
 	return api.FetchCached(c.Client, "openapi:clients", c.getNetworkClientsFresh)
 }
 
+// getNetworkClientsFresh posts the active-client filter request to the Open API
+// and returns the decoded client list for the current site.
 func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
 	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
 	requestBody, err := json.Marshal(clientRequest{
@@ -57,12 +60,14 @@ func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
 	return clientdata.Result.Data, err
 }
 
+// clientResponse represents the Open API response for network clients.
 type clientResponse struct {
 	Result struct {
 		Data []model.NetworkClient `json:"data"`
 	} `json:"result"`
 }
 
+// clientRequest represents the Open API request payload for network clients.
 type clientRequest struct {
 	Filters               clientFilters  `json:"filters"`
 	Sorts                 map[string]any `json:"sorts"`
@@ -72,6 +77,7 @@ type clientRequest struct {
 	Scope                 int            `json:"scope"`
 }
 
+// clientFilters stores filters used in network client Open API requests.
 type clientFilters struct {
 	Active bool `json:"active"`
 }

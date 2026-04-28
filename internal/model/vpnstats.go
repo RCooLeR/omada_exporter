@@ -1,11 +1,8 @@
 package model
 
-import (
-	"strconv"
-	"strings"
-)
-
+// VpnStats represents runtime statistics for a VPN tunnel.
 type VpnStats struct {
+	VpnID         string `json:"vpnId"`
 	Name          string `json:"vpnName"`
 	InterfaceName string `json:"interfaceName"`
 	VpnMode       int8   `json:"serverType"`
@@ -13,50 +10,23 @@ type VpnStats struct {
 	LocalIp       string `json:"localIp"`
 	RemoteIp      string `json:"remoteIp"`
 	Uptime        string `json:"uptime"`
+	DownPkts      int64  `json:"downPkts"`
 	DownBytes     int64  `json:"downBytes"`
+	UpPkts        int64  `json:"upPkts"`
 	UpBytes       int64  `json:"upBytes"`
 }
 
+// GetVpnMode converts the VPN mode code to a readable role label.
 func (v *VpnStats) GetVpnMode() string {
-	switch v.VpnMode {
-	case 0:
-		return "Server"
-	case 1:
-		return "Client"
-	}
-	return ""
+	return vpnModeString(v.VpnMode)
 }
+
+// GetVpnType converts the VPN type code to a readable protocol label.
 func (v *VpnStats) GetVpnType() string {
-	switch v.VpnType {
-	case 0:
-		return "L2TP"
-	case 1:
-		return "PPTP"
-	case 2:
-		return "IPSec"
-	case 3:
-
-		return "OpenVPN"
-	}
-	return ""
+	return vpnTypeString(v.VpnType)
 }
 
-func (v *VpnStats) GetUptime() int {
-	totalMinutes := 0
-	parts := strings.Fields(v.Uptime)
-
-	for _, part := range parts {
-		if strings.HasSuffix(part, "d") {
-			days, _ := strconv.Atoi(strings.TrimSuffix(part, "d"))
-			totalMinutes += days * 24 * 60
-		} else if strings.HasSuffix(part, "h") {
-			hours, _ := strconv.Atoi(strings.TrimSuffix(part, "h"))
-			totalMinutes += hours * 60
-		} else if strings.HasSuffix(part, "m") {
-			minutes, _ := strconv.Atoi(strings.TrimSuffix(part, "m"))
-			totalMinutes += minutes
-		}
-	}
-
-	return totalMinutes
+// GetUptime parses the VPN uptime string and returns the value in seconds.
+func (v *VpnStats) GetUptime() int64 {
+	return parseUptimeSeconds(v.Uptime)
 }

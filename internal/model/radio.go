@@ -1,5 +1,6 @@
 package model
 
+// Radio represents radio data returned by Omada.
 type Radio struct {
 	RdMode           string  `json:"rdMode"`
 	BandWidth        string  `json:"bandWidth"`

@@ -9,6 +9,7 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// DeviceCollector collects and exports device metrics.
 type DeviceCollector struct {
 	omadaDeviceUptimeSeconds *prometheus.Desc
 	omadaDeviceCpuPercentage *prometheus.Desc
@@ -52,6 +53,7 @@ type DeviceCollector struct {
 	webClient *webapi.Client
 }
 
+// Describe sends the collector metric descriptors to Prometheus.
 func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDeviceUptimeSeconds
 	ch <- c.omadaDeviceCpuPercentage
@@ -95,14 +97,17 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDevice6gRxUtil
 }
 
+// trackPortMetrics reports whether port metrics.
 func (c *DeviceCollector) trackPortMetrics() bool {
 	return trackPortMetrics(c.webClient.Client)
 }
 
+// includePortActivityLabel reports whether port activity label.
 func (c *DeviceCollector) includePortActivityLabel() bool {
 	return includePortActivityLabel(c.webClient.Client)
 }
 
+// buildPortLabels builds the port labels.
 func (c *DeviceCollector) buildPortLabels(baseLabels []string, port, maxSpeed, name, portType, operation, linkStatus, linkSpeed, poe, activity string) []string {
 	labels := append([]string{}, baseLabels...)
 	labels = append(labels,
@@ -121,6 +126,7 @@ func (c *DeviceCollector) buildPortLabels(baseLabels []string, port, maxSpeed, n
 	return labels
 }
 
+// collectDevice emits metrics for the device.
 func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device model.DeviceInterface) error {
 	labels := []string{
 		device.GetMac(),
@@ -147,6 +153,7 @@ func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 	return nil
 }
 
+// Collect fetches current data and emits Prometheus metrics.
 func (c *DeviceCollector) Collect(ch chan<- prometheus.Metric) {
 	devices, err := c.webClient.GetDevices()
 	if err != nil {
@@ -196,6 +203,8 @@ func (c *DeviceCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// NewDeviceCollector builds the Prometheus descriptors used to export device,
+// uplink, port, LAG, WAN, and radio metrics.
 func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 	deviceLabels := []string{
 		"device_mac",

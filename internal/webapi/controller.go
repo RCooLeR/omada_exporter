@@ -11,10 +11,13 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// GetController returns cached controller status data combined with upgrade-channel information.
 func (c *Client) GetController() (*model.Controller, error) {
 	return api.FetchCached(c.Client, "webapi:controller", c.getControllerFresh)
 }
 
+// getControllerFresh fetches controller status and available upgrade channels
+// from separate Web API endpoints and merges them into one Controller value.
 func (c *Client) getControllerFresh() (*model.Controller, error) {
 	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, c.OmadaCID)
 	req, err := http.NewRequest("GET", url, nil)
@@ -64,10 +67,12 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 	return &controllerData.Result, err
 }
 
+// controllerResponse represents the Web API response for controller data.
 type controllerResponse struct {
 	Result model.Controller `json:"result"`
 }
 
+// controllerUpdatesResponse represents the Web API response for controller updates.
 type controllerUpdatesResponse struct {
 	Result struct {
 		UpgradeList []model.ControllerUpdate `json:"upgradeList"`

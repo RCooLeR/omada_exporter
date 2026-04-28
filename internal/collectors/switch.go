@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// collectSwitch emits metrics for the switch.
 func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.Switch) error {
 	labels := []string{
 		sw.GetMac(),

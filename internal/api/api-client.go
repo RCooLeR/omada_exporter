@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+// Client coordinates authenticated access to the Omada APIs.
 type Client struct {
 	Config               *config.Config
 	httpClient           *http.Client
@@ -31,6 +32,7 @@ type Client struct {
 	requestGroup         singleflight.Group
 }
 
+// createHttpClient builds the shared HTTP client with TLS and timeout settings.
 func createHttpClient(insecure bool, timeout int) (*http.Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -50,6 +52,7 @@ func createHttpClient(insecure bool, timeout int) (*http.Client, error) {
 	return client, nil
 }
 
+// Configure creates an API client from the exporter configuration.
 func Configure(c *config.Config) (*Client, error) {
 	httpClient, err := createHttpClient(c.Insecure, c.Timeout)
 	if err != nil {
@@ -82,6 +85,7 @@ func Configure(c *config.Config) (*Client, error) {
 	return client, nil
 }
 
+// makeRequest executes an HTTP request with the configured client.
 func (c *Client) makeRequest(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
@@ -95,6 +99,7 @@ func (c *Client) makeRequest(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(req)
 }
 
+// cloneRequest copies an HTTP request so it can be retried safely.
 func cloneRequest(req *http.Request) (*http.Request, error) {
 	cloned := req.Clone(req.Context())
 	if req.Body == nil || req.Body == http.NoBody {
@@ -112,6 +117,7 @@ func cloneRequest(req *http.Request) (*http.Request, error) {
 	return cloned, nil
 }
 
+// readAndRestoreBody reads a response body and restores it for later use.
 func readAndRestoreBody(resp *http.Response) ([]byte, error) {
 	if resp == nil || resp.Body == nil {
 		return nil, nil
@@ -127,6 +133,7 @@ func readAndRestoreBody(resp *http.Response) ([]byte, error) {
 	return body, nil
 }
 
+// apiErrorResponse represents an error payload returned by Omada.
 type apiErrorResponse struct {
 	ErrorCode      *int   `json:"errorCode"`
 	ErrorCodeSnake *int   `json:"error_code"`
@@ -134,10 +141,12 @@ type apiErrorResponse struct {
 	ErrorMsg       string `json:"errorMsg"`
 }
 
+// isHTTPAuthStatus reports whether the status code indicates an authentication failure.
 func isHTTPAuthStatus(statusCode int) bool {
 	return statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden
 }
 
+// isAuthRelatedMessage reports whether a message points to an authentication problem.
 func isAuthRelatedMessage(message string) bool {
 	message = strings.ToLower(message)
 	if message == "" {
@@ -150,6 +159,7 @@ func isAuthRelatedMessage(message string) bool {
 		(strings.Contains(message, "auth") && (strings.Contains(message, "fail") || strings.Contains(message, "expired")))
 }
 
+// isWebAPIAuthFailure inspects a response for Web API authentication failures.
 func isWebAPIAuthFailure(resp *http.Response) (bool, error) {
 	if resp == nil {
 		return false, nil
@@ -178,6 +188,7 @@ func isWebAPIAuthFailure(resp *http.Response) (bool, error) {
 	return isAuthRelatedMessage(apiErr.Msg) || isAuthRelatedMessage(apiErr.ErrorMsg), nil
 }
 
+// isOpenAPIAuthFailure inspects a response for Open API authentication failures.
 func isOpenAPIAuthFailure(resp *http.Response) (bool, error) {
 	if resp == nil {
 		return false, nil
@@ -206,6 +217,7 @@ func isOpenAPIAuthFailure(resp *http.Response) (bool, error) {
 	return isAuthRelatedMessage(apiErr.Msg) || isAuthRelatedMessage(apiErr.ErrorMsg), nil
 }
 
+// doLoggedInRequest performs a request using the current web session.
 func (c *Client) doLoggedInRequest(req *http.Request) (*http.Response, error) {
 	cloned, err := cloneRequest(req)
 	if err != nil {
@@ -214,6 +226,7 @@ func (c *Client) doLoggedInRequest(req *http.Request) (*http.Response, error) {
 	return c.makeRequest(cloned)
 }
 
+// ensureLoggedIn makes sure the web session is authenticated.
 func (c *Client) ensureLoggedIn() error {
 	loggedIn, err := c.IsLoggedIn()
 	if err != nil {
@@ -229,6 +242,7 @@ func (c *Client) ensureLoggedIn() error {
 	return nil
 }
 
+// reauthenticateWebSession refreshes the web session after authentication expires.
 func (c *Client) reauthenticateWebSession() error {
 	if err := c.RefreshOmadaContext(); err != nil {
 		return err
@@ -246,6 +260,7 @@ func (c *Client) reauthenticateWebSession() error {
 	return nil
 }
 
+// MakeLoggedInRequest performs a web API request and retries after reauthentication when needed.
 func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) {
 	if err := c.ensureLoggedIn(); err != nil {
 		return nil, err
@@ -303,6 +318,7 @@ func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) 
 	return resp, nil
 }
 
+// doOpenAPIRequest performs a request using the current Open API token.
 func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 	cloned, err := cloneRequest(req)
 	if err != nil {
@@ -318,6 +334,7 @@ func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 	return c.httpClient.Do(cloned)
 }
 
+// ensureOpenAPIAccessToken makes sure the Open API token is available.
 func (c *Client) ensureOpenAPIAccessToken() error {
 	if time.Now().After(c.accessTokenExpiresAt) && c.refreshToken != "" {
 		if err := c.RefreshOpenApiToken(); err != nil {
@@ -335,6 +352,7 @@ func (c *Client) ensureOpenAPIAccessToken() error {
 	return nil
 }
 
+// reauthenticateOpenAPISession refreshes the Open API session after authentication expires.
 func (c *Client) reauthenticateOpenAPISession() error {
 	if err := c.RefreshOmadaContext(); err != nil {
 		return err
@@ -350,6 +368,7 @@ func (c *Client) reauthenticateOpenAPISession() error {
 	return nil
 }
 
+// MakeOpenApiRequest performs an Open API request and retries after reauthentication when needed.
 func (c *Client) MakeOpenApiRequest(req *http.Request) (*http.Response, error) {
 	if err := c.ensureOpenAPIAccessToken(); err != nil {
 		return nil, err

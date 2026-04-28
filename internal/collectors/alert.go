@@ -8,15 +8,18 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// alertCollector collects and exports alert metrics.
 type alertCollector struct {
 	omadaAlertNum *prometheus.Desc
 	client        *webapi.Client
 }
 
+// Describe sends the collector metric descriptors to Prometheus.
 func (c *alertCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaAlertNum
 }
 
+// Collect fetches current data and emits Prometheus metrics.
 func (c *alertCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
 	config := c.client.Config
@@ -34,6 +37,7 @@ func (c *alertCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.omadaAlertNum, prometheus.GaugeValue, float64(alert.AlertNum), labels...)
 }
 
+// NewAlertCollector builds the Prometheus descriptors used to export alert metrics.
 func NewAlertCollector(apiClient *api.Client) *alertCollector {
 	labels := []string{
 		"obscured",

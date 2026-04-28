@@ -2,6 +2,7 @@ package model
 
 import "fmt"
 
+// AccessPoint represents an Omada access point with uplink, radio, and LAN port data.
 type AccessPoint struct {
 	Device
 	Uplink Uplink `json:"wiredUplink"`
@@ -20,6 +21,7 @@ type AccessPoint struct {
 	Wp6GHz   *Radio `json:"wp6g,omitempty"`
 }
 
+// AccessPointPort represents runtime status and PoE details for an access point LAN port.
 type AccessPointPort struct {
 	Id           string  `json:"id"`
 	Name         string  `json:"name"`
@@ -31,6 +33,7 @@ type AccessPointPort struct {
 	PoePower     float64 `json:"poePower"`
 }
 
+// GetLinkStatus maps the numeric AP port status to a readable link state.
 func (ps *AccessPointPort) GetLinkStatus() string {
 	switch ps.LinkStatus {
 	case 0:
@@ -42,6 +45,8 @@ func (ps *AccessPointPort) GetLinkStatus() string {
 	}
 }
 
+// GetLinkSpeed converts the encoded AP port link speed to Mbps and returns 0
+// when the port is disconnected.
 func (ps *AccessPointPort) GetLinkSpeed() int32 {
 	if 0 == ps.LinkStatus {
 		return 0
@@ -72,6 +77,7 @@ func (ps *AccessPointPort) GetLinkSpeed() int32 {
 	}
 }
 
+// GetLinkSpeedLabel formats the AP port link speed and PoE state as a display label.
 func (ps *AccessPointPort) GetLinkSpeedLabel() string {
 	label := ""
 	if ps.Poe && ps.PoeEnabled {

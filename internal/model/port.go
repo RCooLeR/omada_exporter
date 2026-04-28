@@ -1,5 +1,6 @@
 package model
 
+// Port represents static configuration for a device port.
 type Port struct {
 	Port       int8       `json:"port"`
 	MaxSpeed   int8       `json:"maxSpeed"`
@@ -9,6 +10,7 @@ type Port struct {
 	PortStatus PortStatus `json:"portStatus"`
 }
 
+// GetMaxSpeed converts the encoded maximum port speed to Mbps.
 func (p *Port) GetMaxSpeed() int32 {
 	switch p.MaxSpeed {
 	case 0:
@@ -35,6 +37,7 @@ func (p *Port) GetMaxSpeed() int32 {
 	return 0
 }
 
+// GetType maps the numeric port type to a readable media label.
 func (p *Port) GetType() string {
 	switch p.Type {
 	case 1:

@@ -2,6 +2,7 @@ package model
 
 import "fmt"
 
+// Isp represents ISP load, bandwidth, and gateway context reported by Omada.
 type Isp struct {
 	GatewayName   string `json:"gateway_name"`
 	GatewayMac    string `json:"gateway_mac"`
@@ -19,6 +20,7 @@ type Isp struct {
 	UploadSpeed   float64 `json:"uploadSpeed,string"`
 }
 
+// GetStatus maps the ISP link status code to an online or offline label.
 func (isp *Isp) GetStatus() string {
 	switch isp.Status {
 	case 1:
@@ -30,6 +32,7 @@ func (isp *Isp) GetStatus() string {
 	}
 }
 
+// GetGatewayStatus maps the stored gateway status code to an online or offline label.
 func (isp *Isp) GetGatewayStatus() string {
 	switch isp.Status {
 	case 1:
@@ -40,6 +43,8 @@ func (isp *Isp) GetGatewayStatus() string {
 		return "Unknown"
 	}
 }
+
+// GetMaxBandwidth formats the configured maximum bandwidth into Mbps, Gbps, or Tbps.
 func (isp *Isp) GetMaxBandwidth() string {
 	b := isp.MaxBandwidth
 

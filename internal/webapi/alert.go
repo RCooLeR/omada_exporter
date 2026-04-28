@@ -12,10 +12,13 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
+// GetAlert returns cached site alert counts loaded from the Web API.
 func (c *Client) GetAlert() (*model.Alert, error) {
 	return api.FetchCached(c.Client, "webapi:alert", c.getAlertFresh)
 }
 
+// getAlertFresh posts the site alert-count request and returns the first alert
+// summary from the Web API response when one is present.
 func (c *Client) getAlertFresh() (*model.Alert, error) {
 	url := fmt.Sprintf("%s/%s/api/v2/sites/alert-count", c.Config.Host, c.OmadaCID)
 	jsonStr := []byte(fmt.Sprintf(`{"siteIds":["%s"]}`, c.SiteId))
@@ -46,6 +49,7 @@ func (c *Client) getAlertFresh() (*model.Alert, error) {
 	return nil, err
 }
 
+// alertsResponse represents the Web API response for alerts.
 type alertsResponse struct {
 	Result []model.Alert `json:"result"`
 }

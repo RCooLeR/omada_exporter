@@ -2,12 +2,15 @@ package model
 
 import "fmt"
 
+// Gateway represents an Omada gateway with WAN, ISP, and port telemetry.
 type Gateway struct {
 	Device
 	Wans  []Wan
 	Isps  []Isp
 	Ports []GatewayPort
 }
+
+// GatewayPort represents runtime metrics and capabilities for a gateway port.
 type GatewayPort struct {
 	Port       int8 `json:"port"`
 	MaxSpeed   int32
@@ -24,6 +27,7 @@ type GatewayPort struct {
 	TxRate     float64 `json:"txRate"`
 }
 
+// GetType maps the numeric gateway port type to a readable media label.
 func (p *GatewayPort) GetType() string {
 	switch p.Type {
 	case 1:
@@ -37,6 +41,7 @@ func (p *GatewayPort) GetType() string {
 	}
 }
 
+// GetLinkStatus maps the numeric gateway port status to a readable link state.
 func (ps *GatewayPort) GetLinkStatus() string {
 	switch ps.LinkStatus {
 	case 0:
@@ -48,6 +53,8 @@ func (ps *GatewayPort) GetLinkStatus() string {
 	}
 }
 
+// GetLinkSpeed converts the encoded gateway port speed to Mbps and returns 0
+// when the port is disconnected.
 func (ps *GatewayPort) GetLinkSpeed() int32 {
 	if 0 == ps.LinkStatus {
 		return 0
@@ -78,6 +85,7 @@ func (ps *GatewayPort) GetLinkSpeed() int32 {
 	}
 }
 
+// GetLinkSpeedLabel formats the gateway port link speed and PoE state as a display label.
 func (ps *GatewayPort) GetLinkSpeedLabel() string {
 	label := ""
 	if ps.Poe {

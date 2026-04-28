@@ -12,10 +12,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// GetDevices returns cached device inventory enriched with related port, LAG,
+// and WAN details for the current site.
 func (c *Client) GetDevices() ([]model.DevicesInterface, error) {
 	return api.FetchCached(c.Client, "webapi:devices", c.getDevicesFresh)
 }
 
+// getDevicesFresh loads the base device inventory from the Web API, decodes the
+// concrete device types, and enriches switches, APs, and gateways with
+// additional port and WAN details from follow-up requests.
 func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 	//hack for keeping logic in separate dirs
 	openClient := &openapi.Client{
@@ -72,10 +77,12 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 	return devicedata.Result, nil
 }
 
+// devicesResponse wraps the mixed-type device list returned by the Web API.
 type devicesResponse struct {
 	Result []model.DevicesInterface
 }
 
+// UnmarshalJSON decodes device payloads into their concrete model types.
 func (d *devicesResponse) UnmarshalJSON(data []byte) error {
 	var tmp struct {
 		Result []json.RawMessage `json:"result"`
