@@ -38,9 +38,10 @@ jobs:
 
       - name: Smoke test release image
         run: |
-          mkdir -p linux/amd64
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X github.com/RCooLeR/omada_exporter/cmd.version=${GITHUB_REF_NAME#v}" -o linux/amd64/omada-exporter .
-          docker build --platform linux/amd64 -f Dockerfile.goreleaser -t omada-exporter-smoke:${GITHUB_REF_NAME#v} .
+          smoke_dir="${RUNNER_TEMP}/omada-exporter-smoke/linux/amd64"
+          mkdir -p "${smoke_dir}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X github.com/RCooLeR/omada_exporter/cmd.version=${GITHUB_REF_NAME#v}" -o "${smoke_dir}/omada-exporter" .
+          docker build --platform linux/amd64 -f Dockerfile.goreleaser -t omada-exporter-smoke:${GITHUB_REF_NAME#v} "${RUNNER_TEMP}/omada-exporter-smoke"
           docker run --rm omada-exporter-smoke:${GITHUB_REF_NAME#v} --version
 
       - name: Run GoReleaser
