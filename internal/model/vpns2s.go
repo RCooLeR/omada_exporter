@@ -46,8 +46,8 @@ type SiteToSiteVpnStats struct {
 	UpBytes           int64  `json:"upBytes"`
 	Uptime            string `json:"uptime"`
 	Port              int32  `json:"port"`
-	ConnectedNum      int64  `json:"connectedNum"`
-	DisconnectedNum   int64  `json:"disconnectedNum"`
+	ConnectedNum      *int64 `json:"connectedNum"`
+	DisconnectedNum   *int64 `json:"disconnectedNum"`
 	TotalRemoteNum    int64  `json:"totalRemoteNum"`
 	Status            int8   `json:"status"`
 }
@@ -69,19 +69,27 @@ type SiteToSiteVpnPeerStats struct {
 	Name      string `json:"name"`
 	RemoteIP  string `json:"remoteIp"`
 	LocalIP   string `json:"localIp"`
-	DownPkts  int64  `json:"downPkts"`
+	DownPkts  *int64 `json:"downPkts"`
 	DownBytes int64  `json:"downBytes"`
-	UpPkts    int64  `json:"upPkts"`
+	UpPkts    *int64 `json:"upPkts"`
 	UpBytes   int64  `json:"upBytes"`
 	LoginTime int64  `json:"loginTime"`
 	Port      int32  `json:"port"`
-	Status    int8   `json:"status"`
+	Status    *int8  `json:"status"`
 }
 
 // GetStatus converts the peer status flag into a Prometheus-friendly numeric value.
-func (v *SiteToSiteVpnPeerStats) GetStatus() float64 {
-	if v.Status == 1 {
-		return 1
+func (v *SiteToSiteVpnPeerStats) GetStatus() (float64, bool) {
+	if v.Status == nil {
+		return 0, false
 	}
-	return 0
+	if *v.Status == 1 {
+		return 1, true
+	}
+	return 0, true
+}
+
+// HasPacketStats reports whether packet counters were included in the response.
+func (v *SiteToSiteVpnPeerStats) HasPacketStats() bool {
+	return v.DownPkts != nil || v.UpPkts != nil
 }

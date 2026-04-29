@@ -438,8 +438,7 @@ func isBinaryMetric(name string) bool {
 		"omada_port_link_status",
 		"omada_lag_link_status",
 		"omada_isp_status",
-		"omada_vpn_status",
-		"omada_site_to_site_vpn_peer_status":
+		"omada_vpn_status":
 		return true
 	default:
 		return false
@@ -451,7 +450,7 @@ func binaryDeviceClass(name string) string {
 	switch name {
 	case "omada_controller_upgrade_available", "omada_device_need_upgrade":
 		return "problem"
-	case "omada_port_link_status", "omada_lag_link_status", "omada_isp_status", "omada_vpn_status", "omada_site_to_site_vpn_peer_status":
+	case "omada_port_link_status", "omada_lag_link_status", "omada_isp_status", "omada_vpn_status":
 		return "connectivity"
 	default:
 		return ""
@@ -809,6 +808,10 @@ func derivedMetric(metricName string) (string, string, bool) {
 		return "omada_vpn_down_speed", "VPN downlink speed in bits per second", true
 	case "omada_vpn_up_bytes":
 		return "omada_vpn_up_speed", "VPN uplink speed in bits per second", true
+	case "omada_site_to_site_vpn_down_bytes":
+		return "omada_site_to_site_vpn_down_speed", "Site-to-site VPN downlink speed in bits per second", true
+	case "omada_site_to_site_vpn_up_bytes":
+		return "omada_site_to_site_vpn_up_speed", "Site-to-site VPN uplink speed in bits per second", true
 	case "omada_site_to_site_vpn_peer_down_bytes":
 		return "omada_site_to_site_vpn_peer_down_speed", "Site-to-site VPN peer downlink speed in bits per second", true
 	case "omada_site_to_site_vpn_peer_up_bytes":

@@ -17,14 +17,11 @@ type vpnStatsCollector struct {
 	omadaVpnDownBytes                    *prometheus.Desc
 	omadaVpnUpPackets                    *prometheus.Desc
 	omadaVpnUpBytes                      *prometheus.Desc
-	omadaSiteToSiteVpnConnectedPeers     *prometheus.Desc
-	omadaSiteToSiteVpnDisconnectedPeers  *prometheus.Desc
+	omadaSiteToSiteVpnDownBytes          *prometheus.Desc
+	omadaSiteToSiteVpnUpBytes            *prometheus.Desc
 	omadaSiteToSiteVpnTotalPeers         *prometheus.Desc
-	omadaSiteToSiteVpnPeerStatus         *prometheus.Desc
 	omadaSiteToSiteVpnPeerDownBytes      *prometheus.Desc
 	omadaSiteToSiteVpnPeerUpBytes        *prometheus.Desc
-	omadaSiteToSiteVpnPeerDownPackets    *prometheus.Desc
-	omadaSiteToSiteVpnPeerUpPackets      *prometheus.Desc
 	omadaSiteToSiteVpnPeerLoginTimestamp *prometheus.Desc
 	client                               *openapi.Client
 }
@@ -36,14 +33,11 @@ func (c *vpnStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaVpnDownBytes
 	ch <- c.omadaVpnUpPackets
 	ch <- c.omadaVpnUpBytes
-	ch <- c.omadaSiteToSiteVpnConnectedPeers
-	ch <- c.omadaSiteToSiteVpnDisconnectedPeers
+	ch <- c.omadaSiteToSiteVpnDownBytes
+	ch <- c.omadaSiteToSiteVpnUpBytes
 	ch <- c.omadaSiteToSiteVpnTotalPeers
-	ch <- c.omadaSiteToSiteVpnPeerStatus
 	ch <- c.omadaSiteToSiteVpnPeerDownBytes
 	ch <- c.omadaSiteToSiteVpnPeerUpBytes
-	ch <- c.omadaSiteToSiteVpnPeerDownPackets
-	ch <- c.omadaSiteToSiteVpnPeerUpPackets
 	ch <- c.omadaSiteToSiteVpnPeerLoginTimestamp
 }
 
@@ -76,16 +70,19 @@ func (c *vpnStatsCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get site-to-site VPN stats")
 		return
 	}
-	c.collectSiteToSiteVpnMetrics(ch, site, s2sStats, summaryByID, seenPacketSeries)
 
+	peerStatsByVpnID := make(map[string][]model.SiteToSiteVpnPeerStats, len(summaryByID))
 	for _, summary := range summaries {
 		peerStats, err := client.GetSiteToSiteVpnPeerStats(summary.ID)
 		if err != nil {
 			log.Error().Err(err).Str("vpn_id", summary.ID).Msg("Failed to get site-to-site VPN peer stats")
 			continue
 		}
-		c.collectSiteToSiteVpnPeerMetrics(ch, site, summary, peerStats)
+		peerStatsByVpnID[summary.ID] = append(peerStatsByVpnID[summary.ID], peerStats...)
 	}
+
+	c.collectSiteToSiteVpnMetrics(ch, site, s2sStats, summaryByID, peerStatsByVpnID, seenPacketSeries)
+	c.collectSiteToSiteVpnPeerMetrics(ch, site, summaries, peerStatsByVpnID)
 }
 
 // collectVpnTunnelMetrics emits metrics for the VPN tunnel metrics.
@@ -106,7 +103,7 @@ func (c *vpnStatsCollector) collectVpnTunnelMetrics(ch chan<- prometheus.Metric,
 }
 
 // collectSiteToSiteVpnMetrics emits metrics for the site to site VPN metrics.
-func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Metric, site string, stats []model.SiteToSiteVpnStats, summaryByID map[string]model.SiteToSiteVpnSummary, seenPacketSeries map[string]struct{}) {
+func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Metric, site string, stats []model.SiteToSiteVpnStats, summaryByID map[string]model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats, seenPacketSeries map[string]struct{}) {
 	for _, item := range stats {
 		summary, ok := summaryByID[item.VpnID]
 		name := item.Name
@@ -136,41 +133,57 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Met
 
 		vpnPacketLabels := []string{name, item.InterfaceName, item.GetVpnMode(), vpnType, item.LocalIP, item.RemoteIP, site, c.client.SiteId}
 		packetSeriesKey := vpnPacketSeriesKey(name, item.InterfaceName, item.GetVpnMode(), vpnType, item.LocalIP, item.RemoteIP)
-		if _, exists := seenPacketSeries[packetSeriesKey]; !exists {
-			ch <- prometheus.MustNewConstMetric(c.omadaVpnDownPackets, prometheus.GaugeValue, float64(item.DownPkts), vpnPacketLabels...)
-			ch <- prometheus.MustNewConstMetric(c.omadaVpnUpPackets, prometheus.GaugeValue, float64(item.UpPkts), vpnPacketLabels...)
-			seenPacketSeries[packetSeriesKey] = struct{}{}
+		if shouldEmitVpnPacketSeries(item) {
+			if _, exists := seenPacketSeries[packetSeriesKey]; !exists {
+				ch <- prometheus.MustNewConstMetric(c.omadaVpnDownPackets, prometheus.GaugeValue, float64(item.DownPkts), vpnPacketLabels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaVpnUpPackets, prometheus.GaugeValue, float64(item.UpPkts), vpnPacketLabels...)
+				seenPacketSeries[packetSeriesKey] = struct{}{}
+			}
 		}
 
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnConnectedPeers, prometheus.GaugeValue, float64(item.ConnectedNum), labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnDisconnectedPeers, prometheus.GaugeValue, float64(item.DisconnectedNum), labels...)
+		downBytes, upBytes := aggregateSiteToSitePeerBytes(peerStatsByVpnID[item.VpnID])
+		if downBytes == 0 && upBytes == 0 {
+			downBytes = item.DownBytes
+			upBytes = item.UpBytes
+		}
+
+		siteToSiteTrafficLabels := []string{
+			item.VpnID,
+			name,
+			vpnType,
+			siteVpnType,
+			site,
+			c.client.SiteId,
+		}
+		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnDownBytes, prometheus.GaugeValue, float64(downBytes), siteToSiteTrafficLabels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnUpBytes, prometheus.GaugeValue, float64(upBytes), siteToSiteTrafficLabels...)
+
 		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnTotalPeers, prometheus.GaugeValue, float64(item.TotalRemoteNum), labels...)
 	}
 }
 
 // collectSiteToSiteVpnPeerMetrics emits metrics for the site to site VPN peer metrics.
-func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus.Metric, site string, summary model.SiteToSiteVpnSummary, peerStats []model.SiteToSiteVpnPeerStats) {
-	for _, item := range peerStats {
-		labels := []string{
-			summary.ID,
-			summary.Name,
-			item.ID,
-			item.Name,
-			summary.GetVpnType(),
-			summary.GetSiteVpnType(),
-			item.LocalIP,
-			item.RemoteIP,
-			strconv.Itoa(int(item.Port)),
-			site,
-			c.client.SiteId,
-		}
+func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus.Metric, site string, summaries []model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats) {
+	for _, summary := range summaries {
+		for _, item := range peerStatsByVpnID[summary.ID] {
+			labels := []string{
+				summary.ID,
+				summary.Name,
+				item.ID,
+				item.Name,
+				summary.GetVpnType(),
+				summary.GetSiteVpnType(),
+				item.LocalIP,
+				item.RemoteIP,
+				strconv.Itoa(int(item.Port)),
+				site,
+				c.client.SiteId,
+			}
 
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerStatus, prometheus.GaugeValue, item.GetStatus(), labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerDownBytes, prometheus.GaugeValue, float64(item.DownBytes), labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerUpBytes, prometheus.GaugeValue, float64(item.UpBytes), labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerDownPackets, prometheus.GaugeValue, float64(item.DownPkts), labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerUpPackets, prometheus.GaugeValue, float64(item.UpPkts), labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerLoginTimestamp, prometheus.GaugeValue, normalizeUnixTimestampSeconds(item.LoginTime), labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerDownBytes, prometheus.GaugeValue, float64(item.DownBytes), labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerUpBytes, prometheus.GaugeValue, float64(item.UpBytes), labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnPeerLoginTimestamp, prometheus.GaugeValue, normalizeUnixTimestampSeconds(item.LoginTime), labels...)
+		}
 	}
 }
 
@@ -178,6 +191,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus
 // tunnel, site-to-site, and peer statistics.
 func NewVpnStatsCollector(apiClient *api.Client) *vpnStatsCollector {
 	labels := []string{"name", "interface_name", "vpn_mode", "vpn_type", "local_ip", "remote_ip", "site", "site_id"}
+	siteToSiteTrafficLabels := []string{"vpn_id", "name", "vpn_type", "site_vpn_type", "site", "site_id"}
 	siteToSiteLabels := []string{"vpn_id", "tunnel_id", "name", "vpn_type", "site_vpn_type", "interface_name", "direction", "local_ip", "remote_ip", "local_peer_ip", "remote_peer_ip", "site", "site_id"}
 	siteToSitePeerLabels := []string{"vpn_id", "name", "peer_id", "peer_name", "vpn_type", "site_vpn_type", "local_ip", "remote_ip", "port", "site", "site_id"}
 
@@ -207,24 +221,19 @@ func NewVpnStatsCollector(apiClient *api.Client) *vpnStatsCollector {
 			labels,
 			nil,
 		),
-		omadaSiteToSiteVpnConnectedPeers: prometheus.NewDesc("omada_site_to_site_vpn_connected_peers",
-			"Number of connected site-to-site VPN peers",
-			siteToSiteLabels,
+		omadaSiteToSiteVpnDownBytes: prometheus.NewDesc("omada_site_to_site_vpn_down_bytes",
+			"Site-to-site VPN downlink traffic in bytes aggregated across peers when needed",
+			siteToSiteTrafficLabels,
 			nil,
 		),
-		omadaSiteToSiteVpnDisconnectedPeers: prometheus.NewDesc("omada_site_to_site_vpn_disconnected_peers",
-			"Number of disconnected site-to-site VPN peers",
-			siteToSiteLabels,
+		omadaSiteToSiteVpnUpBytes: prometheus.NewDesc("omada_site_to_site_vpn_up_bytes",
+			"Site-to-site VPN uplink traffic in bytes aggregated across peers when needed",
+			siteToSiteTrafficLabels,
 			nil,
 		),
 		omadaSiteToSiteVpnTotalPeers: prometheus.NewDesc("omada_site_to_site_vpn_total_peers",
 			"Total number of site-to-site VPN peers",
 			siteToSiteLabels,
-			nil,
-		),
-		omadaSiteToSiteVpnPeerStatus: prometheus.NewDesc("omada_site_to_site_vpn_peer_status",
-			"The current runtime status of the site-to-site VPN peer",
-			siteToSitePeerLabels,
 			nil,
 		),
 		omadaSiteToSiteVpnPeerDownBytes: prometheus.NewDesc("omada_site_to_site_vpn_peer_down_bytes",
@@ -234,16 +243,6 @@ func NewVpnStatsCollector(apiClient *api.Client) *vpnStatsCollector {
 		),
 		omadaSiteToSiteVpnPeerUpBytes: prometheus.NewDesc("omada_site_to_site_vpn_peer_up_bytes",
 			"Site-to-site VPN peer uplink traffic in bytes",
-			siteToSitePeerLabels,
-			nil,
-		),
-		omadaSiteToSiteVpnPeerDownPackets: prometheus.NewDesc("omada_site_to_site_vpn_peer_down_packets",
-			"Site-to-site VPN peer downlink traffic in packets",
-			siteToSitePeerLabels,
-			nil,
-		),
-		omadaSiteToSiteVpnPeerUpPackets: prometheus.NewDesc("omada_site_to_site_vpn_peer_up_packets",
-			"Site-to-site VPN peer uplink traffic in packets",
 			siteToSitePeerLabels,
 			nil,
 		),
@@ -283,4 +282,22 @@ func normalizeUnixTimestampSeconds(value int64) float64 {
 // vpnPacketSeriesKey builds a unique key for a VPN packet metric series.
 func vpnPacketSeriesKey(name, interfaceName, vpnMode, vpnType, localIP, remoteIP string) string {
 	return firstNonEmpty(name) + "|" + firstNonEmpty(interfaceName) + "|" + firstNonEmpty(vpnMode) + "|" + firstNonEmpty(vpnType) + "|" + firstNonEmpty(localIP) + "|" + firstNonEmpty(remoteIP)
+}
+
+// shouldEmitVpnPacketSeries reports whether site-to-site tunnel stats provide enough context to expose packet metrics.
+func shouldEmitVpnPacketSeries(item model.SiteToSiteVpnStats) bool {
+	return item.InterfaceName != "" || item.LocalIP != "" || item.RemoteIP != "" || item.DownPkts != 0 || item.UpPkts != 0
+}
+
+// aggregateSiteToSitePeerBytes sums peer byte counters for a site-to-site VPN.
+func aggregateSiteToSitePeerBytes(peerStats []model.SiteToSiteVpnPeerStats) (int64, int64) {
+	var downBytes int64
+	var upBytes int64
+
+	for _, item := range peerStats {
+		downBytes += item.DownBytes
+		upBytes += item.UpBytes
+	}
+
+	return downBytes, upBytes
 }

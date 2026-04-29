@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [2.1.5] - 2026-04-29
+### Fixed
+- Include site-to-site VPNs in `omada_vpn_status` when they are not present in the legacy VPN summary endpoint.
+- Treat omitted site-to-site VPN peer/count fields as missing data instead of exporting misleading zero values.
+
+### Changed
+- Add aggregated per-tunnel site-to-site traffic metrics: `omada_site_to_site_vpn_down_bytes` and `omada_site_to_site_vpn_up_bytes`.
+- Remove unsupported site-to-site metrics for peer status, peer packet counters, and connected/disconnected peer counts.
+
 ## [2.1.4] - 2026-04-29
 ### Fixed
 - Build Linux release binaries with `CGO_ENABLED=0` so Docker release images run correctly on Alpine.
