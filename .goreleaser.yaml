@@ -6,6 +6,8 @@ builds:
   - id: omada_exporter
     main: .
     binary: omada-exporter
+    env:
+      - CGO_ENABLED=0
     goos:
       - linux
       - windows

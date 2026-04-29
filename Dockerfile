@@ -16,8 +16,8 @@ ENV GO111MODULE=on
 # Download deps
 RUN go mod download
 
-# Build the Go app for Linux
-RUN go build -o omada-exporter
+# Build the Go app for Linux with CGO disabled so the binary runs in Alpine.
+RUN CGO_ENABLED=0 go build -o omada-exporter
 
 # --- Stage 2: Create a lightweight image with the binary only ---
 FROM alpine:3.23
