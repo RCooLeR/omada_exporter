@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [2.1.3] - 2026-04-29
+### Added
+- Add support for site-to-site VPN.
+- Add additional metrics for site-to-site VPN.
+- Add `siteId` and `siteName` to client labels.
+
 ## [2.1.2] - 2026-04-25
 ### Added
 - Add Docker container health checks with dedicated `/healthz` and `/readyz` endpoints.
