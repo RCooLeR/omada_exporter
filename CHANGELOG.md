@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [2.1.4] - 2026-04-29
+### Fixed
+- Build Linux release binaries with `CGO_ENABLED=0` so Docker release images run correctly on Alpine.
+- Add a release workflow smoke test that builds the release-style image and verifies the container starts before publishing artifacts.
+
 ## [2.1.3] - 2026-04-29
 ### Added
 - Add support for site-to-site VPN.
