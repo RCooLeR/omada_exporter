@@ -72,13 +72,13 @@ func (c *vpnStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	peerStatsByVpnID := make(map[string][]model.SiteToSiteVpnPeerStats, len(summaryByID))
-	for _, summary := range summaries {
-		peerStats, err := client.GetSiteToSiteVpnPeerStats(summary.ID)
+	for vpnID, tunnelID := range buildSiteToSiteTunnelIDByVpnID(s2sStats) {
+		peerStats, err := client.GetSiteToSiteVpnPeerStats(tunnelID)
 		if err != nil {
-			log.Error().Err(err).Str("vpn_id", summary.ID).Msg("Failed to get site-to-site VPN peer stats")
+			log.Error().Err(err).Str("vpn_id", vpnID).Str("tunnel_id", tunnelID).Msg("Failed to get site-to-site VPN peer stats")
 			continue
 		}
-		peerStatsByVpnID[summary.ID] = append(peerStatsByVpnID[summary.ID], peerStats...)
+		peerStatsByVpnID[vpnID] = append(peerStatsByVpnID[vpnID], peerStats...)
 	}
 
 	c.collectSiteToSiteVpnMetrics(ch, site, s2sStats, summaryByID, peerStatsByVpnID, seenPacketSeries)
@@ -169,7 +169,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus
 			labels := []string{
 				summary.ID,
 				summary.Name,
-				item.ID,
+				siteToSitePeerID(item),
 				item.Name,
 				summary.GetVpnType(),
 				summary.GetSiteVpnType(),
@@ -300,4 +300,27 @@ func aggregateSiteToSitePeerBytes(peerStats []model.SiteToSiteVpnPeerStats) (int
 	}
 
 	return downBytes, upBytes
+}
+
+// buildSiteToSiteTunnelIDByVpnID maps the site-to-site VPN ID used across summary
+// and stats endpoints to the tunnel list ID required by the peer stats endpoint.
+func buildSiteToSiteTunnelIDByVpnID(stats []model.SiteToSiteVpnStats) map[string]string {
+	tunnelIDByVpnID := make(map[string]string, len(stats))
+
+	for _, item := range stats {
+		if item.VpnID == "" || item.ID == "" {
+			continue
+		}
+		if _, exists := tunnelIDByVpnID[item.VpnID]; exists {
+			continue
+		}
+		tunnelIDByVpnID[item.VpnID] = item.ID
+	}
+
+	return tunnelIDByVpnID
+}
+
+// siteToSitePeerID returns the stable peer identifier exposed by the peer stats endpoint.
+func siteToSitePeerID(item model.SiteToSiteVpnPeerStats) string {
+	return firstNonEmpty(item.VpnID, item.ID)
 }

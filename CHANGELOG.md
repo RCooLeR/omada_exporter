@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [2.1.6] - 2026-04-29
+### Fixed
+- Fetch site-to-site VPN peer stats with the tunnel stats `id` required by the peer endpoint, and export peer metrics with the peer-specific identifier from the peer stats response.
+
 ## [2.1.5] - 2026-04-29
 ### Fixed
 - Include site-to-site VPNs in `omada_vpn_status` when they are not present in the legacy VPN summary endpoint.

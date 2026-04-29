@@ -62,22 +62,22 @@ func (c *Client) getSiteToSiteVpnStatsFresh() ([]model.SiteToSiteVpnStats, error
 	return all, nil
 }
 
-// GetSiteToSiteVpnPeerStats returns peer statistics for a site-to-site VPN.
-func (c *Client) GetSiteToSiteVpnPeerStats(vpnID string) ([]model.SiteToSiteVpnPeerStats, error) {
-	cacheKey := fmt.Sprintf("openapi:vpn:s2s:peer:%s", vpnID)
+// GetSiteToSiteVpnPeerStats returns peer statistics for a site-to-site VPN tunnel.
+func (c *Client) GetSiteToSiteVpnPeerStats(tunnelID string) ([]model.SiteToSiteVpnPeerStats, error) {
+	cacheKey := fmt.Sprintf("openapi:vpn:s2s:peer:%s", tunnelID)
 	return api.FetchCached(c.Client, cacheKey, func() ([]model.SiteToSiteVpnPeerStats, error) {
-		return c.getSiteToSiteVpnPeerStatsFresh(vpnID)
+		return c.getSiteToSiteVpnPeerStatsFresh(tunnelID)
 	})
 }
 
-// getSiteToSiteVpnPeerStatsFresh fetches fresh peer statistics for a site-to-site VPN.
-func (c *Client) getSiteToSiteVpnPeerStatsFresh(vpnID string) ([]model.SiteToSiteVpnPeerStats, error) {
+// getSiteToSiteVpnPeerStatsFresh fetches fresh peer statistics for a site-to-site VPN tunnel.
+func (c *Client) getSiteToSiteVpnPeerStatsFresh(tunnelID string) ([]model.SiteToSiteVpnPeerStats, error) {
 	if err := c.requireOpenAPICredentials(); err != nil {
 		return nil, err
 	}
 
-	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/s2s/%s/peer?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId, vpnID)
-	return fetchOpenAPIGrid[model.SiteToSiteVpnPeerStats](c, fmt.Sprintf("site-to-site VPN peer stats vpn=%s", vpnID), urlTemplate)
+	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/s2s/%s/peer?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId, tunnelID)
+	return fetchOpenAPIGrid[model.SiteToSiteVpnPeerStats](c, fmt.Sprintf("site-to-site VPN peer stats tunnel=%s", tunnelID), urlTemplate)
 }
 
 // requireOpenAPICredentials validates that Open API credentials are configured.
