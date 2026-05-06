@@ -1,5 +1,12 @@
-lint:
-	golangci-lint run
+.PHONY: lint generate-metrics-table bridge-lint bridge-generate-metrics-table
+
+lint: bridge-lint
 
 generate-metrics-table:
-	go run main.go --host dummy --username dummy --password dummy mdocs > gen-metrics-table.md
+	cd bridge && go run . --host dummy --client-id dummy --secret-id dummy --username dummy --password dummy mdocs > ../gen-metrics-table.md
+
+bridge-lint:
+	$(MAKE) -C bridge lint
+
+bridge-generate-metrics-table:
+	$(MAKE) -C bridge generate-metrics-table

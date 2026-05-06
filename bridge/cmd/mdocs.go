@@ -3,10 +3,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+var descPattern = regexp.MustCompile(`^Desc\{fqName: "([^"]+)", help: "([^"]*)", constLabels: \{\}, variableLabels: [\{\[]([^}\]]*)[\}\]]\}$`)
 
 // mdocs just spits out the metrics descriptions and exits
 func mdocs() {
@@ -26,15 +29,23 @@ func mdocs() {
 	// drain the channel
 	for {
 		if description := <-dc; description != nil {
-			// Sure would be nice if the prometheus.Desc wasn't so opaque. This is gross and fragile.
-			d := description.String()
-			d = strings.Replace(d, `Desc{fqName: "`, "| ", 1)
-			d = strings.Replace(d, `", help: "`, " | ", 1)
-			d = strings.Replace(d, `", constLabels: {}, variableLabels: [`, " | ", 1)
-			d = strings.Replace(d, `]}`, " | ", 1)
-			fmt.Fprintln(os.Stdout, d)
+			name, help, labels := parseDesc(description.String())
+			fmt.Fprintf(os.Stdout, "| %s | %s | %s |\n", name, help, labels)
 		} else {
 			break
 		}
 	}
+}
+
+func parseDesc(desc string) (string, string, string) {
+	matches := descPattern.FindStringSubmatch(desc)
+	if len(matches) != 4 {
+		return desc, "", ""
+	}
+
+	labels := strings.TrimSpace(matches[3])
+	if labels == "" {
+		labels = "-"
+	}
+	return matches[1], matches[2], labels
 }

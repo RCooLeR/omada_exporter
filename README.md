@@ -1,280 +1,37 @@
-# omada_exporter
+# OmadaBridge
 
-![docker-publish](https://github.com/RCooLeR/omada_exporter/actions/workflows/release.yml/badge.svg)
-
-<p align="center" style="text-align: center">
-    <img src="./docs/images/omada.png" width="70%">
-</p>
-
-## Prometheus exporter and Home Assistant MQTT publisher for TP-Link Omada Controller SDN
-
-`RCooLeR/omada_exporter` is a maintained fork of `charlie-haley/omada_exporter` with additional metrics, OpenAPI support, and Home Assistant MQTT integration.
-
-The exporter can use the same Omada data source to produce:
-
-- Prometheus metrics on `/metrics` for Prometheus, Grafana, and alerting.
-- Home Assistant MQTT Discovery entities and client trackers for MQTT-driven dashboards and automations.
-
-Both outputs can run at the same time.
-
-## Grafana Dashboards
-
-There are [default dashboards in this repo](docs/dashboards/), which are a good starting point for Prometheus and Grafana users.
-
-You can also find it on [Grafana.com](https://grafana.com/grafana/dashboards/16343).
+OmadaBridge is an unofficial bridge for TP-Link Omada Controller data. It exposes Prometheus metrics, publishes the same collected data to Home Assistant through MQTT Discovery, and includes optional Lovelace cards for Home Assistant dashboards.
 
 <p align="center" style="text-align: center">
-    <img src="./docs/images/simple-omada-dashboard.png" width="70%"><br/>
-</p>
-<p align="center" style="text-align: center">
-    <img src="./docs/images/dashboard.png" width="70%"><br/>
+  <img src="./bridge/docs/images/omada.png" width="70%" alt="Omada">
 </p>
 
-<p align="center" style="text-align: center">
-    <img src="./docs/images/gateway-switch.png" width="70%"><br/>
-</p>
+The published container and binary are still named `omada_exporter` / `omada-exporter` for compatibility with existing installs.
 
-## Installation
+## Documentation
 
-### Omada Authentication Setup
+- [Bridge documentation index](./bridge/docs/index.md)
+- [Installation](./bridge/docs/installation.md)
+- [Collected data](./bridge/docs/collected-data.md)
+- [Prometheus metrics](./bridge/docs/prometheus.md)
+- [Home Assistant integration](./bridge/docs/home-assistant.md)
+- [Home Assistant cards](./ha-cards/docs/index.md)
 
-- OpenAPI Client - created via `Settings -> Platform Integration`.
-  Assign admin role for full API access.
-- Service User - create under `Account section` at `Global level`.
-  Assign viewer role for read-only access.
+## Disclaimer
 
-### Docker Run Example
+OmadaBridge is an unofficial DIY open-source project for compatibility, monitoring, and home automation integration. It is not affiliated with, endorsed by, or sponsored by TP-Link, Omada, Home Assistant, or Prometheus.
 
-```bash
-docker run -d \
-    -p 9202:9202 \
-    -e OMADA_HOST='https://192.168.1.20' \
-    -e OMADA_USER='exporter' \
-    -e OMADA_PASS='mypassword' \
-    -e OMADA_SITE='Default' \
-    -e OMADA_CLIENT_ID='' \
-    -e OMADA_SECRET_ID='' \
-    rcooler/omada_exporter:latest
-```
+The bridge reads data from configured Omada APIs and publishes derived monitoring state. It is not a security product, not an availability guarantee, and not a substitute for Omada Controller backups, alerts, or vendor-supported management tools. Review what you publish to MQTT and Prometheus before exposing either service outside trusted networks.
 
-To also publish Home Assistant MQTT entities, add:
+See [NOTICE](./NOTICE) for trademark and affiliation notice.
 
-```bash
--e OMADA_MQTT_ENABLED='true' \
--e OMADA_MQTT_BROKER='tcp://homeassistant.local:1883' \
--e OMADA_MQTT_USER='omada_exporter' \
--e OMADA_MQTT_PASS='mqtt-password'
-```
+## Repository Layout
 
-### Docker Compose Example
+- `bridge/` contains the Go exporter and Home Assistant MQTT bridge.
+- `bridge/docs/` contains bridge installation, metrics, collected data, and Home Assistant integration docs.
+- `ha-cards/` contains optional Lovelace cards.
+- `ha-cards/docs/` contains card installation and configuration docs.
 
-```yaml
-services:
-  omada_exporter:
-    image: rcooler/omada_exporter:latest
-    container_name: omada_exporter
-    ports:
-      - "9202:9202"
-    environment:
-      OMADA_HOST: "https://192.168.1.20:443"
-      OMADA_USER: "exporter"
-      OMADA_PASS: "mypassword"
-      OMADA_SITE: "Default"
-      OMADA_CLIENT_ID: ""
-      OMADA_SECRET_ID: ""
-      OMADA_MQTT_ENABLED: "true"
-      OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"
-      OMADA_MQTT_USER: "omada_exporter"
-      OMADA_MQTT_PASS: "mqtt-password"
-      OMADA_MQTT_DISCOVERY_PREFIX: "homeassistant"
-    restart: unless-stopped
-```
+## License
 
-### Command Line
-
-[You can download the latest binary release here.](https://github.com/RCooLeR/omada_exporter/releases/latest)
-
-The binary always exposes Prometheus metrics and can optionally publish the same data to Home Assistant through MQTT.
-
-```
-NAME:
-   omada-exporter - Prometheus Exporter for TP-Link Omada Controller SDN.
-
-USAGE:
-   main [global options] command [command options] [arguments...]
-
-VERSION:
-   development
-
-AUTHOR:
-   Charlie Haley <charlie-haley@users.noreply.github.com>
-   Roman Derevianko <RCooLeR@users.noreply.github.com>
-
-COMMANDS:
-   version, v  prints the current version.
-   help, h     Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --host value                 The hostname of the Omada Controller, including protocol. [$OMADA_HOST]
-   --username value             Username of the Omada user you'd like to use to fetch metrics. [$OMADA_USER]
-   --password value             Password for your Omada user. [$OMADA_PASS]
-   --port value                 Port on which to expose the Prometheus metrics. (default: "9202") [$OMADA_PORT]
-   --site value                 Omada site to scrape metrics from. (default: "Default") [$OMADA_SITE]
-   --client-id value            Client ID for Open API authentication. [$OMADA_CLIENT_ID]
-   --secret-id value            Secret ID for Open API authentication. [$OMADA_SECRET_ID]
-   --log-level value            Application log level. (default: "error") [$LOG_LEVEL]
-   --timeout value              Timeout when making requests to the Omada Controller. (default: 15) [$OMADA_REQUEST_TIMEOUT]
-   --insecure                   Whether to skip verifying the SSL certificate on the controller. (default: false) [$OMADA_INSECURE]
-   --include-port-activity-label
-                                Include the port_activity_label label on port metrics. (default: true) [$OMADA_INCLUDE_PORT_ACTIVITY_LABEL]
-   --track-port-metrics         Export per-port metrics. (default: true) [$OMADA_TRACK_PORT_METRICS]
-   --track-client-metrics       Export per-client metrics. (default: true) [$OMADA_TRACK_CLIENT_METRICS]
-   --disable-go-collector       Disable Go collector metrics. (default: true) [$OMADA_DISABLE_GO_COLLECTOR]
-   --disable-process-collector  Disable process collector metrics. (default: true) [$OMADA_DISABLE_PROCESS_COLLECTOR]
-   --mqtt-enabled               Enable Home Assistant MQTT discovery publishing. (default: false) [$OMADA_MQTT_ENABLED]
-   --mqtt-broker value          MQTT broker URL, for example tcp://homeassistant.local:1883. (default: "tcp://localhost:1883") [$OMADA_MQTT_BROKER]
-   --mqtt-username value        MQTT username. [$OMADA_MQTT_USER]
-   --mqtt-password value        MQTT password. [$OMADA_MQTT_PASS]
-   --mqtt-client-id value       MQTT client id. (default: "omada_exporter") [$OMADA_MQTT_CLIENT_ID]
-   --mqtt-topic-prefix value    MQTT state topic prefix. (default: "omada_exporter") [$OMADA_MQTT_TOPIC_PREFIX]
-   --mqtt-discovery-prefix value
-                                Home Assistant MQTT discovery prefix. (default: "homeassistant") [$OMADA_MQTT_DISCOVERY_PREFIX]
-   --mqtt-interval value        MQTT publish interval in seconds. (default: 60) [$OMADA_MQTT_INTERVAL]
-   --mqtt-retain                Publish MQTT discovery and state messages as retained. (default: true) [$OMADA_MQTT_RETAIN]
-   --mqtt-expire-after value    Home Assistant sensor expire_after value in seconds. Set 0 to disable. (default: 180) [$OMADA_MQTT_EXPIRE_AFTER]
-   --help, -h                   show help (default: false)
-   --version, -v                print the version (default: false)
-```
-
-The help output still uses the original Prometheus-focused description, but the MQTT flags above are part of the main binary and supported together with `/metrics`.
-
-## Outputs and Configuration
-
-### Home Assistant MQTT
-
-Set `OMADA_MQTT_ENABLED=true` to enable Home Assistant MQTT Discovery publishing.
-
-See [ha.md](ha.md) for Home Assistant setup, Docker Compose examples, published entity coverage, MQTT topic details, and usage notes.
-
-Custom Lovelace cards that consume those MQTT-backed entities are documented in [ha-cards/README.md](ha-cards/README.md).
-
-### Prometheus Scrape Job Example
-
-Add the following job to your `prometheus.yml` configuration:
-
-```yaml
-  - job_name: 'Omada'
-    scrape_interval: 30s
-    scrape_timeout: 30s
-    static_configs:
-      - targets: ['omada_exporter:9202']
-```
-
-> Make sure `omada_exporter` resolves to your container or host running `omada_exporter`.
-
-### Environment Variables
-
-Prometheus `/metrics` is always available. MQTT publishing is optional and can run in parallel with Prometheus scraping.
-
-| Variable                        | Purpose                                                                           |
-|---------------------------------|-----------------------------------------------------------------------------------|
-| OMADA_HOST                      | The hostname of the Omada Controller, including protocol.                         |
-| OMADA_USER                      | Username of the Omada user you'd like to use to fetch metrics.                    |
-| OMADA_PASS                      | Password for your Omada user.                                                     |
-| OMADA_SITE                      | Site you'd like to get metrics from. (default: "Default")                         |
-| OMADA_PORT                      | Port on which to expose the Prometheus metrics. (default: 9202)                   |
-| OMADA_INSECURE                  | Whether to skip verifying the SSL certificate on the controller. (default: false) |
-| OMADA_REQUEST_TIMEOUT           | Timeout when making requests to the Omada Controller. (default: 15)               |
-| OMADA_INCLUDE_PORT_ACTIVITY_LABEL | Include the `port_activity_label` label on port metrics. (default: true)        |
-| OMADA_TRACK_PORT_METRICS        | Export per-port metrics. (default: true)                                           |
-| OMADA_TRACK_CLIENT_METRICS      | Export per-client metrics. (default: true)                                         |
-| OMADA_DISABLE_GO_COLLECTOR      | Disable Go collector metrics. (default: true)                                     |
-| OMADA_DISABLE_PROCESS_COLLECTOR | Disable process collector metrics. (default: true)                                |
-| LOG_LEVEL                       | Application log level. (default: "error")                                         |
-| OMADA_CLIENT_ID                 | Optional Client ID for Open API authentication (WAN & VPN metrics)                |
-| OMADA_SECRET_ID                 | Optional Secret ID for Open API authentication (WAN & VPN metrics)                |
-| OMADA_MQTT_ENABLED              | Enable Home Assistant MQTT discovery publishing. (default: false)                 |
-| OMADA_MQTT_BROKER               | MQTT broker URL, for example `tcp://homeassistant.local:1883`.                    |
-| OMADA_MQTT_USER                 | MQTT username.                                                                    |
-| OMADA_MQTT_PASS                 | MQTT password.                                                                    |
-| OMADA_MQTT_CLIENT_ID            | MQTT client id. (default: `omada_exporter`)                                       |
-| OMADA_MQTT_TOPIC_PREFIX         | MQTT state topic prefix. (default: `omada_exporter`)                              |
-| OMADA_MQTT_DISCOVERY_PREFIX     | Home Assistant MQTT discovery prefix. (default: `homeassistant`)                  |
-| OMADA_MQTT_INTERVAL             | MQTT publish interval in seconds. (default: 60)                                   |
-| OMADA_MQTT_RETAIN               | Publish MQTT discovery and state messages as retained. (default: true)            |
-| OMADA_MQTT_EXPIRE_AFTER         | Home Assistant sensor expire_after in seconds. Set 0 to disable. (default: 180)   |
-
-### Notes
-
-Last tested on [OC200](https://www.omadanetworks.com/us/business-networking/omada-controller-hardware/oc200/), firmware 6.2.0.17 (ER8411, SG3428X-M2, SG3210XHP-M2, SG2210MP, EAP772-Outdoor, EAP650-Outdoor, EAP225-Outdoor, EAP725-Wall)
-
-OpenAPI docs: [https://use1-omada-northbound.tplinkcloud.com/doc.html](https://use1-omada-northbound.tplinkcloud.com/doc.html)
-Web API: no official docs. Login to your controller and inspect requests in browser developer tools.
-
-## 📊 Metrics
-
-`omada_port_*` metrics include the `port_activity_label` label only when `OMADA_INCLUDE_PORT_ACTIVITY_LABEL=true` (default). `OMADA_TRACK_PORT_METRICS=false` suppresses per-port metrics, and `OMADA_TRACK_CLIENT_METRICS=false` suppresses per-client metrics while keeping `omada_client_connected_total`.
-
-| Name | Description | Type | Labels |
-|:-----|:------------|:-----|:-------|
-| omada_client_connected_total | Total number of connected clients. | count | connection_mode site site_id wifi_mode |
-| omada_client_download_activity_bytes | The current download activity for the client in bytes. | byte | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_rssi_dbm | The RSSI for the wireless client in dBm. | dbm | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_rx_rate | RX rate of wireless client. | bps | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_signal_pct | The signal quality for the wireless client in percent. | percent | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_snr_dbm | The signal to noise ratio for the wireless client in dBm. | dbm | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_traffic_down_bytes | Total bytes received by wireless client. | byte | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_traffic_up_bytes | Total bytes sent by wireless client. | byte | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_tx_rate | TX rate of wireless client. | bps | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_client_upload_activity_bytes | The current upload activity for the client in bytes. | byte | ap_mac ap_name connect_dev_type connect_type device_category device_type gateway_mac gateway_name host_name ip lag_id mac name port site site_id ssid switch_mac switch_name system_name vendor vlan_id wifi_mode wireless |
-| omada_controller_storage_available_bytes | Total storage available for the controller. | byte | adopted_ap_and_switch_num adopted_ap_num adopted_olt_num adopted_osg_num adopted_osw_num ap_and_switch_capacity ap_capacity device_firmware_version device_ip device_mac device_model device_name device_version device_version_upgrade olt_capacity osg_capacity osw_capacity share_ap_and_switch_capacity site site_id storage_name |
-| omada_controller_storage_used_bytes | Storage used on the controller. | byte | adopted_ap_and_switch_num adopted_ap_num adopted_olt_num adopted_osg_num adopted_osw_num ap_and_switch_capacity ap_capacity device_firmware_version device_ip device_mac device_model device_name device_version device_version_upgrade olt_capacity osg_capacity osw_capacity share_ap_and_switch_capacity site site_id storage_name |
-| omada_controller_upgrade_available | Firmware upgrade available for the controller per channet. | value | adopted_ap_and_switch_num adopted_ap_num adopted_olt_num adopted_osg_num adopted_osw_num ap_and_switch_capacity ap_capacity device_firmware_version device_ip device_mac device_model device_name device_version device_version_upgrade latest_version olt_capacity osg_capacity osw_capacity share_ap_and_switch_capacity site site_id upgrade_channel |
-| omada_controller_uptime_seconds | Uptime of the controller. | seconds | adopted_ap_and_switch_num adopted_ap_num adopted_olt_num adopted_osg_num adopted_osw_num ap_and_switch_capacity ap_capacity device_firmware_version device_ip device_mac device_model device_name device_version device_version_upgrade olt_capacity osg_capacity osw_capacity share_ap_and_switch_capacity site site_id |
-| omada_device_2g_rx_util | The tx rate of the device on 2.4Ghz. | percent | device_any_poe_enable device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade device_wireless_linked device_wlan_group device_wp2g_band_width device_wp2g_mode device_wp2g_tx_max_rate device_wp5g1_band_width device_wp5g1_mode device_wp5g1_tx_max_rate device_wp5g2_band_width device_wp5g2_mode device_wp5g2_tx_max_rate device_wp5g_band_width device_wp5g_mode device_wp5g_tx_max_rate device_wp6g_band_width device_wp6g_mode device_wp6g_tx_max_rate site site_id |
-| omada_device_2g_tx_util | The tx rate of the device on 2.4Ghz. | percent | device_any_poe_enable device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade device_wireless_linked device_wlan_group device_wp2g_band_width device_wp2g_mode device_wp2g_tx_max_rate device_wp5g1_band_width device_wp5g1_mode device_wp5g1_tx_max_rate device_wp5g2_band_width device_wp5g2_mode device_wp5g2_tx_max_rate device_wp5g_band_width device_wp5g_mode device_wp5g_tx_max_rate device_wp6g_band_width device_wp6g_mode device_wp6g_tx_max_rate site site_id |
-| omada_device_5g_rx_util | The tx rate of the device on 5Ghz. | percent | device_any_poe_enable device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade device_wireless_linked device_wlan_group device_wp2g_band_width device_wp2g_mode device_wp2g_tx_max_rate device_wp5g1_band_width device_wp5g1_mode device_wp5g1_tx_max_rate device_wp5g2_band_width device_wp5g2_mode device_wp5g2_tx_max_rate device_wp5g_band_width device_wp5g_mode device_wp5g_tx_max_rate device_wp6g_band_width device_wp6g_mode device_wp6g_tx_max_rate site site_id |
-| omada_device_5g_tx_util | The tx rate of the device on 5Ghz. | percent | device_any_poe_enable device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade device_wireless_linked device_wlan_group device_wp2g_band_width device_wp2g_mode device_wp2g_tx_max_rate device_wp5g1_band_width device_wp5g1_mode device_wp5g1_tx_max_rate device_wp5g2_band_width device_wp5g2_mode device_wp5g2_tx_max_rate device_wp5g_band_width device_wp5g_mode device_wp5g_tx_max_rate device_wp6g_band_width device_wp6g_mode device_wp6g_tx_max_rate site site_id |
-| omada_device_6g_rx_util | The tx rate of the device on 6Ghz. | percent | device_any_poe_enable device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade device_wireless_linked device_wlan_group device_wp2g_band_width device_wp2g_mode device_wp2g_tx_max_rate device_wp5g1_band_width device_wp5g1_mode device_wp5g1_tx_max_rate device_wp5g2_band_width device_wp5g2_mode device_wp5g2_tx_max_rate device_wp5g_band_width device_wp5g_mode device_wp5g_tx_max_rate device_wp6g_band_width device_wp6g_mode device_wp6g_tx_max_rate site site_id |
-| omada_device_6g_tx_util | The tx rate of the device on 6Ghz.. | percent | device_any_poe_enable device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade device_wireless_linked device_wlan_group device_wp2g_band_width device_wp2g_mode device_wp2g_tx_max_rate device_wp5g1_band_width device_wp5g1_mode device_wp5g1_tx_max_rate device_wp5g2_band_width device_wp5g2_mode device_wp5g2_tx_max_rate device_wp5g_band_width device_wp5g_mode device_wp5g_tx_max_rate device_wp6g_band_width device_wp6g_mode device_wp6g_tx_max_rate site site_id |
-| omada_device_cpu_percentage | Percentage of device CPU used. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_download | Device download traffic. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_mem_percentage | Percentage of device Memory used. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_need_upgrade | A boolean on whether the device needs an upgrade. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_poe_remain_watts | The remaining amount of PoE power for the device in watts. | watt | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_poe_support device_port_number device_show_model device_status device_subtype device_total_power device_type device_version device_version_upgrade site site_id |
-| omada_device_rx_rate | The rx rate of the device. | bps | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_temp | Device temperature. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_tx_rate | The tx rate of the device. | bps | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_upload | Device upload traffic. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_device_uptime_seconds | Uptime of the device. | seconds | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade site site_id |
-| omada_isp_download_speed | The download speed of the ISP | value | download_speed_set gateway_mac gateway_name gateway_status ip load_balance max_bandwidth name port site site_id status |
-| omada_isp_status | The current status of the ISP enabled/disabled | value | download_speed_set gateway_mac gateway_name gateway_status ip load_balance max_bandwidth name port site site_id status |
-| omada_isp_upload_speed | The upload speed of the ISP | value | download_speed_set gateway_mac gateway_name gateway_status ip load_balance max_bandwidth name port site site_id status |
-| omada_lag_link_rx | Bytes recieved on a lag. | bps | 19" device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade lag_id lag_ports lag_type link_speed link_status name site site_id |
-| omada_lag_link_speed_mbps | Lag link speed in mbps. This is the capability of the connection, not the active throughput. | mbps | 19" device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade lag_id lag_ports lag_type link_speed link_status name site site_id |
-| omada_lag_link_status | A boolean representing the link status of the lag. | value | 19" device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade lag_id lag_ports lag_type link_speed link_status name site site_id |
-| omada_lag_link_tx | Bytes transmitted on a lag. | bps | 19" device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade lag_id lag_ports lag_type link_speed link_status name site site_id |
-| omada_port_link_rx | Bytes recieved on a port. | bps | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade link_speed link_status max_speed name operation poe port port_activity_label site site_id type |
-| omada_port_link_speed_mbps | Port link speed in mbps. This is the capability of the connection, not the active throughput. | mbps | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade link_speed link_status max_speed name operation poe port port_activity_label site site_id type |
-| omada_port_link_status | A boolean representing the link status of the port. | value | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade link_speed link_status max_speed name operation poe port port_activity_label site site_id type |
-| omada_port_link_tx | Bytes transmitted on a port. | bps | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade link_speed link_status max_speed name operation poe port port_activity_label site site_id type |
-| omada_port_power_watts | The current PoE usage of the port in watts. | watt | device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade link_speed link_status max_speed name operation poe port port_activity_label site site_id type |
-| omada_site_alert_num | Number of alerts. | count | obscured site site_id |
-| omada_vpn_down_bytes | VPN downlink traffic in bytes | byte | interface_name local_ip name remote_ip site site_id vpn_mode vpn_type |
-| omada_vpn_down_packets | VPN downlink traffic in packets | count | interface_name local_ip name remote_ip site site_id vpn_mode vpn_type |
-| omada_vpn_status | The current status of the VPN enabled/disabled | value | name purpose remote_ip site site_id vpn_id vpn_mode vpn_type |
-| omada_vpn_up_bytes | VPN uplink traffic in bytes | byte | interface_name local_ip name remote_ip site site_id vpn_mode vpn_type |
-| omada_vpn_up_packets | VPN uplink traffic in packets | count | interface_name local_ip name remote_ip site site_id vpn_mode vpn_type |
-| omada_vpn_uptime | The current uptime of the VPN | seconds | interface_name local_ip name remote_ip site site_id vpn_mode vpn_type |
-| omada_site_to_site_vpn_down_bytes | Site-to-site VPN downlink traffic in bytes aggregated per VPN | byte | name site site_id site_vpn_type vpn_id vpn_type |
-| omada_site_to_site_vpn_peer_down_bytes | Site-to-site VPN peer downlink traffic in bytes | byte | local_ip name peer_id peer_name port remote_ip site site_id site_vpn_type vpn_id vpn_type |
-| omada_site_to_site_vpn_peer_login_timestamp | Unix login timestamp of the site-to-site VPN peer in seconds | unix | local_ip name peer_id peer_name port remote_ip site site_id site_vpn_type vpn_id vpn_type |
-| omada_site_to_site_vpn_peer_up_bytes | Site-to-site VPN peer uplink traffic in bytes | byte | local_ip name peer_id peer_name port remote_ip site site_id site_vpn_type vpn_id vpn_type |
-| omada_site_to_site_vpn_total_peers | Total number of site-to-site VPN peers | count | direction interface_name local_ip local_peer_ip name remote_ip remote_peer_ip site site_id site_vpn_type tunnel_id vpn_id vpn_type |
-| omada_site_to_site_vpn_up_bytes | Site-to-site VPN uplink traffic in bytes aggregated per VPN | byte | name site site_id site_vpn_type vpn_id vpn_type |
-| omada_wan_internet_state | The current status of the WAN internet state connected/disconnected | value | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade ip name port proto site site_id type |
-| omada_wan_latency | Wan latency (ms) | ms | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade ip name port proto site site_id type |
-| omada_wan_link_speed_mbps | Wan link speed in mbps. This is the capability of the connection, not the active throughput. | mbps | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade ip name port proto site site_id type |
-| omada_wan_rx_rate | Wan RX rate (KB/s) | bps | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade ip name port proto site site_id type |
-| omada_wan_status | The current status of the WAN connected/disconnected | value | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade ip name port proto site site_id type |
-| omada_wan_tx_rate | Wan TX rate (KB/s) | bps | desc device_firmware_version device_hw_version device_ip device_mac device_model device_name device_show_model device_status device_subtype device_type device_version device_version_upgrade ip name port proto site site_id type |
+MIT License. See [LICENSE](./LICENSE).
