@@ -83,13 +83,14 @@ func runExporter(c *cli.Context) error {
 	if conf.MQTTEnabled {
 		publisher, err := hamqtt.NewPublisher(client, collectors)
 		if err != nil {
-			return err
+			log.Error().Err(err).Msg("home assistant mqtt publisher disabled")
+		} else {
+			go func() {
+				if err := publisher.Run(context.Background()); err != nil && err != context.Canceled {
+					log.Error().Err(err).Msg("home assistant mqtt publisher stopped")
+				}
+			}()
 		}
-		go func() {
-			if err := publisher.Run(context.Background()); err != nil && err != context.Canceled {
-				log.Error().Err(err).Msg("home assistant mqtt publisher stopped")
-			}
-		}()
 	}
 
 	mux.HandleFunc("/healthz", health.livez)

@@ -30,6 +30,8 @@ environment:
 
 If the broker does not require authentication, omit `OMADA_MQTT_USER` and `OMADA_MQTT_PASS`.
 
+If the MQTT broker is unavailable when OmadaBridge starts, the exporter still starts and Prometheus endpoints remain available. MQTT publishing retries in the background until the broker is reachable.
+
 ## MQTT Topics
 
 Default prefixes:

@@ -67,6 +67,11 @@ type publishContext struct {
 
 var slugPattern = regexp.MustCompile(`[^a-z0-9_]+`)
 
+const (
+	mqttConnectTimeout       = 10 * time.Second
+	mqttConnectRetryInterval = 30 * time.Second
+)
+
 // NewPublisher creates an MQTT publisher for the configured collectors.
 func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector) (*Publisher, error) {
 	registry := prometheus.NewRegistry()
@@ -95,7 +100,9 @@ func (p *Publisher) Run(ctx context.Context) error {
 	opts.SetUsername(p.client.Config.MQTTUsername)
 	opts.SetPassword(p.client.Config.MQTTPassword)
 	opts.SetAutoReconnect(true)
-	opts.SetConnectRetry(true)
+	opts.SetMaxReconnectInterval(mqttConnectRetryInterval)
+	opts.SetConnectRetry(false)
+	opts.SetConnectTimeout(mqttConnectTimeout)
 	opts.SetCleanSession(true)
 	opts.SetWill(p.availabilityTopic, "offline", 0, true)
 	opts.OnConnect = func(client mqtt.Client) {
@@ -107,8 +114,8 @@ func (p *Publisher) Run(ctx context.Context) error {
 	}
 
 	p.mqtt = mqtt.NewClient(opts)
-	if token := p.mqtt.Connect(); token.Wait() && token.Error() != nil {
-		return token.Error()
+	if err := p.connect(ctx); err != nil {
+		return err
 	}
 
 	p.publishBytes(p.availabilityTopic, []byte("online"), true)
@@ -129,6 +136,24 @@ func (p *Publisher) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-ticker.C:
 			p.publishAll()
+		}
+	}
+}
+
+func (p *Publisher) connect(ctx context.Context) error {
+	for {
+		token := p.mqtt.Connect()
+		token.Wait()
+		if err := token.Error(); err == nil {
+			return nil
+		} else {
+			log.Warn().Err(err).Dur("retry_after", mqttConnectRetryInterval).Msg("mqtt broker unavailable")
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(mqttConnectRetryInterval):
 		}
 	}
 }
@@ -382,7 +407,7 @@ func (p *Publisher) publishJSON(topic string, payload any, retained bool) {
 
 // publishBytes publishes a raw MQTT payload.
 func (p *Publisher) publishBytes(topic string, payload []byte, retained bool) {
-	if p.mqtt == nil || !p.mqtt.IsConnected() {
+	if p.mqtt == nil || !p.mqtt.IsConnectionOpen() {
 		return
 	}
 	token := p.mqtt.Publish(topic, 0, retained, payload)
