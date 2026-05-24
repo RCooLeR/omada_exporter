@@ -9,7 +9,7 @@ OmadaBridge gathers data from the configured Omada Controller site and exposes t
 3. Prometheus scrapes `/metrics` or per-collector endpoints.
 4. When MQTT is enabled, the Home Assistant publisher gathers the same collectors, creates MQTT Discovery configs, and publishes JSON state payloads for every metric instance.
 
-No database is used. The bridge state is the latest collected Omada API response plus the current MQTT publisher memory used to mark disappeared client trackers as `not_home`.
+No database is used. The bridge state is the latest collected Omada API response, the configured MQTT tracked-client MAC list, plus the current MQTT publisher memory used to mark disappeared client trackers as `not_home`.
 
 ## Collector Groups
 

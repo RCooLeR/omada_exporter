@@ -26,6 +26,7 @@ environment:
   OMADA_MQTT_INTERVAL: "60"
   OMADA_MQTT_RETAIN: "true"
   OMADA_MQTT_EXPIRE_AFTER: "180"
+  OMADA_MQTT_TRACKED_CLIENT_MACS: "aa:bb:cc:dd:ee:ff,11:22:33:44:55:66"
 ```
 
 If the broker does not require authentication, omit `OMADA_MQTT_USER` and `OMADA_MQTT_PASS`.
@@ -228,7 +229,7 @@ When `OMADA_MQTT_EXPIRE_AFTER` is greater than `0`, it is applied to sensor enti
 
 ### Device Trackers
 
-Every active client with a MAC address gets a `device_tracker` discovery config.
+Every active client with a MAC address gets a `device_tracker` discovery config. MAC addresses listed in `OMADA_MQTT_TRACKED_CLIENT_MACS` also get a tracker even when they are not currently active.
 
 | Field | Value |
 | --- | --- |
@@ -248,6 +249,10 @@ If a previously seen client disappears, OmadaBridge publishes:
 ```text
 omada_exporter/device_trackers/<client_mac_slug>/state = not_home
 ```
+
+If a configured tracked MAC is not present in collected metrics, OmadaBridge publishes discovery for that client and sends the same `not_home` state. The list accepts comma, semicolon, or whitespace separators and normalizes common MAC formats such as `aa:bb:cc:dd:ee:ff`, `aa-bb-cc-dd-ee-ff`, `aabb.ccdd.eeff`, and `aabbccddeeff`.
+
+Configured trackers still rely on per-client metrics to switch to `home` from Omada data, so keep `OMADA_TRACK_CLIENT_METRICS=true` when online/offline presence should update automatically.
 
 Attributes include Omada client labels such as IP, hostname, vendor, SSID, AP, switch, gateway, VLAN, RSSI, traffic, and attachment details when available.
 
@@ -357,7 +362,7 @@ Client trackers stay `home`:
 
 - Confirm per-client collection is enabled.
 - Confirm the client has a MAC address in Omada data.
-- The bridge marks clients `not_home` only after they were previously seen by the same running publisher.
+- The bridge marks dynamic clients `not_home` only after they were previously seen by the same running publisher. Add long-lived clients to `OMADA_MQTT_TRACKED_CLIENT_MACS` when they should be published as `not_home` even if already offline.
 
 Cards show no data:
 

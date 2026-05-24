@@ -51,6 +51,7 @@ func Start() {
 		&cli.IntFlag{Destination: &conf.MQTTInterval, Name: "mqtt-interval", Value: 60, Usage: "MQTT publish interval in seconds.", EnvVars: []string{"OMADA_MQTT_INTERVAL"}},
 		&cli.BoolFlag{Destination: &conf.MQTTRetain, Name: "mqtt-retain", Value: true, Usage: "Publish MQTT discovery and state messages as retained.", EnvVars: []string{"OMADA_MQTT_RETAIN"}},
 		&cli.IntFlag{Destination: &conf.MQTTExpireAfter, Name: "mqtt-expire-after", Value: 180, Usage: "Home Assistant sensor expire_after value in seconds. Set 0 to disable.", EnvVars: []string{"OMADA_MQTT_EXPIRE_AFTER"}},
+		&cli.StringFlag{Destination: &conf.MQTTTrackedClientMACs, Name: "mqtt-tracked-client-macs", Value: "", Usage: "Comma-separated client MAC addresses to publish Home Assistant device trackers for even when offline.", EnvVars: []string{"OMADA_MQTT_TRACKED_CLIENT_MACS"}},
 	}
 	app.Commands = []*cli.Command{
 		{Name: "version", Aliases: []string{"v"}, Usage: "prints the current version.",

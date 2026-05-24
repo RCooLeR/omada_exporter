@@ -28,4 +28,5 @@ type Config struct {
 	MQTTInterval             int
 	MQTTRetain               bool
 	MQTTExpireAfter          int
+	MQTTTrackedClientMACs    string
 }

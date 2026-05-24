@@ -45,6 +45,7 @@ services:
       OMADA_MQTT_INTERVAL: "60"
       OMADA_MQTT_RETAIN: "true"
       OMADA_MQTT_EXPIRE_AFTER: "180"
+      OMADA_MQTT_TRACKED_CLIENT_MACS: "aa:bb:cc:dd:ee:ff,11:22:33:44:55:66"
     restart: unless-stopped
 ```
 
@@ -158,3 +159,4 @@ The Docker image health check calls `/healthz`.
 | `OMADA_MQTT_INTERVAL` | `60` | Publish interval in seconds. |
 | `OMADA_MQTT_RETAIN` | `true` | Publish discovery and state messages as retained. |
 | `OMADA_MQTT_EXPIRE_AFTER` | `180` | Home Assistant `expire_after` for sensor entities. Set `0` to disable. |
+| `OMADA_MQTT_TRACKED_CLIENT_MACS` | empty | Comma-separated client MAC addresses to publish `device_tracker` entities for even when currently offline. |

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -22,14 +23,16 @@ import (
 
 // Publisher publishes collected metrics to Home Assistant over MQTT.
 type Publisher struct {
-	client            *api.Client
-	registry          *prometheus.Registry
-	mqtt              mqtt.Client
-	availabilityTopic string
-	published         map[string]struct{}
-	knownClients      map[string]clientTracker
-	metricSamples     map[string]metricSample
-	mu                sync.Mutex
+	client             *api.Client
+	registry           *prometheus.Registry
+	mqtt               mqtt.Client
+	availabilityTopic  string
+	published          map[string]struct{}
+	knownClients       map[string]clientTracker
+	lastClientTrackers map[string]clientTracker
+	trackedClientMACs  []string
+	metricSamples      map[string]metricSample
+	mu                 sync.Mutex
 }
 
 // clientTracker stores MQTT topics and labels for a tracked client.
@@ -83,12 +86,14 @@ func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector
 
 	prefix := topicPrefix(client.Config.MQTTTopicPrefix)
 	return &Publisher{
-		client:            client,
-		registry:          registry,
-		availabilityTopic: prefix + "/status",
-		published:         map[string]struct{}{},
-		knownClients:      map[string]clientTracker{},
-		metricSamples:     map[string]metricSample{},
+		client:             client,
+		registry:           registry,
+		availabilityTopic:  prefix + "/status",
+		published:          map[string]struct{}{},
+		knownClients:       map[string]clientTracker{},
+		lastClientTrackers: map[string]clientTracker{},
+		trackedClientMACs:  parseTrackedClientMACs(client.Config.MQTTTrackedClientMACs),
+		metricSamples:      map[string]metricSample{},
 	}, nil
 }
 
@@ -331,13 +336,15 @@ func (p *Publisher) clientTracker(metricName string, labels map[string]string) (
 	}, true
 }
 
-// publishClientTrackers publishes discovery and state updates for tracked clients.
+// publishClientTrackers publishes discovery and state updates for client trackers.
 func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
+	observedAt := time.Now().UTC()
+
 	for id, tracker := range seen {
 		p.publishClientTrackerDiscovery(id, tracker)
 
 		attributes := map[string]any{
-			"last_seen": time.Now().UTC().Format(time.RFC3339),
+			"last_seen": observedAt.Format(time.RFC3339),
 		}
 		for k, v := range tracker.Labels {
 			attributes[k] = v
@@ -348,15 +355,69 @@ func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 
 	p.mu.Lock()
 	previous := p.knownClients
+	for id, tracker := range seen {
+		p.lastClientTrackers[id] = tracker
+	}
+	lastKnown := copyClientTrackers(p.lastClientTrackers)
 	p.knownClients = seen
 	p.mu.Unlock()
+
+	configured := p.configuredClientTrackers()
+	for id, tracker := range configured {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		if lastKnownTracker, ok := lastKnown[id]; ok {
+			tracker = lastKnownTracker
+		}
+
+		p.publishClientTrackerDiscovery(id, tracker)
+
+		attributes := map[string]any{
+			"last_updated": observedAt.Format(time.RFC3339),
+			"configured":   true,
+		}
+		for k, v := range tracker.Labels {
+			attributes[k] = v
+		}
+		p.publishBytes(tracker.StateTopic, []byte("not_home"), p.client.Config.MQTTRetain)
+		p.publishJSON(tracker.AttributesTopic, attributes, p.client.Config.MQTTRetain)
+	}
 
 	for id, tracker := range previous {
 		if _, ok := seen[id]; ok {
 			continue
 		}
+		if _, ok := configured[id]; ok {
+			continue
+		}
 		p.publishBytes(tracker.StateTopic, []byte("not_home"), p.client.Config.MQTTRetain)
 	}
+}
+
+// configuredClientTrackers builds device trackers for explicitly configured MAC addresses.
+func (p *Publisher) configuredClientTrackers() map[string]clientTracker {
+	trackers := make(map[string]clientTracker, len(p.trackedClientMACs))
+	statePrefix := topicPrefix(p.client.Config.MQTTTopicPrefix)
+	for _, mac := range p.trackedClientMACs {
+		id := trackerID(mac)
+		labels := map[string]string{
+			"mac": mac,
+		}
+		if p.client.Config.Site != "" {
+			labels["site"] = p.client.Config.Site
+		}
+		if p.client.SiteId != "" {
+			labels["site_id"] = p.client.SiteId
+		}
+
+		trackers[id] = clientTracker{
+			StateTopic:      fmt.Sprintf("%s/device_trackers/%s/state", statePrefix, id),
+			AttributesTopic: fmt.Sprintf("%s/device_trackers/%s/attributes", statePrefix, id),
+			Labels:          labels,
+		}
+	}
+	return trackers
 }
 
 // publishClientTrackerDiscovery publishes Home Assistant discovery data for a client tracker.
@@ -725,6 +786,59 @@ func clientName(labels map[string]string) string {
 	return firstNonEmpty(labels["name"], labels["host_name"], labels["system_name"], labels["ip"], labels["mac"], "Omada Client")
 }
 
+// parseTrackedClientMACs parses the configured MAC address list for forced MQTT client trackers.
+func parseTrackedClientMACs(value string) []string {
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';' || unicode.IsSpace(r)
+	})
+
+	macs := []string{}
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		mac, ok := normalizeClientMAC(part)
+		if !ok {
+			log.Warn().Str("mac", part).Msg("ignoring invalid tracked client mac")
+			continue
+		}
+
+		id := trackerID(mac)
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		macs = append(macs, mac)
+	}
+	return macs
+}
+
+// normalizeClientMAC normalizes common MAC address spellings to aa:bb:cc:dd:ee:ff.
+func normalizeClientMAC(value string) (string, bool) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "", false
+	}
+
+	var raw strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= '0' && r <= '9':
+			raw.WriteRune(r)
+		case r >= 'a' && r <= 'f':
+			raw.WriteRune(r)
+		case r == ':' || r == '-' || r == '.' || r == '_':
+			continue
+		default:
+			return "", false
+		}
+	}
+
+	hex := raw.String()
+	if len(hex) != 12 {
+		return "", false
+	}
+	return fmt.Sprintf("%s:%s:%s:%s:%s:%s", hex[0:2], hex[2:4], hex[4:6], hex[6:8], hex[8:10], hex[10:12]), true
+}
+
 // trackerID builds the tracker identifier for a client MAC address.
 func trackerID(mac string) string {
 	return slug(strings.ReplaceAll(strings.ToLower(mac), ":", "_"))
@@ -745,6 +859,16 @@ func copyLabels(labels map[string]string) map[string]string {
 	copied := make(map[string]string, len(labels))
 	for key, value := range labels {
 		copied[key] = value
+	}
+	return copied
+}
+
+// copyClientTrackers returns a shallow copy of tracked client metadata.
+func copyClientTrackers(trackers map[string]clientTracker) map[string]clientTracker {
+	copied := make(map[string]clientTracker, len(trackers))
+	for id, tracker := range trackers {
+		tracker.Labels = copyLabels(tracker.Labels)
+		copied[id] = tracker
 	}
 	return copied
 }

@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Added
+- Add `OMADA_MQTT_TRACKED_CLIENT_MACS` / `--mqtt-tracked-client-macs` to publish Home Assistant client device trackers as `not_home` even when configured clients are already offline.
 
 ## [2.1.6] - 2026-04-29
 ### Fixed

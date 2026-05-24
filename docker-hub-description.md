@@ -30,6 +30,7 @@ services:
       OMADA_MQTT_PASS: "mqtt-password"
       OMADA_MQTT_TOPIC_PREFIX: "omada_exporter"
       OMADA_MQTT_DISCOVERY_PREFIX: "homeassistant"
+      OMADA_MQTT_TRACKED_CLIENT_MACS: "aa:bb:cc:dd:ee:ff"
     restart: unless-stopped
 ```
 
