@@ -71,10 +71,12 @@ func runExporter(c *cli.Context) error {
 	health := &healthState{}
 
 	collectors := initCollectors(client)
+	collectorHealth := newCollectorHealth()
+	prometheus.MustRegister(collectorHealth)
 
 	// register omada collectors
 	for name, c := range collectors {
-		instrumented := newInstrumentedCollector(name, c)
+		instrumented := newInstrumentedCollector(name, c, collectorHealth)
 		collectors[name] = instrumented
 		prometheus.MustRegister(instrumented)
 		reg := prometheus.NewRegistry()

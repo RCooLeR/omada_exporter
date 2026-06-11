@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [2.2.1] - 2026-06-12
+### Fixed
+- Fix startup panic from duplicate collector self-metric descriptors when multiple Omada collectors are registered in the same Prometheus registry.
+
 ## [2.2.0] - 2026-06-11
 ### Added
 - Add `OMADA_MQTT_TRACKED_CLIENT_MACS` / `--mqtt-tracked-client-macs` to publish Home Assistant client device trackers as `not_home` even when configured clients are already offline.
