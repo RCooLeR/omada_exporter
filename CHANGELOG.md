@@ -1,6 +1,26 @@
 ## [Unreleased]
+
+## [2.2.0] - 2026-06-11
 ### Added
 - Add `OMADA_MQTT_TRACKED_CLIENT_MACS` / `--mqtt-tracked-client-macs` to publish Home Assistant client device trackers as `not_home` even when configured clients are already offline.
+- Add GitHub Actions CI for Go tests, vet, build, Home Assistant card typecheck, tests, and build.
+- Add collector self-metrics for last scrape completion, scrape duration, and recovered panics.
+- Add focused tests for API cache behavior, secret redaction, collector panic recovery, MQTT tracked client discovery/state payloads, and Home Assistant card model/format helpers.
+
+### Changed
+- Improve MQTT publisher connection handling so it retries broker connection failures and publishes availability state more reliably.
+- Harden Web API and Open API authentication by deduplicating concurrent login/refresh attempts and redacting token-like query parameters from URL-shaped errors.
+- Upgrade Go module dependencies, Home Assistant card dependencies, and Docker base images.
+- Reorganize repository documentation, release packaging, and Home Assistant card docs for the OmadaBridge project structure.
+
+### Fixed
+- Fix root page links for VPN stats and ISP per-collector metrics.
+- Remove the typo `github.com/RCooLeR/omada_exporte` module replacement.
+- Fix Home Assistant card typing issues exposed by upgraded ECharts, Vite, and TypeScript.
+
+### Docs
+- Document collector self-metrics and local development checks.
+- Add/update legal, trademark, disclaimer, Docker, Home Assistant, and dashboard documentation.
 
 ## [2.1.6] - 2026-04-29
 ### Fixed
