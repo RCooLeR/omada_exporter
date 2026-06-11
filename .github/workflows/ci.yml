@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  bridge:
+    name: Bridge
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: bridge/go.mod
+          cache-dependency-path: bridge/go.sum
+
+      - name: Download Go modules
+        run: go mod download
+        working-directory: bridge
+
+      - name: Verify Go modules are tidy
+        run: go mod tidy && git diff --exit-code -- go.mod go.sum
+        working-directory: bridge
+
+      - name: Run Go tests
+        run: go test ./...
+        working-directory: bridge
+
+      - name: Run Go vet
+        run: go vet ./...
+        working-directory: bridge
+
+      - name: Build bridge binary
+        run: go build ./...
+        working-directory: bridge
+
+  ha-cards:
+    name: Home Assistant cards
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ha-cards/package-lock.json
+
+      - name: Install card dependencies
+        run: npm ci
+        working-directory: ha-cards
+
+      - name: Typecheck cards
+        run: npm run typecheck
+        working-directory: ha-cards
+
+      - name: Test cards
+        run: npm test
+        working-directory: ha-cards
+
+      - name: Build cards
+        run: npm run build
+        working-directory: ha-cards

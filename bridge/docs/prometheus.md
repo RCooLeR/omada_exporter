@@ -52,6 +52,16 @@ Use the hostname or IP address reachable from Prometheus. If Prometheus runs out
 - WAN RX/TX rate metrics are reported by the controller as KB/s.
 - Labels carry Omada identity and topology metadata. High-cardinality labels are expected for per-client and per-port metrics.
 
+## Exporter Self-Metrics
+
+OmadaBridge wraps each Omada collector with a small layer of scrape-health metrics:
+
+| Metric | Meaning | Labels |
+| --- | --- | --- |
+| `omada_collector_last_scrape_completed` | `1` when the collector returned without panicking, `0` when a panic was recovered. API errors handled inside individual collectors are still logged by that collector. | collector |
+| `omada_collector_last_scrape_duration_seconds` | Duration of the most recent collector scrape. | collector |
+| `omada_collector_panics_total` | Total recovered panics for the collector since process start. | collector |
+
 ## Metric Reference
 
 | Metric | Meaning | Main labels |

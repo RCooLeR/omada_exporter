@@ -340,6 +340,9 @@ func (p *Publisher) clientTracker(metricName string, labels map[string]string) (
 func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 	observedAt := time.Now().UTC()
 
+	// Clients that appear in this gather are currently online. We publish both
+	// discovery and state so Home Assistant can create/update the tracker and
+	// immediately mark it as home.
 	for id, tracker := range seen {
 		p.publishClientTrackerDiscovery(id, tracker)
 
@@ -362,6 +365,10 @@ func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 	p.knownClients = seen
 	p.mu.Unlock()
 
+	// Configured MAC addresses are special: the user wants Home Assistant to
+	// know about them even if Omada did not report them in the current online
+	// client list. If we have old labels from a previous online sighting, reuse
+	// them so the tracker keeps its friendly name/vendor details while offline.
 	configured := p.configuredClientTrackers()
 	for id, tracker := range configured {
 		if _, ok := seen[id]; ok {
@@ -384,6 +391,9 @@ func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 		p.publishJSON(tracker.AttributesTopic, attributes, p.client.Config.MQTTRetain)
 	}
 
+	// Dynamic clients are marked away only after this publisher has seen them
+	// once. That avoids creating unlimited offline trackers for every historical
+	// client unless the MAC was explicitly configured above.
 	for id, tracker := range previous {
 		if _, ok := seen[id]; ok {
 			continue

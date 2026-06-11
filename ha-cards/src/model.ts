@@ -372,6 +372,9 @@ function summaryFrom(devices: DeviceRecord[], clients: ClientRecord[], siteName:
 }
 
 export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): DashboardModel {
+  // Home Assistant exposes every MQTT entity as a flat dictionary. The card is
+  // easier to render if we first group those entities back into domain objects:
+  // devices, ports, clients, WAN rows, VPN rows, and ISP rows.
   const devices = new Map<string, DeviceRecord>();
   const ports = new Map<string, PortRecord>();
   const radios = new Map<string, RadioRecord>();
@@ -389,6 +392,8 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (isClientTrackerEntity(entity)) {
+      // Offline configured trackers are useful to Home Assistant itself, but
+      // they should not appear as active clients on the dashboard.
       if (entity.state === "not_home") {
         continue;
       }
@@ -469,6 +474,9 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       if (!attrString(entity, "mac") || metric === "omada_client_connected_total") {
         continue;
       }
+      // Older exports can make controller client-like metrics look similar to
+      // real client metrics. If the labels say "controller", keep the data on
+      // the controller device row instead of showing a fake client.
       if (isControllerEntity(entity)) {
         const controller = ensureControllerDevice(devices, entity);
         if (controller.mac) {
@@ -539,6 +547,9 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   }
 
   for (const client of clients.values()) {
+    // Link aggregation metrics belong to a LAG, while clients usually report
+    // only the parent device and lag_id. Merge the LAG attributes into the
+    // client so the UI can show the attachment accurately.
     const lagId = String(client.attrs.lag_id ?? client.attrs.lagId ?? "").trim();
     const lagDeviceMac = client.switchMac || client.gatewayMac;
     if (lagId && lagId !== "0" && lagDeviceMac) {

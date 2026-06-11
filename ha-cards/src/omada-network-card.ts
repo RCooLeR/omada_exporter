@@ -1,8 +1,8 @@
 import { BarChart, GaugeChart, RadarChart } from "echarts/charts";
 import { GridComponent, RadarComponent } from "echarts/components";
-import { init, use } from "echarts/core";
+import { init, use, type EChartsType } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import type { ECharts, EChartsOption } from "echarts";
+import type { EChartsOption } from "echarts";
 import { css, html, LitElement, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
@@ -235,7 +235,7 @@ export class OmadaNetworkCard extends LitElement {
   private _pendingUpdateCount = 0;
   private _selectedDevice?: DeviceRecord;
   private _selectedClient?: ClientRecord;
-  private readonly _charts = new Map<string, ECharts>();
+  private readonly _charts = new Map<string, EChartsType>();
   private readonly _chartElements = new Map<string, HTMLElement>();
   private readonly _chartSignatures = new Map<string, string>();
   private readonly _deviceMeta = new WeakMap<DeviceRecord, DeviceMeta>();
@@ -295,13 +295,14 @@ export class OmadaNetworkCard extends LitElement {
       this._filteredDevices = this.computeFilteredDevices();
     }
 
-    if (modelChanged) {
-      this._pendingUpdateCount = this._model.devices.reduce(
+    if (modelChanged && this._model) {
+      const model = this._model;
+      this._pendingUpdateCount = model.devices.reduce(
         (count, device) => count + (this.getDeviceMeta(device).pendingUpdate ? 1 : 0),
         0
       );
       if (!this._selection || !this.selectionExists(this._selection)) {
-        const device = this._model.devices[0];
+        const device = model.devices[0];
         const client = this._filteredClients[0];
         this._selection = device ? { kind: "device", key: device.key } : client ? { kind: "client", key: client.key } : undefined;
       }
@@ -1264,7 +1265,7 @@ export class OmadaNetworkCard extends LitElement {
             type: "bar",
             data: rows.map((row) => ({ value: row.value, itemStyle: { color: "#54d1ff" } })),
             barWidth: 16,
-            borderRadius: 99
+            itemStyle: { borderRadius: 99 }
           }]
         };
       }
@@ -1284,7 +1285,7 @@ export class OmadaNetworkCard extends LitElement {
             { value: Math.min(device.clients.length * 10, 100), itemStyle: { color: "#1eb980" } }
           ],
           barWidth: 18,
-          borderRadius: 99
+          itemStyle: { borderRadius: 99 }
         }]
       };
     }
@@ -1300,7 +1301,7 @@ export class OmadaNetworkCard extends LitElement {
         type: "bar",
         data: rows.map((port) => ({ value: port.metrics.omada_port_link_speed_mbps ?? 0, itemStyle: { color: port.poe ? "#ffb648" : "#54d1ff" } })),
         barWidth: 16,
-        borderRadius: 99
+        itemStyle: { borderRadius: 99 }
       }]
     };
   }
@@ -1331,7 +1332,7 @@ export class OmadaNetworkCard extends LitElement {
             { value: client.metrics.omada_client_traffic_up_bytes ?? 0, itemStyle: { color: "#ff6b7e" } }
           ],
           barWidth: 16,
-          borderRadius: 99
+          itemStyle: { borderRadius: 99 }
         }]
       };
     }
@@ -1380,7 +1381,7 @@ export class OmadaNetworkCard extends LitElement {
           { value: client.metrics.omada_client_download_activity_bytes ?? 0, itemStyle: { color: "#ffb648" } },
           { value: client.metrics.omada_client_upload_activity_bytes ?? 0, itemStyle: { color: "#ff6b7e" } }
         ],
-        borderRadius: 99
+        itemStyle: { borderRadius: 99 }
       }]
     };
   }

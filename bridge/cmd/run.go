@@ -74,9 +74,11 @@ func runExporter(c *cli.Context) error {
 
 	// register omada collectors
 	for name, c := range collectors {
-		prometheus.MustRegister(c)
+		instrumented := newInstrumentedCollector(name, c)
+		collectors[name] = instrumented
+		prometheus.MustRegister(instrumented)
 		reg := prometheus.NewRegistry()
-		reg.MustRegister(c)
+		reg.MustRegister(instrumented)
 		mux.Handle(fmt.Sprintf("/metrics/%s", name), promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	}
 
@@ -128,10 +130,10 @@ func runExporter(c *cli.Context) error {
 				<a href="/metrics/vpn">Vpn Metrics</a>
 			</p>
 			<p>
-				<a href="/metrics/vpn">Vpn Stats Metrics</a>
+				<a href="/metrics/vpn-stats">Vpn Stats Metrics</a>
 			</p>
 			<p>
-				<a href="/metrics/vpn">ISP Metrics</a>
+				<a href="/metrics/isp">ISP Metrics</a>
 			</p>
     	</body>
     </html>`))

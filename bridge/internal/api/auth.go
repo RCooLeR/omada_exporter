@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
+	"net/url"
 
 	"github.com/rs/zerolog/log"
 )
@@ -110,7 +110,7 @@ func (c *Client) Login() error {
 		return fmt.Errorf("web login succeeded without a token")
 	}
 	log.Info().Msg(fmt.Sprintf("Login with username %s successful", c.Config.Username))
-	c.token = logindata.Result.Token
+	c.setWebToken(logindata.Result.Token)
 	return nil
 }
 
@@ -148,16 +148,24 @@ func (c *Client) LoginOpenApi() error {
 		return fmt.Errorf("OpenApi authentication succeeded without an access token")
 	}
 	log.Info().Msg("OpenApi authentication successful")
-	c.accessToken = logindata.Result.AccessToken
-	c.refreshToken = logindata.Result.RefreshToken
-	c.accessTokenExpiresAt = time.Now().Add(time.Duration(logindata.Result.ExpiresIn-5) * time.Second)
+	c.setOpenAPITokens(logindata.Result.AccessToken, logindata.Result.RefreshToken, logindata.Result.ExpiresIn)
 	return nil
 }
 
 // RefreshOpenApiToken refreshes the Open API access token.
 func (c *Client) RefreshOpenApiToken() error {
-	url := fmt.Sprintf("%s/openapi/authorize/token?client_id=%s&client_secret=%s&refresh_token=%s&grant_type=refresh_token", c.Config.Host, c.Config.ClientId, c.Config.SecretId, c.refreshToken)
-	req, err := http.NewRequest("POST", url, nil)
+	_, refreshToken, _ := c.currentOpenAPITokenState()
+	if refreshToken == "" {
+		return fmt.Errorf("OpenApi token refresh requested without a refresh token")
+	}
+
+	query := url.Values{}
+	query.Set("client_id", c.Config.ClientId)
+	query.Set("client_secret", c.Config.SecretId)
+	query.Set("refresh_token", refreshToken)
+	query.Set("grant_type", "refresh_token")
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/openapi/authorize/token?%s", c.Config.Host, query.Encode()), nil)
 	if err != nil {
 		return err
 	}
@@ -187,9 +195,7 @@ func (c *Client) RefreshOpenApiToken() error {
 		return fmt.Errorf("OpenApi token refresh succeeded without an access token")
 	}
 	log.Info().Msg("OpenApi Access Token refresh successful")
-	c.accessToken = logindata.Result.AccessToken
-	c.refreshToken = logindata.Result.RefreshToken
-	c.accessTokenExpiresAt = time.Now().Add(time.Duration(logindata.Result.ExpiresIn-5) * time.Second)
+	c.setOpenAPITokens(logindata.Result.AccessToken, logindata.Result.RefreshToken, logindata.Result.ExpiresIn)
 	return nil
 }
 

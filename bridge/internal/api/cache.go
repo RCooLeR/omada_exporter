@@ -48,6 +48,9 @@ func FetchCached[T any](client *Client, key string, fetch func() (T, error)) (T,
 	}
 	client.cacheMu.RUnlock()
 
+	// Several collectors can request the same controller endpoint during one
+	// scrape. singleflight lets the first goroutine do the HTTP request while
+	// the others wait for the same result instead of stampeding the controller.
 	value, err, _ := client.requestGroup.Do(key, func() (any, error) {
 		now := time.Now()
 		client.cacheMu.RLock()

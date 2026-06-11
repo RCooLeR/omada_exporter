@@ -18,6 +18,8 @@ go test ./...
 go build .
 ```
 
+CI also runs `go mod tidy` as a cleanliness check, so run it before committing dependency changes.
+
 The released container image and binary keep the existing `omada_exporter` / `omada-exporter` names for compatibility.
 
 ## License
