@@ -22,6 +22,7 @@ No database is used. The bridge state is the latest collected Omada API response
 | `vpn` | `/metrics/vpn` | VPN status and configured VPN identity. |
 | `vpn-stats` | `/metrics/vpn-stats` | VPN tunnel uptime, traffic, packets, peer stats, and derived MQTT speed sensors. |
 | `isp` | `/metrics/isp` | ISP status, gateway, port, IP, load balancing, max bandwidth, and configured speed. |
+| `insights` | `/metrics/insights` | Optional DPI traffic totals by category and application. Disabled by default. |
 
 ## Controller And Site
 
@@ -29,6 +30,7 @@ Collected controller data includes:
 
 - controller uptime
 - storage used and storage available by storage name
+- total storage capacity by storage name
 - firmware upgrade availability by upgrade channel
 - controller device name, model, version, firmware, MAC, and IP
 - Omada site name and site id
@@ -86,6 +88,7 @@ WAN metrics are device-attached and describe physical or logical WAN links:
 - internet state
 - link speed
 - RX and TX rate
+- RX and TX negotiation rate in Kbit/s
 - latency
 - port, name, description, IP, protocol, and type labels
 
@@ -108,6 +111,19 @@ Client metrics include:
 - gateway, switch, AP, port, LAG id, SSID, Wi-Fi mode, and wired/wireless labels
 
 Set `OMADA_TRACK_CLIENT_METRICS=false` to suppress per-client metrics while keeping aggregate connected-client totals.
+
+## DPI Insights
+
+Optional DPI insight metrics use Omada Web API endpoints and are disabled by default. Enable them with `OMADA_TRACK_INSIGHT_METRICS=true`.
+
+Collected DPI insight data includes:
+
+- total classified traffic for the configured query window
+- classified traffic by DPI category
+- classified traffic by DPI application, capped by `OMADA_INSIGHT_APPLICATION_LIMIT`
+- the configured query window in seconds
+
+These metrics are gauges for the requested time window, not monotonic counters. Omada may not attribute every byte in a category to an application, so application totals can be lower than category totals.
 
 ## VPN
 

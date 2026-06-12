@@ -23,6 +23,9 @@ services:
       OMADA_SECRET_ID: "openapi-secret"
       OMADA_SITE: "Default"
       OMADA_INSECURE: "true"
+      OMADA_TRACK_INSIGHT_METRICS: "false"
+      OMADA_INSIGHT_WINDOW_SECONDS: "86400"
+      OMADA_INSIGHT_APPLICATION_LIMIT: "50"
 
       OMADA_MQTT_ENABLED: "true"
       OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"

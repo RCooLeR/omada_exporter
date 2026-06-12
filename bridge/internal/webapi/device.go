@@ -45,8 +45,15 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 	log.Info().Msg("Received data from devices endpoint")
 	log.Debug().Bytes("data", body).Msg("Received data from devices endpoint")
 
+	if err := api.ValidateAPIResponse(body, "devices"); err != nil {
+		return nil, err
+	}
+
 	var devicedata devicesResponse
 	err = json.Unmarshal(body, &devicedata)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, d := range devicedata.Result {
 		switch dev := d.(type) {

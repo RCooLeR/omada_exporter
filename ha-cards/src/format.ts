@@ -35,6 +35,22 @@ export function formatSpeedMbps(mbps: number): string {
   return `${mbps.toFixed(0)} Mbps`;
 }
 
+export function formatSpeedKbps(kbps: number): string {
+  if (!kbps) {
+    return "-";
+  }
+
+  if (kbps >= 1_000_000) {
+    return `${(kbps / 1_000_000).toFixed(1)} Gbps`;
+  }
+
+  if (kbps >= 1000) {
+    return `${(kbps / 1000).toFixed(kbps >= 10_000 ? 0 : 1)} Mbps`;
+  }
+
+  return `${kbps.toFixed(0)} Kbps`;
+}
+
 export function formatRateBytes(value: number): string {
   if (!value) {
     return "-";

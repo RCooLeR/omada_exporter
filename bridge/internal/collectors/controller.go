@@ -15,15 +15,19 @@ type controllerCollector struct {
 	omadaControllerUptimeSeconds           *prometheus.Desc
 	omadaControllerStorageUsedBytes        *prometheus.Desc
 	omadaControllerStorageAvailableBytes   *prometheus.Desc
+	omadaControllerStorageTotalBytes       *prometheus.Desc
 	omadaControllerStorageUpgradeAvailable *prometheus.Desc
 	client                                 *webapi.Client
 }
+
+const controllerStorageBytesPerGB = 1000000000
 
 // Describe sends the collector metric descriptors to Prometheus.
 func (c *controllerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaControllerUptimeSeconds
 	ch <- c.omadaControllerStorageUsedBytes
 	ch <- c.omadaControllerStorageAvailableBytes
+	ch <- c.omadaControllerStorageTotalBytes
 	ch <- c.omadaControllerStorageUpgradeAvailable
 }
 
@@ -64,9 +68,16 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 
 	for _, s := range controller.Storage {
 		storageLabels := append([]string{s.Name}, labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageUsedBytes, prometheus.GaugeValue, s.Used*1000000000, storageLabels...)
+		totalBytes := s.Total * controllerStorageBytesPerGB
+		usedBytes := s.Used * controllerStorageBytesPerGB
+		availableBytes := totalBytes - usedBytes
+		if availableBytes < 0 {
+			availableBytes = 0
+		}
 
-		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageAvailableBytes, prometheus.GaugeValue, s.Total*100000000, storageLabels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageUsedBytes, prometheus.GaugeValue, usedBytes, storageLabels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageAvailableBytes, prometheus.GaugeValue, availableBytes, storageLabels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageTotalBytes, prometheus.GaugeValue, totalBytes, storageLabels...)
 	}
 	for _, u := range controller.UpgradeList {
 		upgradeLabels := append([]string{u.GetChannel(), u.LatestVersion}, labels...)
@@ -113,7 +124,12 @@ func NewControllerCollector(apiClient *api.Client) *controllerCollector {
 			nil,
 		),
 		omadaControllerStorageAvailableBytes: prometheus.NewDesc("omada_controller_storage_available_bytes",
-			"Total storage available for the controller.",
+			"Free storage available on the controller.",
+			storageLabels,
+			nil,
+		),
+		omadaControllerStorageTotalBytes: prometheus.NewDesc("omada_controller_storage_total_bytes",
+			"Total storage capacity on the controller.",
 			storageLabels,
 			nil,
 		),

@@ -565,6 +565,8 @@ func sensorHints(name string, metricType dto.MetricType) map[string]any {
 	}
 
 	switch {
+	case lower == "omada_client_rx_rate" || lower == "omada_client_tx_rate":
+		hints["unit_of_measurement"] = "Kbit/s"
 	case strings.HasSuffix(lower, "_bytes"):
 		hints["unit_of_measurement"] = "B"
 		hints["device_class"] = "data_size"

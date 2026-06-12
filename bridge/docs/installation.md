@@ -14,7 +14,7 @@ OmadaBridge is distributed as the `rcooler/omada_exporter` Docker image and as t
 
 Create a service user in the Omada Controller account section and use a read-only or viewer-style role where your controller allows it. Create an OpenAPI client under `Settings -> Platform Integration`.
 
-The current CLI marks `OMADA_HOST`, `OMADA_USER`, `OMADA_PASS`, `OMADA_CLIENT_ID`, and `OMADA_SECRET_ID` as required. If OpenAPI credentials are wrong, OpenAPI-backed collectors can be missing or incomplete.
+The current CLI marks `OMADA_HOST`, `OMADA_USER`, `OMADA_PASS`, `OMADA_CLIENT_ID`, and `OMADA_SECRET_ID` as required. Controller, alert, device, and optional DPI insight metrics still use Omada Web API paths, so username/password credentials cannot be removed while collecting the full metric set. If OpenAPI credentials are wrong, OpenAPI-backed collectors can be missing or incomplete.
 
 ## Docker Compose
 
@@ -34,6 +34,9 @@ services:
       OMADA_SITE: "Default"
       OMADA_INSECURE: "true"
       LOG_LEVEL: "info"
+      OMADA_TRACK_INSIGHT_METRICS: "false"
+      OMADA_INSIGHT_WINDOW_SECONDS: "86400"
+      OMADA_INSIGHT_APPLICATION_LIMIT: "50"
 
       OMADA_MQTT_ENABLED: "true"
       OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"
@@ -142,6 +145,9 @@ The Docker image health check calls `/healthz`.
 | `OMADA_INCLUDE_PORT_ACTIVITY_LABEL` | `true` | Include the `port_activity_label` label on port metrics. |
 | `OMADA_TRACK_PORT_METRICS` | `true` | Export per-port metrics. |
 | `OMADA_TRACK_CLIENT_METRICS` | `true` | Export per-client metrics. |
+| `OMADA_TRACK_INSIGHT_METRICS` | `false` | Export optional DPI insight metrics from Omada Web API. |
+| `OMADA_INSIGHT_WINDOW_SECONDS` | `86400` | Query window for DPI insight metrics. |
+| `OMADA_INSIGHT_APPLICATION_LIMIT` | `50` | Maximum DPI application metric series to export. Set `0` to disable application metrics. |
 | `OMADA_DISABLE_GO_COLLECTOR` | `true` | Disable default Go runtime metrics. |
 | `OMADA_DISABLE_PROCESS_COLLECTOR` | `true` | Disable default process metrics. |
 

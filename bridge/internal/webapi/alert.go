@@ -40,13 +40,20 @@ func (c *Client) getAlertFresh() (*model.Alert, error) {
 	log.Info().Msg("Received data from alert endpoint")
 	log.Debug().Bytes("data", body).Msg("Received data from alert endpoint")
 
+	if err := api.ValidateAPIResponse(body, "alert"); err != nil {
+		return nil, err
+	}
+
 	alertsData := alertsResponse{}
 	err = json.Unmarshal(body, &alertsData)
+	if err != nil {
+		return nil, err
+	}
 	if len(alertsData.Result) > 0 {
 		firstAlert := alertsData.Result[0]
-		return &firstAlert, err
+		return &firstAlert, nil
 	}
-	return nil, err
+	return nil, fmt.Errorf("alert response did not include a result for site %s", c.SiteId)
 }
 
 // alertsResponse represents the Web API response for alerts.

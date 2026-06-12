@@ -42,6 +42,10 @@ func (c *Client) getIspFresh() ([]model.Isp, error) {
 	log.Info().Msg("Received data from ISP endpoint")
 	log.Debug().Bytes("data", body).Msg("Received data from ISP endpoint")
 
+	if err := api.ValidateAPIResponse(body, "ISP"); err != nil {
+		return nil, err
+	}
+
 	ispdata := ispResponse{}
 	err = json.Unmarshal(body, &ispdata)
 	var result []model.Isp
@@ -66,7 +70,7 @@ type ispResponse struct {
 			GatewayStatus int8   `json:"status"`
 			IspInfo       struct {
 				IspArr []model.Isp `json:"ispArr"`
-			} `json:"IspInfo"`
+			} `json:"ispInfo"`
 		} `json:"data"`
 	} `json:"result"`
 }

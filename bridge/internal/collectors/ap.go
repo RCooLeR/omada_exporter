@@ -59,7 +59,7 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 	}
 	if ap.Wp5GHz_2 != nil {
 		labels = append(labels,
-			ap.Wp5GHz.RdMode,
+			ap.Wp5GHz_2.RdMode,
 			fmt.Sprintf("%d", ap.Wp5GHz_2.MaxTxRate),
 			ap.Wp5GHz_2.BandWidth,
 		)

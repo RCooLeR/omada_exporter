@@ -97,11 +97,18 @@ func runExporter(c *cli.Context) error {
 		}
 	}
 
+	insightsLink := ""
+	if conf.TrackInsightMetrics {
+		insightsLink = `<p>
+				<a href="/metrics/insights">Insights Metrics</a>
+			</p>`
+	}
+
 	mux.HandleFunc("/healthz", health.livez)
 	mux.HandleFunc("/readyz", health.readyz)
 	log.Info().Msg(fmt.Sprintf("listening on :%s", conf.Port))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`<html>
+		_, _ = w.Write([]byte(fmt.Sprintf(`<html>
     <head>
 	<title>Omada exporter<</title>
 	</head>
@@ -137,8 +144,9 @@ func runExporter(c *cli.Context) error {
 			<p>
 				<a href="/metrics/isp">ISP Metrics</a>
 			</p>
+			%s
     	</body>
-    </html>`))
+    </html>`, insightsLink)))
 	})
 
 	mux.Handle("/metrics", promhttp.Handler())

@@ -20,51 +20,63 @@ func (c *Client) GetNetworkClients() ([]model.NetworkClient, error) {
 // getNetworkClientsFresh posts the active-client filter request to the Open API
 // and returns the decoded client list for the current site.
 func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
+	if err := c.requireOpenAPICredentials(); err != nil {
+		return nil, err
+	}
+
 	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
-	requestBody, err := json.Marshal(clientRequest{
-		Filters: clientFilters{
-			Active: true,
-		},
-		Sorts:                 map[string]any{},
-		HideHealthUnsupported: true,
-		Page:                  1,
-		PageSize:              1000,
-		Scope:                 1,
-	})
-	if err != nil {
-		return nil, err
+	var all []model.NetworkClient
+
+	for page := 1; ; page++ {
+		requestBody, err := json.Marshal(clientRequest{
+			Filters: clientFilters{
+				Active: true,
+			},
+			Sorts:                 map[string]any{},
+			HideHealthUnsupported: true,
+			Page:                  page,
+			PageSize:              openAPIPageSize,
+			Scope:                 1,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		req, err := http.NewRequest("POST", url, bytes.NewReader(requestBody))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json;charset=UTF-8")
+
+		resp, err := c.MakeOpenApiRequest(req)
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		log.Info().Msg("Received data from clients endpoint")
+		log.Debug().Bytes("data", body).Msg("Received data from clients endpoint")
+
+		if err := api.ValidateAPIResponse(body, "clients"); err != nil {
+			return nil, err
+		}
+
+		clientdata := openAPIGridResponse[model.NetworkClient]{}
+		if err := json.Unmarshal(body, &clientdata); err != nil {
+			return nil, err
+		}
+
+		all = append(all, clientdata.Result.Data...)
+
+		totalRows := clientdata.Result.TotalRows
+		if totalRows <= 0 || len(clientdata.Result.Data) == 0 || len(all) >= totalRows {
+			return all, nil
+		}
 	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewReader(requestBody))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json;charset=UTF-8")
-
-	resp, err := c.MakeOpenApiRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	log.Info().Msg("Received data from clients endpoint")
-	log.Debug().Bytes("data", body).Msg("Received data from clients endpoint")
-
-	clientdata := clientResponse{}
-	err = json.Unmarshal(body, &clientdata)
-
-	return clientdata.Result.Data, err
-}
-
-// clientResponse represents the Open API response for network clients.
-type clientResponse struct {
-	Result struct {
-		Data []model.NetworkClient `json:"data"`
-	} `json:"result"`
 }
 
 // clientRequest represents the Open API request payload for network clients.

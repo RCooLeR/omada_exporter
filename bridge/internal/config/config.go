@@ -16,6 +16,9 @@ type Config struct {
 	IncludePortActivityLabel bool
 	TrackPortMetrics         bool
 	TrackClientMetrics       bool
+	TrackInsightMetrics      bool
+	InsightWindowSeconds     int
+	InsightApplicationLimit  int
 	GoCollectorDisabled      bool
 	ProcessCollectorDisabled bool
 	MQTTEnabled              bool

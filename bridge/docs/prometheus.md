@@ -18,6 +18,8 @@ The root `/metrics` endpoint contains every enabled collector. Per-collector end
 /metrics/isp
 ```
 
+When optional DPI insight metrics are enabled, `/metrics/insights` is also registered.
+
 ## Scrape Config
 
 ```yaml
@@ -38,6 +40,9 @@ Use the hostname or IP address reachable from Prometheus. If Prometheus runs out
 | --- | --- | --- |
 | `OMADA_TRACK_PORT_METRICS` | `true` | Disable to suppress per-port metrics. |
 | `OMADA_TRACK_CLIENT_METRICS` | `true` | Disable to suppress per-client metrics while keeping `omada_client_connected_total`. |
+| `OMADA_TRACK_INSIGHT_METRICS` | `false` | Enable optional DPI insight metrics from Omada Web API. |
+| `OMADA_INSIGHT_WINDOW_SECONDS` | `86400` | Query window for DPI insight metrics. |
+| `OMADA_INSIGHT_APPLICATION_LIMIT` | `50` | Maximum DPI application series to export. Set `0` to disable application metrics. |
 | `OMADA_INCLUDE_PORT_ACTIVITY_LABEL` | `true` | Disable to reduce label churn from Omada port activity text. |
 | `OMADA_DISABLE_GO_COLLECTOR` | `true` | Enable Go runtime metrics by setting this to `false`. |
 | `OMADA_DISABLE_PROCESS_COLLECTOR` | `true` | Enable process metrics by setting this to `false`. |
@@ -49,7 +54,9 @@ Use the hostname or IP address reachable from Prometheus. If Prometheus runs out
 - Boolean-style metrics use `1` for active/online/true and `0` for inactive/offline/false.
 - Byte counters ending in `_bytes` are raw bytes.
 - Link speeds ending in `_mbps` are Mbit/s.
+- Client RX/TX negotiation rates are reported by Omada in Kbit/s.
 - WAN RX/TX rate metrics are reported by the controller as KB/s.
+- DPI insight traffic metrics are gauges for the configured query window, not monotonic counters.
 - Labels carry Omada identity and topology metadata. High-cardinality labels are expected for per-client and per-port metrics.
 
 ## Exporter Self-Metrics
@@ -68,7 +75,8 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | --- | --- | --- |
 | `omada_controller_uptime_seconds` | Controller uptime in seconds. | controller device labels, site, site_id |
 | `omada_controller_storage_used_bytes` | Controller storage used. | storage_name, controller device labels, site, site_id |
-| `omada_controller_storage_available_bytes` | Controller storage available. | storage_name, controller device labels, site, site_id |
+| `omada_controller_storage_available_bytes` | Controller free storage available. | storage_name, controller device labels, site, site_id |
+| `omada_controller_storage_total_bytes` | Controller total storage capacity. | storage_name, controller device labels, site, site_id |
 | `omada_controller_upgrade_available` | Firmware upgrade availability by channel. | upgrade_channel, latest_version, controller device labels, site, site_id |
 | `omada_site_alert_num` | Number of site alerts. | obscured, site, site_id |
 | `omada_device_uptime_seconds` | Device uptime in seconds. | device labels, site, site_id |
@@ -112,8 +120,8 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | `omada_client_rssi_dbm` | Wireless client RSSI. | client identity, topology, SSID, site, site_id |
 | `omada_client_traffic_down_bytes` | Total bytes received by a client. | client identity, topology, SSID, site, site_id |
 | `omada_client_traffic_up_bytes` | Total bytes sent by a client. | client identity, topology, SSID, site, site_id |
-| `omada_client_tx_rate` | Client TX rate. | client identity, topology, SSID, site, site_id |
-| `omada_client_rx_rate` | Client RX rate. | client identity, topology, SSID, site, site_id |
+| `omada_client_tx_rate` | Client TX negotiation rate in Kbit/s. | client identity, topology, SSID, site, site_id |
+| `omada_client_rx_rate` | Client RX negotiation rate in Kbit/s. | client identity, topology, SSID, site, site_id |
 | `omada_vpn_status` | VPN enabled/disabled status. | vpn_id, name, purpose, vpn_mode, vpn_type, remote_ip, site, site_id |
 | `omada_vpn_uptime` | VPN tunnel uptime. | name, interface_name, vpn_mode, vpn_type, local_ip, remote_ip, site, site_id |
 | `omada_vpn_down_packets` | VPN downlink packets. | VPN tunnel labels |
@@ -129,6 +137,10 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | `omada_isp_status` | ISP enabled/disabled status. | gateway_name, gateway_mac, gateway_status, name, port, status, ip, load_balance, max_bandwidth, download_speed_set, site, site_id |
 | `omada_isp_download_speed` | Configured ISP download speed. | ISP labels |
 | `omada_isp_upload_speed` | Configured ISP upload speed. | ISP labels |
+| `omada_dpi_scrape_window_seconds` | Configured DPI insight query window. | site, site_id |
+| `omada_dpi_total_traffic_bytes` | Total DPI-classified traffic for the configured window. | site, site_id |
+| `omada_dpi_category_traffic_bytes` | DPI-classified traffic by category for the configured window. | family_id, family_name, site, site_id |
+| `omada_dpi_application_traffic_bytes` | DPI-classified traffic by application for the configured window. | family_id, family_name, application_id, application_name, site, site_id |
 
 ## Label Sets
 

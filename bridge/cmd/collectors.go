@@ -8,7 +8,7 @@ import (
 
 // initCollectors builds the Prometheus collectors map for the API client.
 func initCollectors(client *api.Client) map[string]prometheus.Collector {
-	return map[string]prometheus.Collector{
+	collectors := map[string]prometheus.Collector{
 		"controller": collector.NewControllerCollector(client),
 		"alert":      collector.NewAlertCollector(client),
 		"device":     collector.NewDeviceCollector(client),
@@ -17,4 +17,8 @@ func initCollectors(client *api.Client) map[string]prometheus.Collector {
 		"vpn-stats":  collector.NewVpnStatsCollector(client),
 		"isp":        collector.NewISPCollector(client),
 	}
+	if client == nil || client.Config == nil || client.Config.TrackInsightMetrics {
+		collectors["insights"] = collector.NewInsightsCollector(client)
+	}
+	return collectors
 }

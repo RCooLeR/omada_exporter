@@ -196,13 +196,13 @@ func NewClientCollector(apiClient *api.Client) *clientCollector {
 		),
 
 		omadaClientTxRate: prometheus.NewDesc("omada_client_tx_rate",
-			"TX rate of wireless client.",
+			"TX negotiation rate of the wireless client in Kbit/s.",
 			labels,
 			nil,
 		),
 
 		omadaClientRxRate: prometheus.NewDesc("omada_client_rx_rate",
-			"RX rate of wireless client.",
+			"RX negotiation rate of the wireless client in Kbit/s.",
 			labels,
 			nil,
 		),

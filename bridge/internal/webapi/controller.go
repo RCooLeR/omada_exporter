@@ -38,8 +38,15 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 	log.Info().Msg("Received data from controllerStatus endpoint")
 	log.Debug().Bytes("data", body).Msg("Received data from controllerStatus endpoint")
 
+	if err := api.ValidateAPIResponse(body, "controllerStatus"); err != nil {
+		return nil, err
+	}
+
 	controllerData := controllerResponse{}
 	err = json.Unmarshal(body, &controllerData)
+	if err != nil {
+		return nil, err
+	}
 
 	url = fmt.Sprintf("%s/%s/api/v2/maintenance/software/channelUpdate", c.Config.Host, c.OmadaCID)
 	req, err = http.NewRequest("GET", url, nil)
@@ -60,11 +67,18 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 	log.Info().Msg("Received data from controllerStatus endpoint")
 	log.Debug().Bytes("data", body).Msg("Received data from controllerStatus endpoint")
 
+	if err := api.ValidateAPIResponse(body, "controllerChannelUpdate"); err != nil {
+		return nil, err
+	}
+
 	controllerUpdateData := controllerUpdatesResponse{}
 	err = json.Unmarshal(body, &controllerUpdateData)
+	if err != nil {
+		return nil, err
+	}
 	controllerData.Result.UpgradeList = controllerUpdateData.Result.UpgradeList
 
-	return &controllerData.Result, err
+	return &controllerData.Result, nil
 }
 
 // controllerResponse represents the Web API response for controller data.

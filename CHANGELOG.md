@@ -1,4 +1,16 @@
 ## [Unreleased]
+### Added
+- Add optional DPI insight metrics behind `OMADA_TRACK_INSIGHT_METRICS`, with configurable query window and application-series limit.
+- Add `omada_controller_storage_total_bytes`.
+
+### Changed
+- Fetch paginated OpenAPI client and VPN tunnel stats instead of only the first 1000 rows.
+- Clarify client RX/TX negotiation rate units as Kbit/s in metrics, MQTT hints, docs, and Home Assistant card display.
+
+### Fixed
+- Fix controller storage byte conversion and make `omada_controller_storage_available_bytes` report free storage.
+- Fix AP 5 GHz-2 radio labels to use the 5 GHz-2 radio data.
+- Return errors for empty alert responses, device decode failures, and non-zero Omada API JSON error envelopes.
 
 ## [2.2.1] - 2026-06-12
 ### Fixed

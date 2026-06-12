@@ -220,6 +220,7 @@ Unit and device class hints are inferred from metric names:
 | suffix `_watts` | `W` | `power` |
 | contains `_temp` | `C` | `temperature` |
 | suffix `_mbps` | `Mbit/s` | none |
+| `omada_client_rx_rate`, `omada_client_tx_rate` | `Kbit/s` | none |
 | contains `_rate` or `_speed` | `bit/s` | none |
 | contains `_download` or `_upload` | `B` | none |
 

@@ -19,18 +19,6 @@ func (c *Client) getVpnStatsFresh() ([]model.VpnStats, error) {
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/tunnel?page=1&pageSize=1000", c.Config.Host, c.OmadaCID, c.SiteId)
-	vpnstatsdata := VpnStatsResponse{}
-	if err := c.getOpenAPIJSON(url, "VPNStats", &vpnstatsdata); err != nil {
-		return nil, err
-	}
-
-	return vpnstatsdata.Result.Data, nil
-}
-
-// VpnStatsResponse represents the Open API response for VPN statistics.
-type VpnStatsResponse struct {
-	Result struct {
-		Data []model.VpnStats `json:"data"`
-	} `json:"result"`
+	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/tunnel?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId)
+	return fetchOpenAPIGrid[model.VpnStats](c, "VPNStats", urlTemplate)
 }

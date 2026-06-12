@@ -11,7 +11,7 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
-const openAPIPageSize = 100
+const openAPIPageSize = 1000
 
 // openAPIGridResponse represents a paginated Open API grid response.
 type openAPIGridResponse[T any] struct {
@@ -129,6 +129,10 @@ func (c *Client) getOpenAPIJSON(url, endpointName string, target any) error {
 
 	log.Info().Msgf("Received data from %s endpoint", endpointName)
 	log.Debug().Bytes("data", body).Msgf("Received data from %s endpoint", endpointName)
+
+	if err := api.ValidateAPIResponse(body, endpointName); err != nil {
+		return err
+	}
 
 	return json.Unmarshal(body, target)
 }

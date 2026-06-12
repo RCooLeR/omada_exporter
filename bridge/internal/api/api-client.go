@@ -234,6 +234,44 @@ type apiErrorResponse struct {
 	ErrorMsg       string `json:"errorMsg"`
 }
 
+// ValidateAPIResponse returns an error when Omada wraps a failed request in an
+// otherwise successful HTTP response.
+func ValidateAPIResponse(body []byte, endpointName string) error {
+	var apiErr apiErrorResponse
+	if err := json.Unmarshal(body, &apiErr); err != nil {
+		return nil
+	}
+
+	code := 0
+	hasCode := false
+	if apiErr.ErrorCode != nil {
+		code = *apiErr.ErrorCode
+		hasCode = true
+	}
+	if apiErr.ErrorCodeSnake != nil {
+		code = *apiErr.ErrorCodeSnake
+		hasCode = true
+	}
+	if !hasCode || code == 0 {
+		return nil
+	}
+
+	message := strings.TrimSpace(firstNonEmpty(apiErr.Msg, apiErr.ErrorMsg))
+	if message == "" {
+		message = "Omada API error"
+	}
+	return fmt.Errorf("%s returned errorCode %d: %s", endpointName, code, message)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 // isHTTPAuthStatus reports whether the status code indicates an authentication failure.
 func isHTTPAuthStatus(statusCode int) bool {
 	return statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden
