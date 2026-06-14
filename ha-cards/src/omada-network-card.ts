@@ -12,8 +12,8 @@ import {
   formatBytes,
   formatLatency,
   formatPercent,
+  formatRateBits,
   formatRateBytes,
-  formatSpeedKbps,
   formatSpeedMbps,
   formatUptimeMinutes,
   formatUptimeSeconds,
@@ -856,11 +856,11 @@ export class OmadaNetworkCard extends LitElement {
                 : this.renderDetailStat("Link", wiredLinkSpeed)}
               ${client.wireless
                 ? this.renderDetailStat("RSSI", rssi ? `${rssi} dBm` : "-")
-                : this.renderDetailStat("Download", downActivity ? formatRateBytes(downActivity) : formatSpeedKbps(rx))}
+                : this.renderDetailStat("Download", downActivity ? formatRateBytes(downActivity) : formatRateBits(rx))}
               ${client.wireless
-                ? this.renderDetailStat("RX", formatSpeedKbps(rx))
-                : this.renderDetailStat("Upload", upActivity ? formatRateBytes(upActivity) : formatSpeedKbps(tx))}
-              ${client.wireless ? this.renderDetailStat("TX", formatSpeedKbps(tx)) : nothing}
+                ? this.renderDetailStat("RX", formatRateBits(rx))
+                : this.renderDetailStat("Upload", upActivity ? formatRateBytes(upActivity) : formatRateBits(tx))}
+              ${client.wireless ? this.renderDetailStat("TX", formatRateBits(tx)) : nothing}
             </div>
           </div>
           <div class="detail-card">
@@ -904,8 +904,8 @@ export class OmadaNetworkCard extends LitElement {
               <table><tbody>
                 ${this.attributeRow("Download activity", formatRateBytes(downActivity))}
                 ${this.attributeRow("Upload activity", formatRateBytes(upActivity))}
-                ${this.attributeRow("RX rate", formatSpeedKbps(rx))}
-                ${this.attributeRow("TX rate", formatSpeedKbps(tx))}
+                ${this.attributeRow("RX rate", formatRateBits(rx))}
+                ${this.attributeRow("TX rate", formatRateBits(tx))}
                 ${this.attributeRow("Traffic down", formatBytes(client.metrics.omada_client_traffic_down_bytes ?? 0))}
                 ${this.attributeRow("Traffic up", formatBytes(client.metrics.omada_client_traffic_up_bytes ?? 0))}
                 ${client.wireless ? this.attributeRow("Signal", formatPercent(signal)) : this.attributeRow("Connection", meta.wiredConnectionLabel)}
@@ -1101,7 +1101,7 @@ export class OmadaNetworkCard extends LitElement {
     const uploadActivity = client.metrics.omada_client_upload_activity_bytes ?? 0;
     const activityRate = downloadActivity + uploadActivity;
     if (activityRate > 0) {
-      return activityRate;
+      return activityRate * 8;
     }
 
     return (client.metrics.omada_client_rx_rate ?? 0) + (client.metrics.omada_client_tx_rate ?? 0);
@@ -1116,7 +1116,7 @@ export class OmadaNetworkCard extends LitElement {
     }
 
     const negotiationRate = (client.metrics.omada_client_rx_rate ?? 0) + (client.metrics.omada_client_tx_rate ?? 0);
-    return formatSpeedKbps(negotiationRate);
+    return formatRateBits(negotiationRate);
   }
 
   private clientRateBreakdown(client: ClientRecord): string {
@@ -1129,7 +1129,7 @@ export class OmadaNetworkCard extends LitElement {
 
     const rx = client.metrics.omada_client_rx_rate ?? 0;
     const tx = client.metrics.omada_client_tx_rate ?? 0;
-    return `${formatSpeedKbps(rx)} down / ${formatSpeedKbps(tx)} up`;
+    return `${formatRateBits(rx)} down / ${formatRateBits(tx)} up`;
   }
 
   private findWanFor(row: LinkRow): LinkRow | undefined {

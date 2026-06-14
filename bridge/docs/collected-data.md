@@ -88,7 +88,6 @@ WAN metrics are device-attached and describe physical or logical WAN links:
 - internet state
 - link speed
 - RX and TX rate
-- RX and TX negotiation rate in Kbit/s
 - latency
 - port, name, description, IP, protocol, and type labels
 
@@ -105,7 +104,7 @@ Client metrics include:
 - connected client totals by connection mode and Wi-Fi mode
 - per-client current download and upload activity
 - total traffic down and up
-- RX and TX rate
+- RX and TX negotiation rate in bit/s
 - wireless signal percentage, SNR, and RSSI
 - MAC, IP, VLAN, connection type, device category/type, vendor, host name, system name, and display name
 - gateway, switch, AP, port, LAG id, SSID, Wi-Fi mode, and wired/wireless labels

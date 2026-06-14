@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatBytes,
+  formatRateBits,
   formatRateBytes,
-  formatSpeedKbps,
   formatSpeedMbps,
   formatUptimeSeconds,
   qualityLabel,
@@ -22,7 +22,7 @@ describe("format helpers", () => {
 
   it("formats common network values", () => {
     expect(formatSpeedMbps(1500)).toBe("1.5 Gbps");
-    expect(formatSpeedKbps(866700)).toBe("867 Mbps");
+    expect(formatRateBits(866700)).toBe("867 Kbit/s");
     expect(formatRateBytes(1536)).toBe("1.5 KB/s");
     expect(formatBytes(10 * 1024 * 1024)).toBe("10 MB");
     expect(formatUptimeSeconds(90061)).toBe("1d 1h");

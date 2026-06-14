@@ -5,7 +5,7 @@
 
 ### Changed
 - Fetch paginated OpenAPI client and VPN tunnel stats instead of only the first 1000 rows.
-- Clarify client RX/TX negotiation rate units as Kbit/s in metrics, MQTT hints, docs, and Home Assistant card display.
+- Convert Omada client RX/TX negotiation rates from Kbit/s to bit/s before export, preserving Home Assistant's existing unit.
 
 ### Fixed
 - Fix controller storage byte conversion and make `omada_controller_storage_available_bytes` report free storage.

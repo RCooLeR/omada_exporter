@@ -25,6 +25,8 @@ type clientCollector struct {
 	client                           *openapi.Client
 }
 
+const clientNegotiationRateBitsPerKbit = 1000
+
 // Describe sends the collector metric descriptors to Prometheus.
 func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
 	if c.trackClientMetrics() {
@@ -101,8 +103,8 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 				ch <- prometheus.MustNewConstMetric(c.omadaClientRssiDbm, prometheus.GaugeValue, item.Rssi, labels...)
 				ch <- prometheus.MustNewConstMetric(c.omadaClientSignalPct, prometheus.GaugeValue, item.SignalLevel, labels...)
 				ch <- prometheus.MustNewConstMetric(c.omadaClientSignalNoiseDbm, prometheus.GaugeValue, item.SignalNoise, labels...)
-				ch <- prometheus.MustNewConstMetric(c.omadaClientTxRate, prometheus.GaugeValue, item.TxRate, labels...)
-				ch <- prometheus.MustNewConstMetric(c.omadaClientRxRate, prometheus.GaugeValue, item.RxRate, labels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaClientTxRate, prometheus.GaugeValue, item.TxRate*clientNegotiationRateBitsPerKbit, labels...)
+				ch <- prometheus.MustNewConstMetric(c.omadaClientRxRate, prometheus.GaugeValue, item.RxRate*clientNegotiationRateBitsPerKbit, labels...)
 			}
 		} else {
 			totals["wired"] += 1
@@ -196,13 +198,13 @@ func NewClientCollector(apiClient *api.Client) *clientCollector {
 		),
 
 		omadaClientTxRate: prometheus.NewDesc("omada_client_tx_rate",
-			"TX negotiation rate of the wireless client in Kbit/s.",
+			"TX negotiation rate of the wireless client in bit/s.",
 			labels,
 			nil,
 		),
 
 		omadaClientRxRate: prometheus.NewDesc("omada_client_rx_rate",
-			"RX negotiation rate of the wireless client in Kbit/s.",
+			"RX negotiation rate of the wireless client in bit/s.",
 			labels,
 			nil,
 		),

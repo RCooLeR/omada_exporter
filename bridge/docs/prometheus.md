@@ -54,7 +54,7 @@ Use the hostname or IP address reachable from Prometheus. If Prometheus runs out
 - Boolean-style metrics use `1` for active/online/true and `0` for inactive/offline/false.
 - Byte counters ending in `_bytes` are raw bytes.
 - Link speeds ending in `_mbps` are Mbit/s.
-- Client RX/TX negotiation rates are reported by Omada in Kbit/s.
+- Client RX/TX negotiation rates are reported by Omada in Kbit/s and exported as bit/s.
 - WAN RX/TX rate metrics are reported by the controller as KB/s.
 - DPI insight traffic metrics are gauges for the configured query window, not monotonic counters.
 - Labels carry Omada identity and topology metadata. High-cardinality labels are expected for per-client and per-port metrics.
@@ -120,8 +120,8 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | `omada_client_rssi_dbm` | Wireless client RSSI. | client identity, topology, SSID, site, site_id |
 | `omada_client_traffic_down_bytes` | Total bytes received by a client. | client identity, topology, SSID, site, site_id |
 | `omada_client_traffic_up_bytes` | Total bytes sent by a client. | client identity, topology, SSID, site, site_id |
-| `omada_client_tx_rate` | Client TX negotiation rate in Kbit/s. | client identity, topology, SSID, site, site_id |
-| `omada_client_rx_rate` | Client RX negotiation rate in Kbit/s. | client identity, topology, SSID, site, site_id |
+| `omada_client_tx_rate` | Client TX negotiation rate in bit/s. | client identity, topology, SSID, site, site_id |
+| `omada_client_rx_rate` | Client RX negotiation rate in bit/s. | client identity, topology, SSID, site, site_id |
 | `omada_vpn_status` | VPN enabled/disabled status. | vpn_id, name, purpose, vpn_mode, vpn_type, remote_ip, site, site_id |
 | `omada_vpn_uptime` | VPN tunnel uptime. | name, interface_name, vpn_mode, vpn_type, local_ip, remote_ip, site, site_id |
 | `omada_vpn_down_packets` | VPN downlink packets. | VPN tunnel labels |
