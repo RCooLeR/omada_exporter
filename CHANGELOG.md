@@ -1,4 +1,10 @@
 ## [Unreleased]
+
+## [2.3.1] - 2026-07-05
+### Fixed
+- Keep controller metrics available when the optional software update channel endpoint is unreachable, and avoid unnecessary session reauthentication after transport timeouts.
+
+## [2.3.0] - 2026-07-05
 ### Added
 - Add optional DPI insight metrics behind `OMADA_TRACK_INSIGHT_METRICS`, with configurable query window and application-series limit.
 - Add `omada_controller_storage_total_bytes`.

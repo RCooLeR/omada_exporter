@@ -1,15 +1,19 @@
 package webapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	log "github.com/rs/zerolog/log"
 )
+
+const controllerUpgradeChannelTimeout = 5 * time.Second
 
 // GetController returns cached controller status data combined with upgrade-channel information.
 func (c *Client) GetController() (*model.Controller, error) {
@@ -48,24 +52,37 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 		return nil, err
 	}
 
-	url = fmt.Sprintf("%s/%s/api/v2/maintenance/software/channelUpdate", c.Config.Host, c.OmadaCID)
-	req, err = http.NewRequest("GET", url, nil)
+	upgradeList, err := c.getControllerUpgradeList()
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to get controller upgrade channels")
+	} else {
+		controllerData.Result.UpgradeList = upgradeList
+	}
+
+	return &controllerData.Result, nil
+}
+
+func (c *Client) getControllerUpgradeList() ([]model.ControllerUpdate, error) {
+	url := fmt.Sprintf("%s/%s/api/v2/maintenance/software/channelUpdate", c.Config.Host, c.OmadaCID)
+	ctx, cancel := context.WithTimeout(context.Background(), c.controllerUpgradeTimeout())
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err = c.MakeLoggedInRequest(req)
+	resp, err := c.MakeLoggedInRequest(req)
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
-	body, err = io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msg("Received data from controllerStatus endpoint")
-	log.Debug().Bytes("data", body).Msg("Received data from controllerStatus endpoint")
+	log.Info().Msg("Received data from controllerChannelUpdate endpoint")
+	log.Debug().Bytes("data", body).Msg("Received data from controllerChannelUpdate endpoint")
 
 	if err := api.ValidateAPIResponse(body, "controllerChannelUpdate"); err != nil {
 		return nil, err
@@ -76,9 +93,21 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	controllerData.Result.UpgradeList = controllerUpdateData.Result.UpgradeList
 
-	return &controllerData.Result, nil
+	return controllerUpdateData.Result.UpgradeList, nil
+}
+
+func (c *Client) controllerUpgradeTimeout() time.Duration {
+	timeout := controllerUpgradeChannelTimeout
+	if c.Config == nil || c.Config.Timeout <= 0 {
+		return timeout
+	}
+
+	configured := time.Duration(c.Config.Timeout) * time.Second
+	if configured < timeout {
+		return configured
+	}
+	return timeout
 }
 
 // controllerResponse represents the Web API response for controller data.

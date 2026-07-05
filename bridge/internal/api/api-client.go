@@ -482,23 +482,7 @@ func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) 
 
 	resp, err := c.doLoggedInRequest(req)
 	if err != nil {
-		log.Warn().Err(err).Msg("request failed, re-authenticating web session")
-		if reauthErr := c.reauthenticateWebSession(); reauthErr != nil {
-			return nil, fmt.Errorf("request failed: %v; re-authentication failed: %w", err, reauthErr)
-		}
-		resp, err = c.doLoggedInRequest(req)
-		if err != nil {
-			return nil, err
-		}
-		authFailed, err := isWebAPIAuthFailure(resp)
-		if err != nil {
-			return nil, err
-		}
-		if authFailed {
-			_ = resp.Body.Close()
-			return nil, fmt.Errorf("request remained unauthorized after re-authentication")
-		}
-		return resp, nil
+		return nil, err
 	}
 
 	authFailed, err := isWebAPIAuthFailure(resp)
@@ -626,23 +610,7 @@ func (c *Client) MakeOpenApiRequest(req *http.Request) (*http.Response, error) {
 
 	resp, err := c.doOpenAPIRequest(req)
 	if err != nil {
-		log.Warn().Err(err).Msg("OpenAPI request failed, re-authenticating")
-		if reauthErr := c.reauthenticateOpenAPISession(); reauthErr != nil {
-			return nil, fmt.Errorf("request failed: %v; re-authentication failed: %w", err, reauthErr)
-		}
-		resp, err = c.doOpenAPIRequest(req)
-		if err != nil {
-			return nil, err
-		}
-		authFailed, err := isOpenAPIAuthFailure(resp)
-		if err != nil {
-			return nil, err
-		}
-		if authFailed {
-			_ = resp.Body.Close()
-			return nil, fmt.Errorf("request remained unauthorized after re-authentication")
-		}
-		return resp, nil
+		return nil, err
 	}
 
 	authFailed, err := isOpenAPIAuthFailure(resp)

@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var version = "2.3.0"
+var version = "2.3.1"
 
 var conf = config.Config{}
 
