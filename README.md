@@ -12,6 +12,7 @@ The published container and binary are still named `omada_exporter` / `omada-exp
 
 - [Bridge documentation index](./bridge/docs/index.md)
 - [Installation](./bridge/docs/installation.md)
+- [Omada credentials](./bridge/docs/omada-credentials.md)
 - [Collected data](./bridge/docs/collected-data.md)
 - [Prometheus metrics](./bridge/docs/prometheus.md)
 - [Home Assistant integration](./bridge/docs/home-assistant.md)

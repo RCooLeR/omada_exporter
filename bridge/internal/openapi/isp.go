@@ -20,8 +20,8 @@ func (c *Client) GetIsp() ([]model.Isp, error) {
 // getIspFresh loads ISP dashboard data from the Open API and flattens the
 // per-gateway response into a single ISP slice with gateway fields filled in.
 func (c *Client) getIspFresh() ([]model.Isp, error) {
-	if c.Config.ClientId == "" || c.Config.SecretId == "" {
-		return nil, fmt.Errorf("ClientId and SecretId are required parameters.")
+	if err := c.requireOpenAPICredentials(); err != nil {
+		return nil, err
 	}
 	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/dashboard/gateway/isp/load", c.Config.Host, c.OmadaCID, c.SiteId)
 	req, err := http.NewRequest("GET", url, nil)

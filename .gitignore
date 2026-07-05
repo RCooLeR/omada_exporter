@@ -20,5 +20,8 @@ go.work
 # generated metrics table
 gen-metrics-table.md
 
+# local Fusion Gateway Pioneer Program test notes and raw evidence
+/fusion/
+
 #IDE
 .idea

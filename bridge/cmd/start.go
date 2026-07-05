@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var version = "2.2.1"
+var version = "2.3.0"
 
 var conf = config.Config{}
 
@@ -26,10 +26,12 @@ func Start() {
 	}
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{Destination: &conf.Host, Required: true, Name: "host", Value: "", Usage: "The hostname of the Omada Controller, including protocol.", EnvVars: []string{"OMADA_HOST"}},
-		&cli.StringFlag{Destination: &conf.ClientId, Required: true, Name: "client-id", Value: "", Usage: "ClientId for your Omada user.", EnvVars: []string{"OMADA_CLIENT_ID"}},
-		&cli.StringFlag{Destination: &conf.SecretId, Required: true, Name: "secret-id", Value: "", Usage: "SecretId for your Omada user.", EnvVars: []string{"OMADA_SECRET_ID"}},
+		&cli.StringFlag{Destination: &conf.ClientId, Name: "client-id", Value: "", Usage: "ClientId for Omada OpenAPI client-credentials authentication.", EnvVars: []string{"OMADA_CLIENT_ID"}},
+		&cli.StringFlag{Destination: &conf.SecretId, Name: "secret-id", Value: "", Usage: "SecretId for Omada OpenAPI client-credentials authentication.", EnvVars: []string{"OMADA_SECRET_ID"}},
 		&cli.StringFlag{Destination: &conf.Username, Required: true, Name: "username", Value: "", Usage: "Username of the Omada user you'd like to use to fetch metrics.", EnvVars: []string{"OMADA_USER"}},
 		&cli.StringFlag{Destination: &conf.Password, Required: true, Name: "password", Value: "", Usage: "Password for your Omada user.", EnvVars: []string{"OMADA_PASS"}},
+		&cli.StringFlag{Destination: &conf.SystemType, Name: "system-type", Value: config.SystemTypeAuto, Usage: "Omada system type: auto, standard, or fusion.", EnvVars: []string{"OMADA_SYSTEM_TYPE"}},
+		&cli.StringFlag{Destination: &conf.OpenAPIAuth, Name: "openapi-auth", Value: config.OpenAPIAuthAuto, Usage: "OpenAPI authentication mode: auto, client_credentials, web_session, or disabled.", EnvVars: []string{"OMADA_OPENAPI_AUTH"}},
 		&cli.StringFlag{Destination: &conf.Port, Name: "port", Value: "9202", Usage: "Port on which to expose the Prometheus metrics.", EnvVars: []string{"OMADA_PORT"}},
 		&cli.StringFlag{Destination: &conf.Site, Name: "site", Value: "Default", Usage: "Omada site to scrape metrics from.", EnvVars: []string{"OMADA_SITE"}},
 		&cli.StringFlag{Destination: &conf.LogLevel, Name: "log-level", Value: "error", Usage: "Application log level.", EnvVars: []string{"LOG_LEVEL"}},

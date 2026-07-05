@@ -13,8 +13,8 @@ import (
 // GetWans fetches WAN status data for the provided gateway from the Open API,
 // decodes the response, and stores the resulting WAN list on gw.Wans.
 func (c *Client) GetWans(gw *model.Gateway) error {
-	if c.Config.ClientId == "" || c.Config.SecretId == "" {
-		return fmt.Errorf("ClientId and SecretId are required parameters.")
+	if err := c.requireOpenAPICredentials(); err != nil {
+		return err
 	}
 	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/gateways/%s/wan-status", c.Config.Host, c.OmadaCID, c.SiteId, gw.Mac)
 	req, err := http.NewRequest("GET", url, nil)

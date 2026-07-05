@@ -6,15 +6,22 @@ OmadaBridge is distributed as the `rcooler/omada_exporter` Docker image and as t
 
 - TP-Link Omada Controller reachable from the bridge.
 - Omada service user credentials for the controller Web API.
-- Omada OpenAPI client id and secret for OpenAPI-backed WAN, ISP, VPN, and client data.
+- For standard Omada controllers, an Omada OpenAPI client id and secret are recommended for OpenAPI-backed WAN, ISP, VPN, and client data.
+- For Omada Fusion gateways, username/password credentials are enough; the bridge can use Fusion's web-session OpenAPI path.
 - Docker, Docker Compose, or a local Go toolchain.
 - Optional: MQTT broker reachable by both OmadaBridge and Home Assistant.
 
 ## Omada Credentials
 
-Create a service user in the Omada Controller account section and use a read-only or viewer-style role where your controller allows it. Create an OpenAPI client under `Settings -> Platform Integration`.
+If you are setting this up for the first time, read [Omada Credentials](./omada-credentials.md). It explains how to create:
 
-The current CLI marks `OMADA_HOST`, `OMADA_USER`, `OMADA_PASS`, `OMADA_CLIENT_ID`, and `OMADA_SECRET_ID` as required. Controller, alert, device, and optional DPI insight metrics still use Omada Web API paths, so username/password credentials cannot be removed while collecting the full metric set. If OpenAPI credentials are wrong, OpenAPI-backed collectors can be missing or incomplete.
+- a normal Omada user for `OMADA_USER` / `OMADA_PASS`,
+- OpenAPI app credentials for `OMADA_CLIENT_ID` / `OMADA_SECRET_ID`,
+- Fusion credentials when the UI only shows Webhooks.
+
+Short version: create a service user under `Global View > Account > Account`. For standard Omada controllers, create an OpenAPI app under `Global View > Settings > Platform Integration > Open API`.
+
+The CLI requires `OMADA_HOST`, `OMADA_USER`, and `OMADA_PASS`. `OMADA_CLIENT_ID` and `OMADA_SECRET_ID` are optional. When they are present, OmadaBridge uses standard OpenAPI client-credentials authentication. When they are absent and Fusion is detected, OmadaBridge uses Fusion's web-session OpenAPI mode. When OpenAPI is unavailable, Web API-backed controller, alert, device, port, and optional DPI insight metrics can still be collected.
 
 ## Docker Compose
 
@@ -31,6 +38,8 @@ services:
       OMADA_PASS: "change-me"
       OMADA_CLIENT_ID: "openapi-client-id"
       OMADA_SECRET_ID: "openapi-secret"
+      OMADA_SYSTEM_TYPE: "auto"
+      OMADA_OPENAPI_AUTH: "auto"
       OMADA_SITE: "Default"
       OMADA_INSECURE: "true"
       LOG_LEVEL: "info"
@@ -70,6 +79,8 @@ docker run -d \
   -e OMADA_PASS='change-me' \
   -e OMADA_CLIENT_ID='openapi-client-id' \
   -e OMADA_SECRET_ID='openapi-secret' \
+  -e OMADA_SYSTEM_TYPE='auto' \
+  -e OMADA_OPENAPI_AUTH='auto' \
   -e OMADA_SITE='Default' \
   -e OMADA_INSECURE='true' \
   rcooler/omada_exporter:latest
@@ -88,6 +99,8 @@ Download the latest release from GitHub and run:
   --password change-me \
   --client-id openapi-client-id \
   --secret-id openapi-secret \
+  --system-type auto \
+  --openapi-auth auto \
   --site Default \
   --port 9202
 ```
@@ -110,6 +123,19 @@ Run the local build:
 
 On Windows, the local binary is usually `omada_exporter.exe`.
 
+For Fusion gateways without OpenAPI app credentials:
+
+```bash
+./omada_exporter \
+  --host https://192.168.188.1:443 \
+  --username exporter \
+  --password change-me \
+  --system-type auto \
+  --openapi-auth auto \
+  --site Default \
+  --insecure
+```
+
 ## Health Checks
 
 Default HTTP port: `9202`.
@@ -129,8 +155,10 @@ The Docker image health check calls `/healthz`.
 | `OMADA_HOST` | empty | yes | Controller URL including protocol. |
 | `OMADA_USER` | empty | yes | Omada service user. |
 | `OMADA_PASS` | empty | yes | Omada service user password. |
-| `OMADA_CLIENT_ID` | empty | yes | Omada OpenAPI client id. |
-| `OMADA_SECRET_ID` | empty | yes | Omada OpenAPI secret. |
+| `OMADA_CLIENT_ID` | empty | no | Omada OpenAPI client id for standard client-credentials auth. |
+| `OMADA_SECRET_ID` | empty | no | Omada OpenAPI secret for standard client-credentials auth. |
+| `OMADA_SYSTEM_TYPE` | `auto` | no | Omada system type: `auto`, `standard`, or `fusion`. |
+| `OMADA_OPENAPI_AUTH` | `auto` | no | OpenAPI auth mode: `auto`, `client_credentials`, `web_session`, or `disabled`. |
 | `OMADA_SITE` | `Default` | no | Site name to collect. |
 | `OMADA_PORT` | `9202` | no | HTTP listen port. |
 | `OMADA_INSECURE` | `false` | no | Skip TLS certificate verification for the controller. |

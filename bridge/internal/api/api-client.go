@@ -26,6 +26,8 @@ type Client struct {
 	token                string
 	OmadaCID             string
 	SiteId               string
+	ControllerKind       string
+	OpenAPIAuthMode      string
 	authMu               sync.RWMutex
 	accessToken          string
 	refreshToken         string
@@ -80,11 +82,10 @@ func Configure(c *config.Config) (*Client, error) {
 		return nil, err
 	}
 	client.SiteId = *sid
-	if client.Config.ClientId != "" && client.Config.SecretId != "" {
-		err := client.LoginOpenApi()
-		if err != nil {
-			return nil, err
-		}
+
+	client.ControllerKind = client.detectControllerKind()
+	if err := client.configureOpenAPIAuth(); err != nil {
+		return nil, err
 	}
 
 	return client, nil
@@ -191,6 +192,74 @@ func (c *Client) currentOpenAPIAccessToken() string {
 	c.authMu.RLock()
 	defer c.authMu.RUnlock()
 	return c.accessToken
+}
+
+func normalizeOption(value, fallback string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func (c *Client) detectControllerKind() string {
+	requested := normalizeOption(c.Config.SystemType, config.SystemTypeAuto)
+	switch requested {
+	case config.SystemTypeFusion, config.SystemTypeStandard:
+		return requested
+	}
+
+	status, err := c.getControllerSystemStatus()
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to detect Omada controller kind, assuming standard")
+		return config.SystemTypeStandard
+	}
+
+	model := strings.ToLower(status.Model + " " + status.ModelName + " " + status.Category)
+	if strings.Contains(model, "fusion") {
+		return config.SystemTypeFusion
+	}
+	return config.SystemTypeStandard
+}
+
+func (c *Client) configureOpenAPIAuth() error {
+	requested := normalizeOption(c.Config.OpenAPIAuth, config.OpenAPIAuthAuto)
+
+	switch requested {
+	case config.OpenAPIAuthDisabled:
+		c.OpenAPIAuthMode = config.OpenAPIAuthDisabled
+		return nil
+	case config.OpenAPIAuthWebSession:
+		c.OpenAPIAuthMode = config.OpenAPIAuthWebSession
+		return c.ensureLoggedIn()
+	case config.OpenAPIAuthClientCredentials:
+		c.OpenAPIAuthMode = config.OpenAPIAuthClientCredentials
+		return c.ensureOpenAPICredentialsConfigured()
+	case config.OpenAPIAuthAuto:
+	default:
+		return fmt.Errorf("unsupported OpenAPI auth mode %q", c.Config.OpenAPIAuth)
+	}
+
+	if c.Config.ClientId != "" || c.Config.SecretId != "" {
+		c.OpenAPIAuthMode = config.OpenAPIAuthClientCredentials
+		return c.ensureOpenAPICredentialsConfigured()
+	}
+
+	if c.ControllerKind == config.SystemTypeFusion {
+		c.OpenAPIAuthMode = config.OpenAPIAuthWebSession
+		return c.ensureLoggedIn()
+	}
+
+	c.OpenAPIAuthMode = config.OpenAPIAuthDisabled
+	log.Warn().Msg("OpenAPI credentials are not configured; OpenAPI-backed metrics will be skipped")
+	return nil
+}
+
+func (c *Client) ensureOpenAPICredentialsConfigured() error {
+	if c.Config.ClientId == "" || c.Config.SecretId == "" {
+		return fmt.Errorf("ClientId and SecretId are required for OpenAPI client-credentials authentication")
+	}
+	return c.LoginOpenApi()
 }
 
 // redactURLString removes secrets from URLs before they are logged or returned.
@@ -476,7 +545,12 @@ func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 	cloned.Header.Set("X-Requested-With", "XMLHttpRequest")
 	cloned.Header.Set("User-Agent", "omada_exporter")
 	cloned.Header.Set("Connection", "keep-alive")
-	cloned.Header.Set("Authorization", "AccessToken="+c.currentOpenAPIAccessToken())
+	if c.OpenAPIAuthMode == config.OpenAPIAuthWebSession {
+		cloned.Header.Set("Csrf-Token", c.currentWebToken())
+		cloned.Header.Set("Omada-Request-Source", "web-local")
+	} else {
+		cloned.Header.Set("Authorization", "AccessToken="+c.currentOpenAPIAccessToken())
+	}
 
 	resp, err := c.httpClient.Do(cloned)
 	if err != nil {
@@ -487,6 +561,16 @@ func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 
 // ensureOpenAPIAccessToken makes sure the Open API token is available.
 func (c *Client) ensureOpenAPIAccessToken() error {
+	switch c.OpenAPIAuthMode {
+	case config.OpenAPIAuthWebSession:
+		return c.ensureLoggedIn()
+	case config.OpenAPIAuthDisabled:
+		return fmt.Errorf("OpenAPI authentication is disabled or unavailable")
+	case config.OpenAPIAuthClientCredentials, "":
+	default:
+		return fmt.Errorf("unsupported OpenAPI auth mode %q", c.OpenAPIAuthMode)
+	}
+
 	// The Open API uses access/refresh tokens instead of the web CSRF token.
 	// The refresh/login work is deduplicated for the same reason as web login:
 	// a single scrape can need several Open API collectors at the same time.
@@ -512,6 +596,13 @@ func (c *Client) ensureOpenAPIAccessToken() error {
 
 // reauthenticateOpenAPISession refreshes the Open API session after authentication expires.
 func (c *Client) reauthenticateOpenAPISession() error {
+	if c.OpenAPIAuthMode == config.OpenAPIAuthWebSession {
+		return c.reauthenticateWebSession()
+	}
+	if c.OpenAPIAuthMode == config.OpenAPIAuthDisabled {
+		return fmt.Errorf("OpenAPI authentication is disabled or unavailable")
+	}
+
 	_, err, _ := c.openAPIAuthGroup.Do("openapi-reauth", func() (any, error) {
 		if err := c.RefreshOmadaContext(); err != nil {
 			return nil, err

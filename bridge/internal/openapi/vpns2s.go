@@ -11,7 +11,7 @@ import (
 	log "github.com/rs/zerolog/log"
 )
 
-const openAPIPageSize = 1000
+const openAPIPageSize = 100
 
 // openAPIGridResponse represents a paginated Open API grid response.
 type openAPIGridResponse[T any] struct {
@@ -82,8 +82,11 @@ func (c *Client) getSiteToSiteVpnPeerStatsFresh(tunnelID string) ([]model.SiteTo
 
 // requireOpenAPICredentials validates that Open API credentials are configured.
 func (c *Client) requireOpenAPICredentials() error {
-	if c.Config.ClientId == "" || c.Config.SecretId == "" {
-		return fmt.Errorf("ClientId and SecretId are required parameters.")
+	if c.OpenAPIAuthMode == "disabled" {
+		return fmt.Errorf("OpenAPI authentication is disabled or unavailable")
+	}
+	if c.OpenAPIAuthMode == "client_credentials" && (c.Config.ClientId == "" || c.Config.SecretId == "") {
+		return fmt.Errorf("ClientId and SecretId are required for OpenAPI client-credentials authentication")
 	}
 	return nil
 }

@@ -1,5 +1,16 @@
 package config
 
+const (
+	SystemTypeAuto     = "auto"
+	SystemTypeStandard = "standard"
+	SystemTypeFusion   = "fusion"
+
+	OpenAPIAuthAuto              = "auto"
+	OpenAPIAuthClientCredentials = "client_credentials"
+	OpenAPIAuthWebSession        = "web_session"
+	OpenAPIAuthDisabled          = "disabled"
+)
+
 // Config stores the exporter configuration values.
 type Config struct {
 	Host                     string
@@ -7,6 +18,8 @@ type Config struct {
 	Password                 string
 	ClientId                 string
 	SecretId                 string
+	SystemType               string
+	OpenAPIAuth              string
 	Port                     string
 	Site                     string
 	LogLevel                 string

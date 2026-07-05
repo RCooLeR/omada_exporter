@@ -5,6 +5,7 @@ OmadaBridge reads Omada Controller data, exposes Prometheus metrics on HTTP, and
 ## Bridge
 
 - [Installation](./installation.md): Docker, binary, source build, Omada credentials, environment variables, and health checks.
+- [Omada credentials](./omada-credentials.md): step-by-step service user, OpenAPI app, and Fusion credential setup.
 - [Collected data](./collected-data.md): what data is read from Omada and how it maps to monitoring outputs.
 - [Prometheus metrics](./prometheus.md): endpoints, scrape config, metric conventions, and metric reference.
 - [Home Assistant integration](./home-assistant.md): MQTT setup, topics, created devices, entity ids, sensor naming, payloads, and troubleshooting.

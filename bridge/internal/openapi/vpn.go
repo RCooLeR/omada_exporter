@@ -19,8 +19,8 @@ func (c *Client) GetVpn() ([]model.Vpn, error) {
 // getVpnFresh fetches VPN summary data from the Open API and decodes the
 // returned tunnel list for the current site.
 func (c *Client) getVpnFresh() ([]model.Vpn, error) {
-	if c.Config.ClientId == "" || c.Config.SecretId == "" {
-		return nil, fmt.Errorf("ClientId and SecretId are required parameters.")
+	if err := c.requireOpenAPICredentials(); err != nil {
+		return nil, err
 	}
 	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/vpn", c.Config.Host, c.OmadaCID, c.SiteId)
 	req, err := http.NewRequest("GET", url, nil)

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -42,6 +43,63 @@ type NetworkClient struct {
 	SignalNoise float64 `json:"snr"`
 	RxRate      float64 `json:"rxRate"`
 	TxRate      float64 `json:"txRate"`
+}
+
+// UnmarshalJSON accepts both older snake_case OpenAPI client fields and the
+// camelCase fields returned by Fusion's v1 clients endpoint.
+func (c *NetworkClient) UnmarshalJSON(data []byte) error {
+	type Alias NetworkClient
+	var raw struct {
+		Alias
+		ConnectTypeSnake int8    `json:"connect_type"`
+		ConnectTypeCamel *int8   `json:"connectType"`
+		GatewayMacSnake  string  `json:"gateway_mac"`
+		GatewayNameSnake string  `json:"gateway_name"`
+		SwitchMacSnake   string  `json:"switch_mac"`
+		SwitchNameSnake  string  `json:"switch_name"`
+		LagIdSnake       int8    `json:"lag_id"`
+		WifiModeSnake    int8    `json:"wifi_mode"`
+		WifiModeCamel    *int8   `json:"wifiMode"`
+		SignalLevelCamel float64 `json:"signalLevel"`
+		SignalNoiseCamel float64 `json:"signalNoise"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	*c = NetworkClient(raw.Alias)
+	if raw.ConnectTypeCamel != nil {
+		c.ConnectType = *raw.ConnectTypeCamel
+	} else {
+		c.ConnectType = raw.ConnectTypeSnake
+	}
+	if raw.WifiModeCamel != nil {
+		c.WifiMode = *raw.WifiModeCamel
+	} else {
+		c.WifiMode = raw.WifiModeSnake
+	}
+	if c.GatewayMac == "" {
+		c.GatewayMac = raw.GatewayMacSnake
+	}
+	if c.GatewayName == "" {
+		c.GatewayName = raw.GatewayNameSnake
+	}
+	if c.SwitchMac == "" {
+		c.SwitchMac = raw.SwitchMacSnake
+	}
+	if c.SwitchName == "" {
+		c.SwitchName = raw.SwitchNameSnake
+	}
+	if c.LagId == 0 {
+		c.LagId = raw.LagIdSnake
+	}
+	if c.SignalLevel == 0 {
+		c.SignalLevel = raw.SignalLevelCamel
+	}
+	if c.SignalNoise == 0 {
+		c.SignalNoise = raw.SignalNoiseCamel
+	}
+	return nil
 }
 
 // GetName returns the trimmed client name reported by Omada.

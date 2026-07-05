@@ -21,6 +21,8 @@ services:
       OMADA_PASS: "change-me"
       OMADA_CLIENT_ID: "openapi-client-id"
       OMADA_SECRET_ID: "openapi-secret"
+      OMADA_SYSTEM_TYPE: "auto"
+      OMADA_OPENAPI_AUTH: "auto"
       OMADA_SITE: "Default"
       OMADA_INSECURE: "true"
       OMADA_TRACK_INSIGHT_METRICS: "false"
@@ -36,6 +38,8 @@ services:
       OMADA_MQTT_TRACKED_CLIENT_MACS: "aa:bb:cc:dd:ee:ff"
     restart: unless-stopped
 ```
+
+For Omada Fusion gateways, `OMADA_CLIENT_ID` and `OMADA_SECRET_ID` can be omitted. Keep `OMADA_SYSTEM_TYPE` and `OMADA_OPENAPI_AUTH` on `auto`, or force Fusion with `OMADA_SYSTEM_TYPE=fusion` and `OMADA_OPENAPI_AUTH=web_session`.
 
 Health:
 

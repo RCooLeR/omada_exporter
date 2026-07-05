@@ -6,6 +6,7 @@ This directory contains the Go bridge that reads TP-Link Omada Controller data a
 
 - [Documentation index](./docs/index.md)
 - [Installation](./docs/installation.md)
+- [Omada credentials](./docs/omada-credentials.md)
 - [Collected data](./docs/collected-data.md)
 - [Prometheus metrics](./docs/prometheus.md)
 - [Home Assistant integration](./docs/home-assistant.md)

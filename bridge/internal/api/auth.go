@@ -152,6 +152,48 @@ func (c *Client) LoginOpenApi() error {
 	return nil
 }
 
+type controllerSystemStatus struct {
+	Model     string
+	ModelName string
+	Category  string
+}
+
+func (c *Client) getControllerSystemStatus() (controllerSystemStatus, error) {
+	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, c.OmadaCID)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return controllerSystemStatus{}, err
+	}
+
+	resp, err := c.MakeLoggedInRequest(req)
+	if err != nil {
+		return controllerSystemStatus{}, err
+	}
+	defer resp.Body.Close()
+
+	var statusResponse struct {
+		ErrorCode int    `json:"errorCode"`
+		Msg       string `json:"msg"`
+		Result    struct {
+			Model     string `json:"model"`
+			ModelName string `json:"modelName"`
+			Category  string `json:"category"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&statusResponse); err != nil {
+		return controllerSystemStatus{}, err
+	}
+	if statusResponse.ErrorCode != 0 {
+		return controllerSystemStatus{}, fmt.Errorf("system status returned error code %d: %s", statusResponse.ErrorCode, statusResponse.Msg)
+	}
+
+	return controllerSystemStatus{
+		Model:     statusResponse.Result.Model,
+		ModelName: statusResponse.Result.ModelName,
+		Category:  statusResponse.Result.Category,
+	}, nil
+}
+
 // RefreshOpenApiToken refreshes the Open API access token.
 func (c *Client) RefreshOpenApiToken() error {
 	_, refreshToken, _ := c.currentOpenAPITokenState()

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
@@ -24,6 +25,19 @@ func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
 		return nil, err
 	}
 
+	clients, err := c.getNetworkClientsV2Fresh()
+	if err == nil {
+		return clients, nil
+	}
+	if !isUnsupportedClientsV2Error(err) {
+		return nil, err
+	}
+
+	log.Warn().Err(err).Msg("OpenAPI v2 clients endpoint is unavailable, falling back to v1 clients endpoint")
+	return c.getNetworkClientsV1Fresh()
+}
+
+func (c *Client) getNetworkClientsV2Fresh() ([]model.NetworkClient, error) {
 	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
 	var all []model.NetworkClient
 
@@ -77,6 +91,20 @@ func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
 			return all, nil
 		}
 	}
+}
+
+func (c *Client) getNetworkClientsV1Fresh() ([]model.NetworkClient, error) {
+	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/clients?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId)
+	return fetchOpenAPIGrid[model.NetworkClient](c, "clients v1", urlTemplate)
+}
+
+func isUnsupportedClientsV2Error(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "errorcode -1600") ||
+		strings.Contains(message, "unsupported request path")
 }
 
 // clientRequest represents the Open API request payload for network clients.
