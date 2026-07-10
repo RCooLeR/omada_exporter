@@ -12,6 +12,7 @@ export interface LovelaceCardConfig {
   logo_mode?: "light" | "dark" | "auto";
   device_limit?: number;
   client_limit?: number;
+  show_vpn_peers?: boolean;
 }
 
 export interface HassEntity {
@@ -119,6 +120,7 @@ export interface DashboardModel {
   clients: ClientRecord[];
   isps: LinkRow[];
   vpns: LinkRow[];
+  vpnPeers: LinkRow[];
   wans: LinkRow[];
   deviceByKey: Map<string, DeviceRecord>;
   deviceByMac: Map<string, DeviceRecord>;

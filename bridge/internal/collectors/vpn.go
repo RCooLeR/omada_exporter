@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/RCooLeR/omada_exporter/internal/api"
+	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
 	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,6 +34,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 	} else {
 		for _, item := range vpn {
 			labels := []string{item.Id, item.Name, item.GetPurpose(), item.GetVpnMode(), item.GetVpnType(), item.RemoteIp, site, client.SiteId}
+			labels = append(labels, item.DetailLabels().Values()...)
 			ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, bools.ToFloat64(item.Status), labels...)
 			seenIDs[item.Id] = struct{}{}
 		}
@@ -49,6 +51,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 		labels := []string{item.ID, item.Name, "Site-to-Site", "", item.GetVpnType(), "", site, client.SiteId}
+		labels = append(labels, item.DetailLabels("").Values()...)
 		ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, bools.ToFloat64(item.Status), labels...)
 	}
 }
@@ -56,6 +59,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 // NewVpnCollector builds the Prometheus descriptors used to export VPN summary metrics.
 func NewVpnCollector(apiClient *api.Client) *vpnCollector {
 	labels := []string{"vpn_id", "name", "purpose", "vpn_mode", "vpn_type", "remote_ip", "site", "site_id"}
+	labels = append(labels, model.VPNDetailLabelNames()...)
 
 	return &vpnCollector{
 		omadaVpnStatus: prometheus.NewDesc("omada_vpn_status",

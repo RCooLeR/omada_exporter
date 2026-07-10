@@ -98,6 +98,13 @@ VPN metrics also include:
 vpn_id, tunnel_id, peer_id
 ```
 
+VPN state payloads also expose optional WireGuard/site-to-site details when the Omada API returns them:
+
+```text
+local_ip, local_networks, remote_networks,
+allowed_ips, endpoint, endpoint_ip
+```
+
 When there is no hardware identifier such as `device_mac`, `mac`, or `gateway_mac`, the builder may add:
 
 ```text
@@ -191,6 +198,7 @@ These metrics are published as `binary_sensor` entities:
 | `omada_lag_link_status` | `connectivity` |
 | `omada_isp_status` | `connectivity` |
 | `omada_vpn_status` | `connectivity` |
+| `omada_site_to_site_vpn_peer_status` | `connectivity` |
 
 Binary sensor config uses:
 

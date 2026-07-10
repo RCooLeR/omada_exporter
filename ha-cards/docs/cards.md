@@ -36,6 +36,7 @@ Options:
 | `logo_mode` | `auto` | `auto`, `light`, or `dark`. Controls which bundled Omada logo variant is rendered. |
 | `device_limit` | `100` | Maximum devices rendered in the device list. |
 | `client_limit` | `150` | Maximum clients rendered in the client list. |
+| `show_vpn_peers` | `true` | Show per-peer VPN rows below VPN tunnel rows when peer metrics are available. |
 
 ## `custom:omada-links-card`
 
@@ -51,6 +52,7 @@ Options:
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `site` | empty | Optional filter by Home Assistant entity `site` attribute. |
+| `show_vpn_peers` | `true` | Show per-peer VPN rows below VPN tunnel rows when peer metrics are available. |
 
 ## Resource Registration
 

@@ -122,16 +122,19 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | `omada_client_traffic_up_bytes` | Total bytes sent by a client. | client identity, topology, SSID, site, site_id |
 | `omada_client_tx_rate` | Client TX negotiation rate in bit/s. | client identity, topology, SSID, site, site_id |
 | `omada_client_rx_rate` | Client RX negotiation rate in bit/s. | client identity, topology, SSID, site, site_id |
-| `omada_vpn_status` | VPN enabled/disabled status. | vpn_id, name, purpose, vpn_mode, vpn_type, remote_ip, site, site_id |
-| `omada_vpn_uptime` | VPN tunnel uptime. | name, interface_name, vpn_mode, vpn_type, local_ip, remote_ip, site, site_id |
+| `omada_vpn_status` | VPN enabled/disabled status. | vpn_id, name, purpose, vpn_mode, vpn_type, remote_ip, site, site_id, VPN detail labels |
+| `omada_vpn_uptime` | VPN tunnel uptime. | name, interface_name, vpn_mode, vpn_type, local_ip, remote_ip, site, site_id, VPN detail labels |
 | `omada_vpn_down_packets` | VPN downlink packets. | VPN tunnel labels |
 | `omada_vpn_down_bytes` | VPN downlink bytes. | VPN tunnel labels |
 | `omada_vpn_up_packets` | VPN uplink packets. | VPN tunnel labels |
 | `omada_vpn_up_bytes` | VPN uplink bytes. | VPN tunnel labels |
-| `omada_site_to_site_vpn_down_bytes` | Site-to-site VPN aggregate downlink bytes. | vpn_id, name, vpn_type, site_vpn_type, site, site_id |
-| `omada_site_to_site_vpn_up_bytes` | Site-to-site VPN aggregate uplink bytes. | vpn_id, name, vpn_type, site_vpn_type, site, site_id |
-| `omada_site_to_site_vpn_total_peers` | Site-to-site VPN peer count. | vpn_id, tunnel_id, name, vpn_type, direction, local/remote IP labels, site, site_id |
-| `omada_site_to_site_vpn_peer_down_bytes` | Site-to-site VPN peer downlink bytes. | vpn_id, name, peer_id, peer_name, vpn_type, local_ip, remote_ip, port, site, site_id |
+| `omada_site_to_site_vpn_down_bytes` | Site-to-site VPN aggregate downlink bytes. | vpn_id, name, vpn_type, site_vpn_type, site, site_id, VPN detail labels |
+| `omada_site_to_site_vpn_up_bytes` | Site-to-site VPN aggregate uplink bytes. | vpn_id, name, vpn_type, site_vpn_type, site, site_id, VPN detail labels |
+| `omada_site_to_site_vpn_total_peers` | Site-to-site VPN peer count. | vpn_id, tunnel_id, name, vpn_type, direction, local/remote IP labels, site, site_id, VPN detail labels |
+| `omada_site_to_site_vpn_peer_status` | Site-to-site VPN peer online status, when returned by Omada. | site-to-site peer labels |
+| `omada_site_to_site_vpn_peer_down_packets` | Site-to-site VPN peer downlink packets, when returned by Omada. | site-to-site peer labels |
+| `omada_site_to_site_vpn_peer_down_bytes` | Site-to-site VPN peer downlink bytes. | vpn_id, name, peer_id, peer_name, vpn_type, local_ip, remote_ip, port, site, site_id, VPN detail labels |
+| `omada_site_to_site_vpn_peer_up_packets` | Site-to-site VPN peer uplink packets, when returned by Omada. | site-to-site peer labels |
 | `omada_site_to_site_vpn_peer_up_bytes` | Site-to-site VPN peer uplink bytes. | site-to-site peer labels |
 | `omada_site_to_site_vpn_peer_login_timestamp` | Unix login timestamp for a site-to-site VPN peer. | site-to-site peer labels |
 | `omada_isp_status` | ISP enabled/disabled status. | gateway_name, gateway_mac, gateway_status, name, port, status, ip, load_balance, max_bandwidth, download_speed_set, site, site_id |
@@ -141,6 +144,8 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | `omada_dpi_total_traffic_bytes` | Total DPI-classified traffic for the configured window. | site, site_id |
 | `omada_dpi_category_traffic_bytes` | DPI-classified traffic by category for the configured window. | family_id, family_name, site, site_id |
 | `omada_dpi_application_traffic_bytes` | DPI-classified traffic by application for the configured window. | family_id, family_name, application_id, application_name, site, site_id |
+
+VPN detail labels, when returned by the Omada API, include `local_ip`, `local_networks`, `remote_networks`, `allowed_ips`, `endpoint`, and `endpoint_ip`.
 
 ## Label Sets
 

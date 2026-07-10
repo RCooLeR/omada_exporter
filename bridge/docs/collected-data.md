@@ -130,11 +130,12 @@ VPN collection includes:
 
 - VPN status
 - VPN id, name, purpose, mode, type, remote IP, site, and site id
+- optional VPN IP details such as local IP, local/remote networks, allowed IPs, and endpoint IP
 - tunnel uptime
 - up/down packets
 - up/down bytes
 - site-to-site aggregate traffic
-- site-to-site peer traffic
+- site-to-site peer status, packets, and traffic when returned by Omada
 - site-to-site peer login timestamp
 
 The MQTT publisher also creates derived speed sensors from VPN byte counters:

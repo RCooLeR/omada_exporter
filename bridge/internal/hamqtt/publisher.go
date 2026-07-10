@@ -534,7 +534,8 @@ func isBinaryMetric(name string) bool {
 		"omada_port_link_status",
 		"omada_lag_link_status",
 		"omada_isp_status",
-		"omada_vpn_status":
+		"omada_vpn_status",
+		"omada_site_to_site_vpn_peer_status":
 		return true
 	default:
 		return false
@@ -546,7 +547,7 @@ func binaryDeviceClass(name string) string {
 	switch name {
 	case "omada_controller_upgrade_available", "omada_device_need_upgrade":
 		return "problem"
-	case "omada_port_link_status", "omada_lag_link_status", "omada_isp_status", "omada_vpn_status":
+	case "omada_port_link_status", "omada_lag_link_status", "omada_isp_status", "omada_vpn_status", "omada_site_to_site_vpn_peer_status":
 		return "connectivity"
 	default:
 		return ""

@@ -97,6 +97,80 @@ function vpnRowKey(entity: HassEntity): string {
   return entity.entity_id;
 }
 
+function isVpnMetric(metric: string): boolean {
+  return metric.startsWith("omada_vpn_") || metric.startsWith("omada_site_to_site_vpn_");
+}
+
+function isVpnPeerMetric(metric: string): boolean {
+  return metric.startsWith("omada_site_to_site_vpn_peer_");
+}
+
+function vpnPeerRowKey(entity: HassEntity): string {
+  const vpnId = attrString(entity, "vpn_id").trim();
+  const peerId = attrString(entity, "peer_id").trim();
+  const peerName = attrString(entity, "peer_name").trim();
+  const remoteIp = attrString(entity, "remote_ip").trim();
+
+  return ["vpn_peer", vpnId, peerId || peerName || remoteIp].filter(Boolean).join(":") || entity.entity_id;
+}
+
+function rowAttrString(row: LinkRow, key: string): string {
+  const value = row.attrs[key];
+  return value == null ? "" : String(value).trim();
+}
+
+function firstRowAttr(row: LinkRow, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = rowAttrString(row, key);
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+export function vpnRemoteLabel(row: LinkRow): string {
+  return (
+    firstRowAttr(
+      row,
+      "remote_ip_preferred",
+      "endpoint_ip",
+      "endpoint",
+      "remote_ip",
+      "remote_ip_runtime",
+      "remote_peer_ip",
+      "allowed_ips",
+      "remote_networks"
+    ) || "-"
+  );
+}
+
+export function vpnModeLabel(row: LinkRow): string {
+  return firstRowAttr(row, "vpn_mode", "site_vpn_type", "purpose", "vpn_type") || "-";
+}
+
+export function vpnTotalBytes(row: LinkRow): number {
+  const tunnelTotal = (row.metrics.omada_vpn_up_bytes ?? 0) + (row.metrics.omada_vpn_down_bytes ?? 0);
+  const siteToSiteTotal =
+    (row.metrics.omada_site_to_site_vpn_up_bytes ?? 0) + (row.metrics.omada_site_to_site_vpn_down_bytes ?? 0);
+  const directPeerTotal =
+    (row.metrics.omada_site_to_site_vpn_peer_up_bytes ?? 0) + (row.metrics.omada_site_to_site_vpn_peer_down_bytes ?? 0);
+  const peerTotal =
+    (row.metrics.omada_site_to_site_vpn_peer_up_bytes_total ?? 0) +
+    (row.metrics.omada_site_to_site_vpn_peer_down_bytes_total ?? 0);
+
+  return tunnelTotal || siteToSiteTotal || directPeerTotal || peerTotal;
+}
+
+export function vpnUptimeSeconds(row: LinkRow): number {
+  return row.metrics.omada_vpn_uptime ?? 0;
+}
+
+export function vpnPeerLoginSeconds(row: LinkRow): number {
+  return row.metrics.omada_site_to_site_vpn_peer_login_timestamp ?? 0;
+}
+
 function matchSite(entity: HassEntity, siteFilter?: string): boolean {
   if (!siteFilter) {
     return true;
@@ -312,6 +386,31 @@ function ensureLinkRow(map: Map<string, LinkRow>, entity: HassEntity, fallbackKe
   return existing;
 }
 
+function ensureVpnParentRow(map: Map<string, LinkRow>, entity: HassEntity): LinkRow {
+  const key = vpnRowKey(entity);
+  let existing = map.get(key);
+
+  if (!existing) {
+    existing = {
+      key,
+      name: attrString(entity, "name") || key,
+      status: "",
+      attrs: {
+        vpn_id: attrString(entity, "vpn_id"),
+        name: attrString(entity, "name"),
+        vpn_type: attrString(entity, "vpn_type"),
+        site_vpn_type: attrString(entity, "site_vpn_type"),
+        site: attrString(entity, "site"),
+        site_id: attrString(entity, "site_id")
+      },
+      metrics: {}
+    };
+    map.set(key, existing);
+  }
+
+  return existing;
+}
+
 function firstNumber(value: string): number | undefined {
   const match = value.match(/\d+/);
   if (!match) {
@@ -382,6 +481,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   const lags = new Map<string, { attrs: Record<string, unknown>; metrics: Record<string, number> }>();
   const isps = new Map<string, LinkRow>();
   const vpns = new Map<string, LinkRow>();
+  const vpnPeers = new Map<string, LinkRow>();
   const wans = new Map<string, LinkRow>();
   const deviceByMac = new Map<string, DeviceRecord>();
   const portByDeviceMacAndPort = new Map<string, PortRecord>();
@@ -499,7 +599,29 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       continue;
     }
 
-    if (metric.startsWith("omada_vpn_")) {
+    if (isVpnPeerMetric(metric)) {
+      const peer = ensureLinkRow(vpnPeers, entity, [
+        vpnPeerRowKey(entity),
+        attrString(entity, "peer_id"),
+        `${attrString(entity, "vpn_id")}:${attrString(entity, "peer_name")}`,
+        `${attrString(entity, "name")}:${attrString(entity, "peer_name")}`
+      ]);
+      peer.name = attrString(entity, "peer_name") || attrString(entity, "remote_ip") || attrString(entity, "peer_id") || peer.name;
+      peer.metrics[metric] = value;
+
+      const parent = ensureVpnParentRow(vpns, entity);
+      if (metric === "omada_site_to_site_vpn_peer_down_bytes") {
+        parent.metrics.omada_site_to_site_vpn_peer_down_bytes_total =
+          (parent.metrics.omada_site_to_site_vpn_peer_down_bytes_total ?? 0) + value;
+      }
+      if (metric === "omada_site_to_site_vpn_peer_up_bytes") {
+        parent.metrics.omada_site_to_site_vpn_peer_up_bytes_total =
+          (parent.metrics.omada_site_to_site_vpn_peer_up_bytes_total ?? 0) + value;
+      }
+      continue;
+    }
+
+    if (isVpnMetric(metric)) {
       const row = ensureLinkRow(vpns, entity, [
         vpnRowKey(entity),
         attrString(entity, "vpn_id"),
@@ -617,6 +739,14 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
   const ispList = Array.from(isps.values()).sort((left, right) => left.name.localeCompare(right.name));
   const vpnList = Array.from(vpns.values()).sort((left, right) => left.name.localeCompare(right.name));
+  const vpnPeerList = Array.from(vpnPeers.values()).sort((left, right) => {
+    const leftVpn = String(left.attrs.name ?? "");
+    const rightVpn = String(right.attrs.name ?? "");
+    if (leftVpn !== rightVpn) {
+      return leftVpn.localeCompare(rightVpn);
+    }
+    return left.name.localeCompare(right.name);
+  });
   const wanList = Array.from(wans.values()).sort((left, right) => left.name.localeCompare(right.name));
 
   return {
@@ -625,6 +755,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     clients: clientList,
     isps: ispList,
     vpns: vpnList,
+    vpnPeers: vpnPeerList,
     wans: wanList,
     deviceByKey: new Map(deviceList.map((device) => [device.key, device])),
     deviceByMac,

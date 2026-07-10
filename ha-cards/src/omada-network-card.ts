@@ -15,7 +15,6 @@ import {
   formatRateBits,
   formatRateBytes,
   formatSpeedMbps,
-  formatUptimeMinutes,
   formatUptimeSeconds,
   qualityLabel
 } from "./format";
@@ -27,7 +26,14 @@ import type {
   LinkRow,
   LovelaceCardConfig
 } from "./ha-types";
-import { getDashboardModel } from "./model";
+import {
+  getDashboardModel,
+  vpnModeLabel,
+  vpnPeerLoginSeconds,
+  vpnRemoteLabel,
+  vpnTotalBytes,
+  vpnUptimeSeconds
+} from "./model";
 
 type Selection = { kind: "device"; key: string } | { kind: "client"; key: string };
 type DeviceMeta = {
@@ -253,7 +259,7 @@ export class OmadaNetworkCard extends LitElement {
       throw new Error("Card type is required");
     }
     const previousSite = this._config?.site;
-    this._config = { logo_mode: "auto", device_limit: 100, client_limit: 150, ...config };
+    this._config = { logo_mode: "auto", device_limit: 100, client_limit: 150, show_vpn_peers: true, ...config };
 
     if (!this.hass) {
       return;
@@ -496,7 +502,7 @@ export class OmadaNetworkCard extends LitElement {
       { label: "Updates", value: String(this._pendingUpdateCount), sub: "Devices pending" },
       { label: "Peak CPU", value: formatPercent(summary.maxCpu), sub: summary.maxCpuDevice || "-" },
       { label: "Peak RAM", value: formatPercent(summary.maxMem), sub: summary.maxMemDevice || "-" },
-      { label: "VPN", value: String(this._model!.vpns.length), sub: "Discovered tunnels" }
+      { label: "VPN", value: String(this._model!.vpns.length), sub: this.vpnPeerCountLabel() }
     ].map(
       (chip) => html`
         <div class="chip">
@@ -552,14 +558,16 @@ export class OmadaNetworkCard extends LitElement {
   }
 
   private renderVpnBlock() {
+    const showPeers = this._config?.show_vpn_peers !== false;
+    const vpnPeerCount = showPeers ? this._model!.vpnPeers.length : 0;
     return html`
-      <div class="section-title"><span>VPN</span><span>${this._model!.vpns.length} tunnels</span></div>
+      <div class="section-title"><span>VPN</span><span>${this._model!.vpns.length} tunnels${vpnPeerCount ? ` / ${vpnPeerCount} peers` : ""}</span></div>
       <div class="table">
         <table>
           <thead>
             <tr>
               <th>VPN</th>
-              <th>Remote IP</th>
+              <th>Remote / Allowed</th>
               <th>Mode</th>
               <th>Status</th>
               <th>Uptime</th>
@@ -569,24 +577,54 @@ export class OmadaNetworkCard extends LitElement {
           <tbody>
             ${repeat(this._model!.vpns, (row) => row.key, (row) => {
               const isUp = (row.metrics.omada_vpn_status ?? 0) > 0;
-              const uptime = row.metrics.omada_vpn_uptime ?? 0;
-              const total = (row.metrics.omada_vpn_up_bytes ?? 0) + (row.metrics.omada_vpn_down_bytes ?? 0);
-              const remoteIp = String(row.attrs.remote_ip_preferred ?? row.attrs.remote_ip ?? row.attrs.remote_ip_runtime ?? "-") || "-";
+              const uptime = vpnUptimeSeconds(row);
+              const total = vpnTotalBytes(row);
+              const remoteIp = vpnRemoteLabel(row);
               return html`
                 <tr>
                   <td>${row.name}</td>
                   <td>${remoteIp}</td>
-                  <td>${String(row.attrs.vpn_mode ?? "-")}</td>
+                  <td>${vpnModeLabel(row)}</td>
                   <td><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</td>
-                  <td>${formatUptimeMinutes(uptime)}</td>
+                  <td>${formatUptimeSeconds(uptime)}</td>
                   <td>${formatBytes(total)}</td>
                 </tr>
               `;
             })}
+            ${showPeers ? repeat(this._model!.vpnPeers, (row) => row.key, (row) => {
+              const statusMetric = row.metrics.omada_site_to_site_vpn_peer_status;
+              const login = vpnPeerLoginSeconds(row);
+              const isUp = statusMetric == null ? login > 0 : statusMetric > 0;
+              const total = vpnTotalBytes(row);
+              const remoteIp = vpnRemoteLabel(row);
+              return html`
+                <tr>
+                  <td>${String(row.attrs.name ?? "-")} / ${row.name}</td>
+                  <td>${remoteIp}</td>
+                  <td>${vpnModeLabel(row)}</td>
+                  <td><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</td>
+                  <td>${this.formatVpnPeerLogin(login)}</td>
+                  <td>${formatBytes(total)}</td>
+                </tr>
+              `;
+            }) : nothing}
           </tbody>
         </table>
       </div>
     `;
+  }
+
+  private vpnPeerCountLabel(): string {
+    const peers = this._model?.vpnPeers.length ?? 0;
+    return peers ? `${peers} peers` : "Discovered tunnels";
+  }
+
+  private formatVpnPeerLogin(value: number): string {
+    if (!value) {
+      return "-";
+    }
+
+    return new Date(value * 1000).toLocaleString();
   }
 
   private renderDeviceList() {

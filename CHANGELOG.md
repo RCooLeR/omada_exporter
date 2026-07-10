@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.3.2] - 2026-07-10
+### Added
+- Expose optional VPN detail labels from Omada OpenAPI responses, including local IP, local/remote networks, allowed IPs, endpoint, and endpoint IP.
+- Add optional site-to-site VPN peer status and packet metrics when Omada returns peer-level data.
+- Show site-to-site VPN metrics and optional peer rows in the Home Assistant cards.
+
+### Fixed
+- Use site-to-site VPN aggregate and peer metrics in Home Assistant card VPN totals instead of showing empty totals for WireGuard/site-to-site rows.
+- Improve Home Assistant card VPN display fallbacks for remote/allowed IP, mode, and uptime.
+
 ## [2.3.1] - 2026-07-05
 ### Fixed
 - Keep controller metrics available when the optional software update channel endpoint is unreachable, and avoid unnecessary session reauthentication after transport timeouts.
