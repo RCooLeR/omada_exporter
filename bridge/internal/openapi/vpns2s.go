@@ -59,7 +59,19 @@ func (c *Client) getSiteToSiteVpnStatsFresh() ([]model.SiteToSiteVpnStats, error
 		all = append(all, items...)
 	}
 
-	return all, nil
+	// Deduplication filter to prevent Prometheus "collected before with the same name and label values" errors.
+	seen := make(map[string]bool)
+	var deduplicated []model.SiteToSiteVpnStats
+	for _, item := range all {
+		// Check if we have already processed this VPN ID during this run.
+		if seen[item.VpnID] {
+			continue
+		}
+		seen[item.VpnID] = true
+		deduplicated = append(deduplicated, item)
+	}
+
+	return deduplicated, nil
 }
 
 // GetSiteToSiteVpnPeerStats returns peer statistics for a site-to-site VPN tunnel.
