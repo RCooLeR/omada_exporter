@@ -107,7 +107,13 @@ Client metrics include:
 - RX and TX negotiation rate in bit/s
 - wireless signal percentage, SNR, and RSSI
 - MAC, IP, VLAN, connection type, device category/type, vendor, host name, system name, and display name
-- gateway, switch, AP, port, LAG id, SSID, Wi-Fi mode, and wired/wireless labels
+- gateway, switch, AP, parent `port`, parent `lag_id`, SSID, Wi-Fi mode, and wired/wireless labels
+
+Client attachment labels describe topology on the parent switch/gateway. A
+client with `lag_id=3` is connected through LAG 3 on the device in
+`switch_mac`/`gateway_mac`; the client does not own that LAG. Wired clients do
+not expose Wi-Fi mode, SSID, or AP labels, and `lag_id` is empty when
+Omada reports its no-LAG value of zero.
 
 Set `OMADA_TRACK_CLIENT_METRICS=false` to suppress per-client metrics while keeping aggregate connected-client totals.
 

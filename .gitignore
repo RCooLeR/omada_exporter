@@ -23,5 +23,8 @@ gen-metrics-table.md
 # local Fusion Gateway Pioneer Program test notes and raw evidence
 /fusion/
 
+# local Omada firmware analysis and extracted evidence
+/firmware/
+
 #IDE
 .idea

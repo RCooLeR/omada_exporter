@@ -30,8 +30,13 @@ type Publisher struct {
 	published          map[string]struct{}
 	knownClients       map[string]clientTracker
 	lastClientTrackers map[string]clientTracker
+	clientLastSeen     map[string]time.Time
+	clientAttributes   map[string]string
 	trackedClientMACs  []string
 	metricSamples      map[string]metricSample
+	retainedDiscovery  map[string]string
+	retainedStates     map[string]map[string]string
+	retainedLoaded     bool
 	mu                 sync.Mutex
 }
 
@@ -40,6 +45,13 @@ type clientTracker struct {
 	StateTopic      string
 	AttributesTopic string
 	Labels          map[string]string
+}
+
+type retainedClientAttributes struct {
+	Topic    string
+	Payload  string
+	Labels   map[string]string
+	LastSeen time.Time
 }
 
 // entity describes a Home Assistant entity generated from a metric.
@@ -66,6 +78,7 @@ type metricSample struct {
 type publishContext struct {
 	vpnIDByModeTypeName map[string]string
 	vpnIDByName         map[string]string
+	infrastructureByMAC map[string]map[string]string
 }
 
 var slugPattern = regexp.MustCompile(`[^a-z0-9_]+`)
@@ -92,8 +105,12 @@ func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector
 		published:          map[string]struct{}{},
 		knownClients:       map[string]clientTracker{},
 		lastClientTrackers: map[string]clientTracker{},
+		clientLastSeen:     map[string]time.Time{},
+		clientAttributes:   map[string]string{},
 		trackedClientMACs:  parseTrackedClientMACs(client.Config.MQTTTrackedClientMACs),
 		metricSamples:      map[string]metricSample{},
+		retainedDiscovery:  map[string]string{},
+		retainedStates:     map[string]map[string]string{},
 	}, nil
 }
 
@@ -124,6 +141,11 @@ func (p *Publisher) Run(ctx context.Context) error {
 	}
 
 	p.publishBytes(p.availabilityTopic, []byte("online"), true)
+	if p.client.Config.MQTTRetain {
+		if err := p.loadRetainedInventory(ctx); err != nil {
+			log.Warn().Err(err).Msg("retained mqtt inventory unavailable; automatic superseded-entity cleanup disabled")
+		}
+	}
 	p.publishAll()
 
 	interval := time.Duration(p.client.Config.MQTTInterval) * time.Second
@@ -174,6 +196,7 @@ func (p *Publisher) publishAll() {
 	now := time.Now().UTC()
 	ctx := buildPublishContext(families)
 	seenClients := map[string]clientTracker{}
+	currentEntities := map[string]entity{}
 	for _, family := range families {
 		for _, metric := range family.Metric {
 			value, ok := metricValue(metric)
@@ -183,17 +206,26 @@ func (p *Publisher) publishAll() {
 
 			labels := metricLabels(metric)
 			ent := p.newMetricEntity(family, labels, ctx)
+			currentEntities[ent.DiscoveryTopic] = ent
 			p.publishDiscovery(ent, family.GetType())
 			p.publishMetricState(ent, value, now)
-			p.publishDerivedMetricState(family.GetName(), labels, value, now, ctx)
+			if derived, ok := p.publishDerivedMetricState(family.GetName(), labels, value, now, ctx); ok {
+				currentEntities[derived.DiscoveryTopic] = derived
+			}
 
 			if tracker, ok := p.clientTracker(family.GetName(), labels); ok {
-				seenClients[trackerID(labels["mac"])] = tracker
+				id := trackerID(labels["mac"])
+				_, infrastructure := ctx.infrastructureByMAC[id]
+				if !infrastructure || p.isExplicitlyTrackedClient(id) {
+					seenClients[id] = tracker
+				}
 			}
 		}
 	}
 
 	p.publishClientTrackers(seenClients)
+	p.removeInfrastructureClientTrackers(ctx)
+	p.reconcileSupersededEntities(currentEntities)
 }
 
 // publishDiscovery publishes Home Assistant discovery data for a metric entity.
@@ -261,10 +293,10 @@ func (p *Publisher) publishMetricState(ent entity, value float64, observedAt tim
 }
 
 // publishDerivedMetricState publishes derived values calculated from a metric.
-func (p *Publisher) publishDerivedMetricState(metricName string, labels map[string]string, value float64, observedAt time.Time, ctx publishContext) {
+func (p *Publisher) publishDerivedMetricState(metricName string, labels map[string]string, value float64, observedAt time.Time, ctx publishContext) (entity, bool) {
 	derivedMetricName, help, ok := derivedMetric(metricName)
 	if !ok {
-		return
+		return entity{}, false
 	}
 
 	sampleKey := objectID(metricName, labels)
@@ -273,6 +305,7 @@ func (p *Publisher) publishDerivedMetricState(metricName string, labels map[stri
 	ent := p.newDerivedEntity(derivedMetricName, help, labels, ctx)
 	p.publishDiscovery(ent, dto.MetricType_GAUGE)
 	p.publishMetricState(ent, rate, observedAt)
+	return ent, true
 }
 
 // newMetricEntity builds a Home Assistant entity description from a metric family.
@@ -286,14 +319,17 @@ func (p *Publisher) newMetricEntity(family *dto.MetricFamily, labels map[string]
 	objectID := objectID(metricName, labels)
 	discoveryPrefix := topicPrefix(p.client.Config.MQTTDiscoveryPrefix)
 	statePrefix := topicPrefix(p.client.Config.MQTTTopicPrefix)
+	discoveryTopic := fmt.Sprintf("%s/%s/omada_exporter/%s/config", discoveryPrefix, component, objectID)
+	stateTopic := fmt.Sprintf("%s/entities/%s/state", statePrefix, objectID)
+	objectID, discoveryTopic, stateTopic = p.canonicalEntityTopics(metricName, labels, component, objectID, discoveryTopic, stateTopic)
 
 	return entity{
 		Component:      component,
 		ObjectID:       objectID,
 		UniqueID:       "omada_exporter_" + objectID,
 		Name:           friendlyMetricName(metricName, labels),
-		DiscoveryTopic: fmt.Sprintf("%s/%s/omada_exporter/%s/config", discoveryPrefix, component, objectID),
-		StateTopic:     fmt.Sprintf("%s/entities/%s/state", statePrefix, objectID),
+		DiscoveryTopic: discoveryTopic,
+		StateTopic:     stateTopic,
 		MetricName:     metricName,
 		Help:           family.GetHelp(),
 		Labels:         labels,
@@ -306,14 +342,17 @@ func (p *Publisher) newDerivedEntity(metricName, help string, labels map[string]
 	objectID := objectID(metricName, labels)
 	discoveryPrefix := topicPrefix(p.client.Config.MQTTDiscoveryPrefix)
 	statePrefix := topicPrefix(p.client.Config.MQTTTopicPrefix)
+	discoveryTopic := fmt.Sprintf("%s/sensor/omada_exporter/%s/config", discoveryPrefix, objectID)
+	stateTopic := fmt.Sprintf("%s/entities/%s/state", statePrefix, objectID)
+	objectID, discoveryTopic, stateTopic = p.canonicalEntityTopics(metricName, labels, "sensor", objectID, discoveryTopic, stateTopic)
 
 	return entity{
 		Component:      "sensor",
 		ObjectID:       objectID,
 		UniqueID:       "omada_exporter_" + objectID,
 		Name:           friendlyMetricName(metricName, labels),
-		DiscoveryTopic: fmt.Sprintf("%s/sensor/omada_exporter/%s/config", discoveryPrefix, objectID),
-		StateTopic:     fmt.Sprintf("%s/entities/%s/state", statePrefix, objectID),
+		DiscoveryTopic: discoveryTopic,
+		StateTopic:     stateTopic,
 		MetricName:     metricName,
 		Help:           help,
 		Labels:         labels,
@@ -340,30 +379,32 @@ func (p *Publisher) clientTracker(metricName string, labels map[string]string) (
 func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 	observedAt := time.Now().UTC()
 
+	p.mu.Lock()
+	if p.lastClientTrackers == nil {
+		p.lastClientTrackers = map[string]clientTracker{}
+	}
+	if p.clientLastSeen == nil {
+		p.clientLastSeen = map[string]time.Time{}
+	}
+	previous := copyClientTrackers(p.knownClients)
+	for id, tracker := range seen {
+		p.lastClientTrackers[id] = tracker
+		p.clientLastSeen[id] = observedAt
+	}
+	lastKnown := copyClientTrackers(p.lastClientTrackers)
+	lastSeen := copyClientLastSeen(p.clientLastSeen)
+	p.knownClients = seen
+	p.mu.Unlock()
+
 	// Clients that appear in this gather are currently online. We publish both
 	// discovery and state so Home Assistant can create/update the tracker and
 	// immediately mark it as home.
 	for id, tracker := range seen {
 		p.publishClientTrackerDiscovery(id, tracker)
 
-		attributes := map[string]any{
-			"last_seen": observedAt.Format(time.RFC3339),
-		}
-		for k, v := range tracker.Labels {
-			attributes[k] = v
-		}
 		p.publishBytes(tracker.StateTopic, []byte("home"), p.client.Config.MQTTRetain)
-		p.publishJSON(tracker.AttributesTopic, attributes, p.client.Config.MQTTRetain)
+		p.publishClientTrackerAttributes(tracker, false, time.Time{})
 	}
-
-	p.mu.Lock()
-	previous := p.knownClients
-	for id, tracker := range seen {
-		p.lastClientTrackers[id] = tracker
-	}
-	lastKnown := copyClientTrackers(p.lastClientTrackers)
-	p.knownClients = seen
-	p.mu.Unlock()
 
 	// Configured MAC addresses are special: the user wants Home Assistant to
 	// know about them even if Omada did not report them in the current online
@@ -380,15 +421,8 @@ func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 
 		p.publishClientTrackerDiscovery(id, tracker)
 
-		attributes := map[string]any{
-			"last_updated": observedAt.Format(time.RFC3339),
-			"configured":   true,
-		}
-		for k, v := range tracker.Labels {
-			attributes[k] = v
-		}
 		p.publishBytes(tracker.StateTopic, []byte("not_home"), p.client.Config.MQTTRetain)
-		p.publishJSON(tracker.AttributesTopic, attributes, p.client.Config.MQTTRetain)
+		p.publishClientTrackerAttributes(tracker, true, lastSeen[id])
 	}
 
 	// Dynamic clients are marked away only after this publisher has seen them
@@ -402,7 +436,90 @@ func (p *Publisher) publishClientTrackers(seen map[string]clientTracker) {
 			continue
 		}
 		p.publishBytes(tracker.StateTopic, []byte("not_home"), p.client.Config.MQTTRetain)
+		p.publishClientTrackerAttributes(tracker, false, lastSeen[id])
 	}
+}
+
+// publishClientTrackerAttributes publishes stable tracker metadata only when
+// the effective Home Assistant attributes change. lastSeen is supplied only
+// for an offline transition, so active clients do not generate a new Recorder
+// write on every collection interval.
+func (p *Publisher) publishClientTrackerAttributes(tracker clientTracker, configured bool, lastSeen time.Time) {
+	attributes := make(map[string]any, len(tracker.Labels)+2)
+	for key, value := range tracker.Labels {
+		attributes[key] = value
+	}
+	if configured {
+		attributes["configured"] = true
+	}
+	if !lastSeen.IsZero() {
+		attributes["last_seen"] = lastSeen.Format(time.RFC3339)
+	}
+
+	body, err := json.Marshal(attributes)
+	if err != nil {
+		log.Error().Err(err).Str("topic", tracker.AttributesTopic).Msg("failed to encode mqtt payload")
+		return
+	}
+
+	p.mu.Lock()
+	if p.clientAttributes == nil {
+		p.clientAttributes = map[string]string{}
+	}
+	if p.client.Config.MQTTRetain && p.clientAttributes[tracker.AttributesTopic] == string(body) {
+		p.mu.Unlock()
+		return
+	}
+	p.mu.Unlock()
+
+	if !p.publishBytes(tracker.AttributesTopic, body, p.client.Config.MQTTRetain) {
+		return
+	}
+
+	p.mu.Lock()
+	p.clientAttributes[tracker.AttributesTopic] = string(body)
+	p.mu.Unlock()
+}
+
+func copyClientLastSeen(source map[string]time.Time) map[string]time.Time {
+	copy := make(map[string]time.Time, len(source))
+	for id, observedAt := range source {
+		copy[id] = observedAt
+	}
+	return copy
+}
+
+// removeInfrastructureClientTrackers prevents controllers, gateways, switches,
+// and APs that also appear in Omada's active-client feed from becoming a
+// second Home Assistant client device. Explicitly configured tracker MACs are
+// preserved because that is a direct user request.
+func (p *Publisher) removeInfrastructureClientTrackers(ctx publishContext) {
+	discoveryPrefix := topicPrefix(p.client.Config.MQTTDiscoveryPrefix)
+	statePrefix := topicPrefix(p.client.Config.MQTTTopicPrefix)
+	for id := range ctx.infrastructureByMAC {
+		if p.isExplicitlyTrackedClient(id) {
+			continue
+		}
+		p.publishBytes(fmt.Sprintf("%s/device_tracker/omada_exporter/%s/config", discoveryPrefix, id), []byte{}, true)
+		p.publishBytes(fmt.Sprintf("%s/device_trackers/%s/state", statePrefix, id), []byte{}, true)
+		p.publishBytes(fmt.Sprintf("%s/device_trackers/%s/attributes", statePrefix, id), []byte{}, true)
+
+		p.mu.Lock()
+		delete(p.knownClients, id)
+		delete(p.lastClientTrackers, id)
+		delete(p.clientLastSeen, id)
+		delete(p.clientAttributes, fmt.Sprintf("%s/device_trackers/%s/attributes", statePrefix, id))
+		p.mu.Unlock()
+	}
+}
+
+func (p *Publisher) isExplicitlyTrackedClient(id string) bool {
+	for _, mac := range p.trackedClientMACs {
+		if trackerID(mac) == id {
+			return true
+		}
+	}
+	return false
 }
 
 // configuredClientTrackers builds device trackers for explicitly configured MAC addresses.
@@ -476,19 +593,399 @@ func (p *Publisher) publishJSON(topic string, payload any, retained bool) {
 	p.publishBytes(topic, body, retained)
 }
 
-// publishBytes publishes a raw MQTT payload.
-func (p *Publisher) publishBytes(topic string, payload []byte, retained bool) {
+// publishBytes publishes a raw MQTT payload and reports whether the broker
+// accepted it.
+func (p *Publisher) publishBytes(topic string, payload []byte, retained bool) bool {
 	if p.mqtt == nil || !p.mqtt.IsConnectionOpen() {
-		return
+		return false
 	}
 	token := p.mqtt.Publish(topic, 0, retained, payload)
 	if !token.WaitTimeout(10 * time.Second) {
 		log.Warn().Str("topic", topic).Msg("mqtt publish timed out")
-		return
+		return false
 	}
 	if err := token.Error(); err != nil {
 		log.Error().Err(err).Str("topic", topic).Msg("mqtt publish failed")
+		return false
 	}
+	return true
+}
+
+// loadRetainedInventory takes a bounded snapshot of metric discovery and state
+// topics owned by this publisher. MQTT has no list-topics operation, so retained
+// wildcard subscriptions are the only way to discover records created by a
+// previous process/version.
+func (p *Publisher) loadRetainedInventory(ctx context.Context) error {
+	if p.mqtt == nil || !p.mqtt.IsConnectionOpen() {
+		return fmt.Errorf("mqtt connection is not open")
+	}
+
+	discoveryFilter := fmt.Sprintf("%s/+/omada_exporter/+/config", topicPrefix(p.client.Config.MQTTDiscoveryPrefix))
+	stateFilter := fmt.Sprintf("%s/entities/+/state", topicPrefix(p.client.Config.MQTTTopicPrefix))
+	trackerStateFilter := fmt.Sprintf("%s/device_trackers/+/state", topicPrefix(p.client.Config.MQTTTopicPrefix))
+	trackerAttributesFilter := fmt.Sprintf("%s/device_trackers/+/attributes", topicPrefix(p.client.Config.MQTTTopicPrefix))
+	retainedClientTrackers := map[string]clientTracker{}
+	retainedClientAttributePayloads := map[string]retainedClientAttributes{}
+	activity := make(chan struct{}, 1)
+
+	notifyActivity := func() {
+		select {
+		case activity <- struct{}{}:
+		default:
+		}
+	}
+
+	discoveryHandler := func(_ mqtt.Client, message mqtt.Message) {
+		if !message.Retained() || len(message.Payload()) == 0 {
+			return
+		}
+
+		var config struct {
+			StateTopic string `json:"state_topic"`
+			Origin     struct {
+				Name string `json:"name"`
+			} `json:"origin"`
+		}
+		if err := json.Unmarshal(message.Payload(), &config); err != nil || config.Origin.Name != "omada_exporter" {
+			return
+		}
+		if !strings.HasPrefix(config.StateTopic, topicPrefix(p.client.Config.MQTTTopicPrefix)+"/entities/") {
+			return
+		}
+
+		p.mu.Lock()
+		p.retainedDiscovery[message.Topic()] = config.StateTopic
+		p.mu.Unlock()
+		notifyActivity()
+	}
+
+	stateHandler := func(_ mqtt.Client, message mqtt.Message) {
+		if !message.Retained() || len(message.Payload()) == 0 {
+			return
+		}
+
+		var payload map[string]any
+		if err := json.Unmarshal(message.Payload(), &payload); err != nil {
+			return
+		}
+		labels := stringLabels(payload)
+		if labels["metric"] == "" {
+			return
+		}
+
+		p.mu.Lock()
+		p.retainedStates[message.Topic()] = labels
+		p.mu.Unlock()
+		notifyActivity()
+	}
+
+	trackerStateHandler := func(_ mqtt.Client, message mqtt.Message) {
+		if !message.Retained() || strings.TrimSpace(string(message.Payload())) != "home" {
+			return
+		}
+
+		id, tracker, ok := retainedClientTracker(message.Topic(), p.client.Config.MQTTTopicPrefix)
+		if !ok {
+			return
+		}
+
+		p.mu.Lock()
+		retainedClientTrackers[id] = tracker
+		p.mu.Unlock()
+		notifyActivity()
+	}
+
+	trackerAttributesHandler := func(_ mqtt.Client, message mqtt.Message) {
+		if !message.Retained() || len(message.Payload()) == 0 {
+			return
+		}
+
+		id, ok := retainedClientTrackerAttributesID(message.Topic(), p.client.Config.MQTTTopicPrefix)
+		if !ok {
+			return
+		}
+
+		var payload map[string]any
+		if err := json.Unmarshal(message.Payload(), &payload); err != nil {
+			return
+		}
+		normalized, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
+
+		labels := stringLabels(payload)
+		lastSeen, _ := time.Parse(time.RFC3339, labels["last_seen"])
+		delete(labels, "last_seen")
+		delete(labels, "last_updated")
+
+		p.mu.Lock()
+		retainedClientAttributePayloads[id] = retainedClientAttributes{
+			Topic:    message.Topic(),
+			Payload:  string(normalized),
+			Labels:   labels,
+			LastSeen: lastSeen,
+		}
+		p.mu.Unlock()
+		notifyActivity()
+	}
+
+	for filter, handler := range map[string]mqtt.MessageHandler{
+		discoveryFilter:         discoveryHandler,
+		stateFilter:             stateHandler,
+		trackerStateFilter:      trackerStateHandler,
+		trackerAttributesFilter: trackerAttributesHandler,
+	} {
+		token := p.mqtt.Subscribe(filter, 0, handler)
+		if !token.WaitTimeout(10 * time.Second) {
+			return fmt.Errorf("subscribe to %s timed out", filter)
+		}
+		if err := token.Error(); err != nil {
+			return fmt.Errorf("subscribe to %s: %w", filter, err)
+		}
+	}
+
+	// Retained delivery has no end-of-snapshot marker. Wait until deliveries
+	// have been quiet for one second, with a hard upper bound for large brokers.
+	quiet := time.NewTimer(time.Second)
+	maximum := time.NewTimer(10 * time.Second)
+	defer quiet.Stop()
+	defer maximum.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-activity:
+			if !quiet.Stop() {
+				select {
+				case <-quiet.C:
+				default:
+				}
+			}
+			quiet.Reset(time.Second)
+		case <-quiet.C:
+			goto snapshotComplete
+		case <-maximum.C:
+			goto snapshotComplete
+		}
+	}
+
+snapshotComplete:
+	if token := p.mqtt.Unsubscribe(discoveryFilter, stateFilter, trackerStateFilter, trackerAttributesFilter); token.WaitTimeout(10*time.Second) && token.Error() != nil {
+		log.Warn().Err(token.Error()).Msg("failed to unsubscribe retained mqtt inventory filters")
+	}
+	p.mu.Lock()
+	if p.lastClientTrackers == nil {
+		p.lastClientTrackers = map[string]clientTracker{}
+	}
+	if p.clientLastSeen == nil {
+		p.clientLastSeen = map[string]time.Time{}
+	}
+	if p.clientAttributes == nil {
+		p.clientAttributes = map[string]string{}
+	}
+	for id, attributes := range retainedClientAttributePayloads {
+		p.clientAttributes[attributes.Topic] = attributes.Payload
+		if tracker, ok := retainedClientTrackers[id]; ok {
+			tracker.Labels = copyLabels(attributes.Labels)
+			retainedClientTrackers[id] = tracker
+			p.lastClientTrackers[id] = tracker
+			if !attributes.LastSeen.IsZero() {
+				p.clientLastSeen[id] = attributes.LastSeen
+			}
+		}
+	}
+	for id, tracker := range retainedClientTrackers {
+		p.knownClients[id] = tracker
+	}
+	p.retainedLoaded = true
+	p.mu.Unlock()
+	return nil
+}
+
+// retainedClientTracker reconstructs enough tracker metadata from a retained
+// state topic to mark a previously-home dynamic client away after a restart.
+func retainedClientTracker(topic, configuredPrefix string) (string, clientTracker, bool) {
+	prefix := topicPrefix(configuredPrefix) + "/device_trackers/"
+	if !strings.HasPrefix(topic, prefix) || !strings.HasSuffix(topic, "/state") {
+		return "", clientTracker{}, false
+	}
+
+	id := strings.TrimSuffix(strings.TrimPrefix(topic, prefix), "/state")
+	if id == "" || strings.Contains(id, "/") {
+		return "", clientTracker{}, false
+	}
+
+	return id, clientTracker{
+		StateTopic:      topic,
+		AttributesTopic: prefix + id + "/attributes",
+		Labels:          map[string]string{},
+	}, true
+}
+
+func retainedClientTrackerAttributesID(topic, configuredPrefix string) (string, bool) {
+	prefix := topicPrefix(configuredPrefix) + "/device_trackers/"
+	if !strings.HasPrefix(topic, prefix) || !strings.HasSuffix(topic, "/attributes") {
+		return "", false
+	}
+
+	id := strings.TrimSuffix(strings.TrimPrefix(topic, prefix), "/attributes")
+	if id == "" || strings.Contains(id, "/") {
+		return "", false
+	}
+	return id, true
+}
+
+// stringLabels extracts the string-valued metric identity/attribute fields
+// from a retained JSON state payload.
+func stringLabels(payload map[string]any) map[string]string {
+	labels := make(map[string]string, len(payload))
+	for key, value := range payload {
+		if text, ok := value.(string); ok {
+			labels[key] = text
+		}
+	}
+	return labels
+}
+
+// canonicalEntityTopics reuses the newest retained counterpart during an
+// identity-policy migration. That preserves Home Assistant entity IDs,
+// history, automations, and customizations while older duplicate counterparts
+// are removed by reconciliation.
+func (p *Publisher) canonicalEntityTopics(metricName string, labels map[string]string, component, fallbackObjectID, fallbackDiscoveryTopic, fallbackStateTopic string) (string, string, string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.retainedLoaded {
+		return fallbackObjectID, fallbackDiscoveryTopic, fallbackStateTopic
+	}
+
+	discoveryPrefix := fmt.Sprintf("%s/%s/omada_exporter/", topicPrefix(p.client.Config.MQTTDiscoveryPrefix), component)
+	wantedKey := supersessionKey(metricName, labels)
+	bestDiscoveryTopic := ""
+	bestStateTopic := ""
+	bestObjectID := ""
+	bestObservedAt := time.Time{}
+
+	for discoveryTopic, stateTopic := range p.retainedDiscovery {
+		if !strings.HasPrefix(discoveryTopic, discoveryPrefix) || !strings.HasSuffix(discoveryTopic, "/config") {
+			continue
+		}
+		retainedLabels := p.retainedStates[stateTopic]
+		if retainedLabels["metric"] != metricName || supersessionKey(metricName, retainedLabels) != wantedKey || !sameLogicalSite(retainedLabels, labels) {
+			continue
+		}
+
+		objectID := strings.TrimSuffix(strings.TrimPrefix(discoveryTopic, discoveryPrefix), "/config")
+		if objectID == "" || strings.Contains(objectID, "/") {
+			continue
+		}
+		observedAt, _ := time.Parse(time.RFC3339, retainedLabels["last_updated"])
+		if bestDiscoveryTopic == "" || observedAt.After(bestObservedAt) || (observedAt.Equal(bestObservedAt) && discoveryTopic < bestDiscoveryTopic) {
+			bestDiscoveryTopic = discoveryTopic
+			bestStateTopic = stateTopic
+			bestObjectID = objectID
+			bestObservedAt = observedAt
+		}
+	}
+
+	if bestDiscoveryTopic == "" {
+		return fallbackObjectID, fallbackDiscoveryTopic, fallbackStateTopic
+	}
+	return bestObjectID, bestDiscoveryTopic, bestStateTopic
+}
+
+// reconcileSupersededEntities removes only records for which a current entity
+// with the same semantic identity exists. Missing entities without a confirmed
+// counterpart are deliberately preserved, so API failures and offline clients
+// cannot trigger broad deletion.
+func (p *Publisher) reconcileSupersededEntities(current map[string]entity) {
+	if !p.client.Config.MQTTRetain {
+		return
+	}
+
+	currentByKey := make(map[string]entity, len(current))
+	for _, ent := range current {
+		currentByKey[supersessionKey(ent.MetricName, ent.Labels)] = ent
+	}
+
+	p.mu.Lock()
+	for topic, ent := range current {
+		p.retainedDiscovery[topic] = ent.StateTopic
+		labels := copyLabels(ent.Labels)
+		labels["metric"] = ent.MetricName
+		p.retainedStates[ent.StateTopic] = labels
+	}
+	loaded := p.retainedLoaded
+	knownDiscovery := make(map[string]string, len(p.retainedDiscovery))
+	for topic, stateTopic := range p.retainedDiscovery {
+		knownDiscovery[topic] = stateTopic
+	}
+	knownStates := make(map[string]map[string]string, len(p.retainedStates))
+	for topic, labels := range p.retainedStates {
+		knownStates[topic] = copyLabels(labels)
+	}
+	p.mu.Unlock()
+
+	if !loaded {
+		return
+	}
+
+	for discoveryTopic, stateTopic := range knownDiscovery {
+		if _, isCurrent := current[discoveryTopic]; isCurrent {
+			continue
+		}
+		oldLabels := knownStates[stateTopic]
+		metricName := oldLabels["metric"]
+		if metricName == "" {
+			continue
+		}
+		counterpart, ok := currentByKey[supersessionKey(metricName, oldLabels)]
+		if !ok || !sameLogicalSite(oldLabels, counterpart.Labels) {
+			continue
+		}
+
+		discoveryRemoved := p.publishBytes(discoveryTopic, []byte{}, true)
+		stateRemoved := p.publishBytes(stateTopic, []byte{}, true)
+		if !discoveryRemoved || !stateRemoved {
+			log.Warn().
+				Str("topic", discoveryTopic).
+				Str("state_topic", stateTopic).
+				Str("metric", metricName).
+				Bool("discovery_removed", discoveryRemoved).
+				Bool("state_removed", stateRemoved).
+				Msg("failed to fully remove superseded retained mqtt entity; cleanup will be retried")
+			continue
+		}
+		log.Info().Str("topic", discoveryTopic).Str("metric", metricName).Msg("removed superseded retained mqtt entity")
+
+		p.mu.Lock()
+		delete(p.retainedDiscovery, discoveryTopic)
+		delete(p.retainedStates, stateTopic)
+		delete(p.published, discoveryTopic)
+		p.mu.Unlock()
+	}
+}
+
+func supersessionKey(metricName string, labels map[string]string) string {
+	return strings.Join(metricIdentityParts(metricName, labels, false), "\x00")
+}
+
+// sameLogicalSite accepts an exact site ID or exact site name match. This
+// permits safe reconciliation across a controller migration that regenerated
+// site IDs, while refusing deletion when both site identity fields changed.
+func sameLogicalSite(oldLabels, currentLabels map[string]string) bool {
+	oldID := strings.TrimSpace(oldLabels["site_id"])
+	currentID := strings.TrimSpace(currentLabels["site_id"])
+	oldName := strings.TrimSpace(oldLabels["site"])
+	currentName := strings.TrimSpace(currentLabels["site"])
+
+	if oldID != "" && currentID != "" && oldID == currentID {
+		return true
+	}
+	if oldName != "" && currentName != "" && oldName == currentName {
+		return true
+	}
+	return oldID == "" && currentID == "" && oldName == "" && currentName == ""
 }
 
 // metricValue extracts a numeric value from a Prometheus metric.
@@ -604,7 +1101,7 @@ func friendlyMetricName(metricName string, labels map[string]string) string {
 	name := strings.Join(parts, " ")
 
 	qualifiers := []string{}
-	for _, key := range []string{"storage_name", "upgrade_channel", "port", "lag_id", "name", "connection_mode", "wifi_mode", "ssid"} {
+	for _, key := range friendlyQualifierLabels(metricName) {
 		value := strings.TrimSpace(labels[key])
 		if value == "" {
 			continue
@@ -624,38 +1121,117 @@ func friendlyMetricName(metricName string, labels map[string]string) string {
 	return name
 }
 
+// friendlyQualifierLabels selects display qualifiers that belong to the
+// metric itself. Client attachment labels are deliberately excluded: moving a
+// client must update attributes without renaming the entity.
+func friendlyQualifierLabels(metricName string) []string {
+	switch {
+	case strings.HasPrefix(metricName, "omada_controller_storage_"):
+		return []string{"storage_name"}
+	case metricName == "omada_controller_upgrade_available":
+		return []string{"upgrade_channel"}
+	case strings.HasPrefix(metricName, "omada_port_"):
+		return []string{"port"}
+	case strings.HasPrefix(metricName, "omada_lag_"):
+		return []string{"lag_id"}
+	case strings.HasPrefix(metricName, "omada_wan_"), strings.HasPrefix(metricName, "omada_isp_"):
+		return []string{"port", "name"}
+	case metricName == "omada_client_connected_total":
+		return []string{"connection_mode", "wifi_mode"}
+	case strings.HasPrefix(metricName, "omada_vpn_"), strings.HasPrefix(metricName, "omada_site_to_site_vpn_"):
+		return []string{"name", "peer_name"}
+	default:
+		return nil
+	}
+}
+
 // objectID builds a stable Home Assistant object identifier for a metric.
 func objectID(metricName string, labels map[string]string) string {
-	stable := []string{metricName}
+	stable := metricIdentityParts(metricName, labels, true)
+	return slug(strings.Join(stable, "_")) + "_" + shortHash(stable)
+}
 
-	for _, key := range []string{"site_id", "site", "device_mac", "mac", "gateway_mac", "storage_name", "upgrade_channel", "port", "lag_id"} {
-		if value := labels[key]; value != "" {
-			stable = append(stable, key+"_"+value)
+// metricIdentityParts returns only labels that identify the metric's owning
+// object or real subresource. Mutable names, client attachment paths, and live
+// topology properties must remain attributes rather than entity identity.
+func metricIdentityParts(metricName string, labels map[string]string, includeSite bool) []string {
+	parts := []string{metricName}
+	appendIdentity := func(key string) {
+		if value := strings.TrimSpace(labels[key]); value != "" {
+			parts = append(parts, key+"_"+value)
 		}
 	}
 
-	if metricName == "omada_vpn_status" && labels["vpn_id"] != "" {
-		stable = append(stable, "vpn_id_"+labels["vpn_id"])
-	}
-	if strings.HasPrefix(metricName, "omada_site_to_site_vpn_") && labels["vpn_id"] != "" {
-		stable = append(stable, "vpn_id_"+labels["vpn_id"])
-	}
-	if labels["tunnel_id"] != "" {
-		stable = append(stable, "tunnel_id_"+labels["tunnel_id"])
-	}
-	if labels["peer_id"] != "" {
-		stable = append(stable, "peer_id_"+labels["peer_id"])
+	if includeSite {
+		if strings.TrimSpace(labels["site_id"]) != "" {
+			appendIdentity("site_id")
+		} else {
+			appendIdentity("site")
+		}
 	}
 
-	if labels["device_mac"] == "" && labels["mac"] == "" && labels["gateway_mac"] == "" && !(metricName == "omada_vpn_status" && labels["vpn_id"] != "") {
-		for _, key := range []string{"interface_name", "local_ip", "remote_ip", "connection_mode", "wifi_mode", "ssid", "name", "peer_name"} {
-			if value := labels[key]; value != "" {
-				stable = append(stable, key+"_"+value)
+	hasOwner := false
+	for _, key := range []string{"device_mac", "mac", "gateway_mac"} {
+		if strings.TrimSpace(labels[key]) != "" {
+			appendIdentity(key)
+			hasOwner = true
+			break
+		}
+	}
+
+	switch {
+	case strings.HasPrefix(metricName, "omada_controller_storage_"):
+		appendIdentity("storage_name")
+	case metricName == "omada_controller_upgrade_available":
+		appendIdentity("upgrade_channel")
+	case strings.HasPrefix(metricName, "omada_port_"), strings.HasPrefix(metricName, "omada_wan_"), strings.HasPrefix(metricName, "omada_isp_"):
+		appendIdentity("port")
+	case strings.HasPrefix(metricName, "omada_lag_"):
+		appendIdentity("lag_id")
+	case metricName == "omada_client_connected_total":
+		appendIdentity("connection_mode")
+		appendIdentity("wifi_mode")
+	case metricName == "omada_dpi_category_traffic_bytes":
+		appendIdentity("family_id")
+		if strings.TrimSpace(labels["family_id"]) == "" {
+			appendIdentity("family_name")
+		}
+	case metricName == "omada_dpi_application_traffic_bytes":
+		appendIdentity("family_id")
+		appendIdentity("application_id")
+		if strings.TrimSpace(labels["application_id"]) == "" {
+			appendIdentity("application_name")
+		}
+	}
+
+	vpnID := strings.TrimSpace(labels["vpn_id"])
+	if vpnID != "" && (metricName == "omada_vpn_status" || strings.HasPrefix(metricName, "omada_site_to_site_vpn_")) {
+		appendIdentity("vpn_id")
+		if strings.HasPrefix(metricName, "omada_site_to_site_vpn_peer_") {
+			if strings.TrimSpace(labels["peer_id"]) != "" {
+				appendIdentity("peer_id")
+			} else {
+				appendIdentity("peer_name")
+				appendIdentity("remote_ip")
 			}
 		}
+		return parts
 	}
 
-	return slug(strings.Join(stable, "_")) + "_" + shortHash(stable)
+	if strings.HasPrefix(metricName, "omada_vpn_") && vpnID == "" {
+		for _, key := range []string{"name", "interface_name", "vpn_mode", "vpn_type"} {
+			appendIdentity(key)
+		}
+		return parts
+	}
+
+	if !hasOwner && len(parts) == 1 {
+		for _, key := range []string{"interface_name", "connection_mode", "wifi_mode", "name"} {
+			appendIdentity(key)
+		}
+	}
+
+	return parts
 }
 
 // shortHash returns a short hash for the provided values.
@@ -711,7 +1287,7 @@ func normalizeBroker(broker string) string {
 
 // deviceInfo builds Home Assistant device metadata for a metric.
 func deviceInfo(client *api.Client, metricName string, labels map[string]string) map[string]any {
-	if strings.HasPrefix(metricName, "omada_client_") && labels["mac"] != "" {
+	if strings.HasPrefix(metricName, "omada_client_") && labels["mac"] != "" && labels["device_mac"] == "" {
 		device := map[string]any{
 			"identifiers":  []string{"omada_client_" + trackerID(labels["mac"])},
 			"name":         clientName(labels),
@@ -890,13 +1466,28 @@ func buildPublishContext(families []*dto.MetricFamily) publishContext {
 	modeTypeNameIDs := map[string]string{}
 	nameCounts := map[string]int{}
 	nameIDs := map[string]string{}
+	infrastructureByMAC := map[string]map[string]string{}
 
 	for _, family := range families {
-		if family.GetName() != "omada_vpn_status" {
-			continue
-		}
 		for _, metric := range family.Metric {
 			labels := metricLabels(metric)
+			if (strings.HasPrefix(family.GetName(), "omada_controller_") || strings.HasPrefix(family.GetName(), "omada_device_")) && labels["device_mac"] != "" {
+				id := trackerID(labels["device_mac"])
+				existing := infrastructureByMAC[id]
+				if existing == nil {
+					existing = map[string]string{}
+					infrastructureByMAC[id] = existing
+				}
+				for key, value := range labels {
+					if value != "" {
+						existing[key] = value
+					}
+				}
+			}
+
+			if family.GetName() != "omada_vpn_status" {
+				continue
+			}
 			vpnID := strings.TrimSpace(labels["vpn_id"])
 			if vpnID == "" {
 				continue
@@ -919,6 +1510,7 @@ func buildPublishContext(families []*dto.MetricFamily) publishContext {
 	return publishContext{
 		vpnIDByModeTypeName: uniqueLookup(modeTypeNameCounts, modeTypeNameIDs),
 		vpnIDByName:         uniqueLookup(nameCounts, nameIDs),
+		infrastructureByMAC: infrastructureByMAC,
 	}
 }
 
@@ -935,6 +1527,16 @@ func uniqueLookup(counts map[string]int, values map[string]string) map[string]st
 
 // deviceLabels returns the labels used to identify the owning device for a metric.
 func deviceLabels(metricName string, labels map[string]string, ctx publishContext) map[string]string {
+	if strings.HasPrefix(metricName, "omada_client_") && labels["mac"] != "" {
+		if infrastructure := ctx.infrastructureByMAC[trackerID(labels["mac"])]; infrastructure != nil {
+			enriched := copyLabels(labels)
+			for key, value := range infrastructure {
+				enriched[key] = value
+			}
+			return enriched
+		}
+	}
+
 	if !strings.HasPrefix(metricName, "omada_vpn_") || labels["vpn_id"] != "" {
 		return labels
 	}

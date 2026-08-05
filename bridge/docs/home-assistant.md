@@ -85,18 +85,29 @@ unique_id = "omada_exporter_" + object_id
 
 Home Assistant uses the discovery `object_id` as the starting point for the final entity id, but users can rename entities and Home Assistant can add suffixes to avoid collisions. Treat `unique_id`, MQTT object id, and JSON attributes as the stable identifiers. Do not rely on the final `sensor.*` or `binary_sensor.*` entity id staying unchanged.
 
-The object id builder uses these labels first when present:
+The object id builder uses `site_id` when present, with `site` as its fallback,
+then exactly one owning hardware identifier:
 
 ```text
-site_id, site, device_mac, mac, gateway_mac,
-storage_name, upgrade_channel, port, lag_id
+device_mac | mac | gateway_mac
 ```
 
-VPN metrics also include:
+Metric-specific stable subresources are added only where they identify a real
+series:
 
 ```text
-vpn_id, tunnel_id, peer_id
+controller storage: storage_name
+controller upgrades: upgrade_channel
+ports/WAN/ISP: port
+switch LAGs: lag_id
+VPNs/peers: vpn_id, peer_id
+client totals: connection_mode, wifi_mode
+DPI: family_id, application_id
 ```
+
+Client attachment properties such as gateway, switch, port, LAG, AP, SSID, and
+Wi-Fi mode are attributes, not entity identity. Moving a client updates the
+same entity.
 
 VPN state payloads also expose optional WireGuard/site-to-site details when the Omada API returns them:
 
@@ -105,11 +116,10 @@ local_ip, local_networks, remote_networks,
 allowed_ips, endpoint, endpoint_ip
 ```
 
-When there is no hardware identifier such as `device_mac`, `mac`, or `gateway_mac`, the builder may add:
+Legacy VPN metrics without an API VPN ID use stable tunnel descriptors such as:
 
 ```text
-interface_name, local_ip, remote_ip, connection_mode,
-wifi_mode, ssid, name, peer_name
+name, interface_name, vpn_mode, vpn_type
 ```
 
 Examples:
@@ -262,7 +272,21 @@ If a configured tracked MAC is not present in collected metrics, OmadaBridge pub
 
 Configured trackers still rely on per-client metrics to switch to `home` from Omada data, so keep `OMADA_TRACK_CLIENT_METRICS=true` when online/offline presence should update automatically.
 
-Attributes include Omada client labels such as IP, hostname, vendor, SSID, AP, switch, gateway, VLAN, RSSI, traffic, and attachment details when available.
+Attributes include Omada client labels such as IP, hostname, vendor, SSID, AP,
+switch, gateway, VLAN, RSSI, traffic, and attachment details when available.
+With `OMADA_MQTT_RETAIN=true`, they are retained and published only when the
+effective attribute payload changes. With retention disabled, they are replayed
+on each collection cycle so a restarted broker or Home Assistant MQTT consumer
+can rebuild the tracker metadata. Active trackers do not receive a polling
+timestamp. When a client changes from `home` to `not_home`, OmadaBridge
+publishes `last_seen` once with the time of the final successful observation.
+Configured clients additionally carry the stable `configured: true` attribute
+while offline. Tracker attributes do not contain `last_updated`.
+
+Presence continues to come exclusively from the `home`/`not_home` state topic.
+With retention enabled, OmadaBridge restores retained tracker states and
+attributes at startup, then marks a previously-home client `not_home` if it is
+absent from the first fresh collection.
 
 ## Entity Names
 
@@ -272,11 +296,16 @@ Metric entity names are generated from the metric name plus selected labels:
 2. Remaining words are title-cased.
 3. Qualifiers are appended when labels exist.
 
-Qualifier label order:
+Qualifiers are metric-specific:
 
 ```text
-storage_name, upgrade_channel, port, lag_id, name,
-connection_mode, wifi_mode, ssid
+controller storage: storage_name
+controller upgrades: upgrade_channel
+ports: port
+switch LAGs: lag_id
+WAN/ISP: port, name
+client totals: connection_mode, wifi_mode
+VPNs: name, peer_name
 ```
 
 Examples:
@@ -319,7 +348,8 @@ The bundled cards read Home Assistant entities, not OmadaBridge HTTP endpoints. 
 - entity attribute `metric` to classify metric entities
 - `device_mac`, `device_name`, `device_type`, model/version/status labels for infrastructure devices
 - `mac`, `ip`, `host_name`, `vendor`, `ssid`, `wifi_mode`, AP/switch/gateway labels for clients
-- `port`, `lag_id`, and LAG attributes for wired path details
+- client `port` and `lag_id` attributes for its parent wired path
+- `lag_id` and LAG metrics only on the owning switch/gateway
 - `omada_isp_*`, `omada_wan_*`, and `omada_vpn_*` metrics for link tables
 - `device_tracker` entities with a `mac` attribute for active client presence
 
@@ -360,17 +390,37 @@ No Home Assistant entities appear:
 - Subscribe to `homeassistant/#` and confirm retained discovery configs exist.
 - Subscribe to `omada_exporter/#` and confirm state topics exist.
 
-Entities are stale after renaming metrics or changing topic prefixes:
+Superseded retained entities:
 
 - MQTT retained discovery topics can keep old entities alive.
-- Clear old retained `homeassistant/+/omada_exporter/+/config` topics.
+- At startup OmadaBridge inventories its retained metric topics. It removes an
+  old discovery/state pair only when a current entity has the same metric,
+  owning identity, and matching site ID or site name.
+- When several retained entities represent that same current property, the
+  newest retained counterpart is reused as the canonical entity. Its Home
+  Assistant identity and history are preserved while older copies are removed.
+- Records without a confirmed current counterpart are preserved. This prevents
+  transient API failures or offline clients from causing broad deletion.
+- Automatic reconciliation requires the MQTT account to subscribe to the
+  publisher's discovery and `entities/+/state` topics. If broker ACLs deny
+  those reads, publishing continues and cleanup is safely disabled with a log
+  warning.
+- Changing the MQTT discovery or state topic prefix moves the publisher outside
+  the old inventory scope; clear the old prefix manually in that case.
 - Reload the Home Assistant MQTT integration or restart Home Assistant.
 
 Client trackers stay `home`:
 
 - Confirm per-client collection is enabled.
 - Confirm the client has a MAC address in Omada data.
-- The bridge marks dynamic clients `not_home` only after they were previously seen by the same running publisher. Add long-lived clients to `OMADA_MQTT_TRACKED_CLIENT_MACS` when they should be published as `not_home` even if already offline.
+- With retained MQTT enabled, the bridge restores previously-home dynamic
+  tracker IDs at startup and marks absent clients `not_home` after the first
+  fresh publish. The MQTT account must be able to subscribe to the configured
+  `device_trackers/+/state` and `device_trackers/+/attributes` topics for this
+  restart recovery and attribute-cache restoration.
+- Add long-lived clients to `OMADA_MQTT_TRACKED_CLIENT_MACS` when their tracker
+  should be created as `not_home` even if the current publisher has never seen
+  them online.
 
 Cards show no data:
 

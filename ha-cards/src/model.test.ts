@@ -48,6 +48,28 @@ describe("buildDashboardModel", () => {
             name: "Offline client",
             site: "Default"
           }
+        },
+        "sensor.offline_traffic": {
+          entity_id: "sensor.offline_traffic",
+          state: "999999999999",
+          attributes: {
+            metric: "omada_client_traffic_down_bytes",
+            mac: "22:33:44:55:66:77",
+            name: "Offline client",
+            wireless: "false",
+            site: "Default"
+          }
+        },
+        "sensor.orphaned_client": {
+          entity_id: "sensor.orphaned_client",
+          state: "888888888888",
+          attributes: {
+            metric: "omada_client_traffic_up_bytes",
+            mac: "33:44:55:66:77:88",
+            name: "Retained client without a tracker",
+            wireless: "false",
+            site: "Default"
+          }
         }
       }
     };
@@ -168,5 +190,160 @@ describe("buildDashboardModel", () => {
     expect(peer ? vpnRemoteLabel(peer) : "").toBe("93.175.202.49");
     expect(peer ? vpnTotalBytes(peer) : 0).toBe(512);
     expect(peer ? vpnPeerLoginSeconds(peer) : 0).toBe(1773156000);
+  });
+
+  it("prefers current client attachment properties over stale retained entities", () => {
+    const hass: HomeAssistant = {
+      states: {
+        "device_tracker.current_client": {
+          entity_id: "device_tracker.current_client",
+          state: "home",
+          last_updated: "2026-07-19T10:00:00Z",
+          attributes: {
+            mac: "AA-BB-CC-DD-EE-FF",
+            name: "OC220",
+            wireless: "false",
+            site: "Default"
+          }
+        },
+        "sensor.current_client": {
+          entity_id: "sensor.current_client",
+          state: "200",
+          attributes: {
+            metric: "omada_client_traffic_down_bytes",
+            last_updated: "2026-07-19T10:00:00Z",
+            mac: "aa:bb:cc:dd:ee:ff",
+            name: "OC220",
+            wireless: "false",
+            switch_mac: "11:22:33:44:55:66",
+            switch_name: "Core Switch",
+            port: "1",
+            lag_id: "",
+            site: "Default"
+          }
+        },
+        "sensor.stale_client": {
+          entity_id: "sensor.stale_client",
+          state: "100",
+          attributes: {
+            metric: "omada_client_traffic_down_bytes",
+            last_updated: "2026-07-14T10:00:00Z",
+            mac: "aa:bb:cc:dd:ee:ff",
+            name: "OC220",
+            wireless: "false",
+            switch_mac: "11:22:33:44:55:66",
+            switch_name: "Core Switch",
+            port: "8",
+            lag_id: "3",
+            wifi_mode: "802.11a",
+            site: "Default"
+          }
+        }
+      }
+    };
+
+    const model = buildDashboardModel(hass, "Default");
+    const client = model.clients[0];
+
+    expect(client?.attachmentPort).toBe("1");
+    expect(client?.attachmentLagId).toBe("");
+    expect(client?.wifiMode).toBe("");
+    expect(client?.metrics.omada_client_traffic_down_bytes).toBe(200);
+  });
+
+  it("keeps switch LAG metrics owned by the switch attachment", () => {
+    const hass: HomeAssistant = {
+      states: {
+        "device_tracker.server": {
+          entity_id: "device_tracker.server",
+          state: "home",
+          last_updated: "2026-07-19T10:00:00Z",
+          attributes: {
+            mac: "aa:bb:cc:dd:ee:ff",
+            name: "Server",
+            wireless: "false",
+            site: "Default"
+          }
+        },
+        "sensor.client": {
+          entity_id: "sensor.client",
+          state: "200",
+          attributes: {
+            metric: "omada_client_traffic_down_bytes",
+            last_updated: "2026-07-19T10:00:00Z",
+            mac: "aa:bb:cc:dd:ee:ff",
+            name: "Server",
+            wireless: "false",
+            switch_mac: "11:22:33:44:55:66",
+            switch_name: "Core Switch",
+            lag_id: "3",
+            site: "Default"
+          }
+        },
+        "sensor.lag_speed": {
+          entity_id: "sensor.lag_speed",
+          state: "2000",
+          attributes: {
+            metric: "omada_lag_link_speed_mbps",
+            last_updated: "2026-07-19T10:00:00Z",
+            device_mac: "11:22:33:44:55:66",
+            device_name: "Core Switch",
+            device_type: "switch",
+            lag_id: "3",
+            lag_ports: "7,8",
+            site: "Default"
+          }
+        }
+      }
+    };
+
+    const client = buildDashboardModel(hass, "Default").clients[0];
+    expect(client?.attachmentLagId).toBe("3");
+    expect(client?.attachmentLagPorts).toBe("7,8");
+    expect(client?.attachmentLinkSpeedMbps).toBe(2000);
+    expect(client?.metrics.omada_lag_link_speed_mbps).toBeUndefined();
+    expect(client?.attrs.lag_ports).toBeUndefined();
+  });
+
+  it("does not copy stale client attachment labels onto a controller", () => {
+    const hass: HomeAssistant = {
+      states: {
+        "sensor.controller": {
+          entity_id: "sensor.controller",
+          state: "120",
+          attributes: {
+            metric: "omada_controller_uptime_seconds",
+            last_updated: "2026-07-19T10:00:00Z",
+            device_mac: "aa:bb:cc:dd:ee:ff",
+            device_name: "OC220",
+            device_model: "OC220",
+            site: "Default"
+          }
+        },
+        "sensor.stale_controller_client": {
+          entity_id: "sensor.stale_controller_client",
+          state: "100",
+          attributes: {
+            metric: "omada_client_traffic_down_bytes",
+            last_updated: "2026-07-14T10:00:00Z",
+            mac: "aa:bb:cc:dd:ee:ff",
+            name: "OC220",
+            device_type: "controller",
+            wireless: "false",
+            switch_mac: "11:22:33:44:55:66",
+            port: "8",
+            lag_id: "3",
+            wifi_mode: "802.11a",
+            site: "Default"
+          }
+        }
+      }
+    };
+
+    const model = buildDashboardModel(hass, "Default");
+    expect(model.devices).toHaveLength(1);
+    expect(model.clients).toHaveLength(0);
+    expect(model.devices[0]?.attrs.lag_id).toBeUndefined();
+    expect(model.devices[0]?.attrs.wifi_mode).toBeUndefined();
   });
 });

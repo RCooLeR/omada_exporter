@@ -81,7 +81,10 @@ export interface ClientRecord {
   switchName: string;
   gatewayMac: string;
   gatewayName: string;
-  port: string;
+  attachmentPort: string;
+  attachmentLagId: string;
+  attachmentLagPorts: string;
+  attachmentLinkSpeedMbps?: number;
   ssid: string;
   vlanId: string;
   wifiMode: string;

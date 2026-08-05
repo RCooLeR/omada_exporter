@@ -50,20 +50,26 @@ device_mac + band/radio labels
 
 ## Client Records
 
-Client rows are built from:
-
-- metric entities starting with `omada_client_`
-- `device_tracker` entities with a `mac` attribute and state not equal to `not_home`
+Client rows require a `device_tracker` entity with a `mac` attribute whose
+current state is exactly `home`. Metric entities starting with
+`omada_client_` enrich those active rows with traffic, signal, and attachment
+data. Retained metric entities never create a client by themselves, so clients
+that are `not_home`, unavailable, or missing a tracker are not shown.
 
 Important attributes:
 
 ```text
 mac, ip, vendor, host_name, system_name, device_category,
 device_type, wireless, ap_mac, ap_name, switch_mac, switch_name,
-gateway_mac, gateway_name, port, lag_id, ssid, vlan_id, wifi_mode, site
+gateway_mac, gateway_name, port, lag_id,
+ssid, vlan_id, wifi_mode, site
 ```
 
-Wired client path data is enriched from port and LAG metrics when `switch_mac` or `gateway_mac` plus `port` or `lag_id` match an existing port/LAG record.
+Wired client path data references port and LAG metrics when `switch_mac` or
+`gateway_mac` plus `port` or `lag_id` match an existing
+parent port/LAG record. The card copies only attachment display values such as
+link speed and LAG member ports; switch-owned LAG attributes and metrics remain
+on the switch.
 
 ## ISP, WAN, And VPN Tables
 

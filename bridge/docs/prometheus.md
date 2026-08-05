@@ -167,6 +167,11 @@ gateway_mac, gateway_name, switch_mac, switch_name, port, lag_id,
 wireless, ap_mac, ap_name, wifi_mode, ssid, site, site_id
 ```
 
+For client metrics, `port` and `lag_id` identify the attachment on the parent
+switch/gateway; they are not capabilities owned by the client. Empty or zero
+LAG values are exported as an empty label. Wired clients have empty AP, SSID,
+and Wi-Fi-mode labels.
+
 ## Query Examples
 
 Connected clients:

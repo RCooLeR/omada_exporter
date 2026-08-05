@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -109,6 +110,10 @@ func (s *NetworkClient) GetName() string {
 
 // GetWifiMode maps the Wi-Fi mode code to a readable 802.11 standard label.
 func (c *NetworkClient) GetWifiMode() string {
+	if !c.Wireless {
+		return ""
+	}
+
 	mapping := map[int8]string{
 		0: "802.11a",
 		1: "802.11b",
@@ -126,6 +131,24 @@ func (c *NetworkClient) GetWifiMode() string {
 		return ""
 	}
 	return formatted
+}
+
+// GetAttachmentPort returns the physical switch/gateway port used by a wired
+// client. Port zero is Omada's missing/not-applicable value.
+func (c *NetworkClient) GetAttachmentPort() string {
+	if c.Wireless || c.Port <= 0 {
+		return ""
+	}
+	return strconv.Itoa(int(c.Port))
+}
+
+// GetAttachmentLagID returns the LAG on the parent switch/gateway used by a
+// wired client. The LAG belongs to that parent device, not to the client.
+func (c *NetworkClient) GetAttachmentLagID() string {
+	if c.Wireless || c.LagId <= 0 {
+		return ""
+	}
+	return strconv.Itoa(int(c.LagId))
 }
 
 // GetConnectType maps the connection type code to a wired or wireless client label.

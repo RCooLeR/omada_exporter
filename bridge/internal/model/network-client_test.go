@@ -31,10 +31,39 @@ func TestNetworkClientUnmarshalAcceptsFusionCamelCaseFields(t *testing.T) {
 	if client.WifiMode != 9 {
 		t.Fatalf("WifiMode = %d, want 9", client.WifiMode)
 	}
-	if got := client.GetWifiMode(); got != "802.11bea" {
-		t.Fatalf("GetWifiMode() = %q, want 802.11bea", got)
+	if got := client.GetWifiMode(); got != "" {
+		t.Fatalf("GetWifiMode() = %q for wired client, want empty", got)
 	}
 	if client.GatewayMac != "11-22-33-44-55-66" {
 		t.Fatalf("GatewayMac = %q, want Fusion gateway MAC", client.GatewayMac)
+	}
+}
+
+func TestNetworkClientAttachmentAndWirelessLabels(t *testing.T) {
+	wired := NetworkClient{Port: 1, LagId: 0, WifiMode: 0}
+	if got := wired.GetAttachmentPort(); got != "1" {
+		t.Fatalf("GetAttachmentPort() = %q, want 1", got)
+	}
+	if got := wired.GetAttachmentLagID(); got != "" {
+		t.Fatalf("GetAttachmentLagID() = %q, want empty", got)
+	}
+	if got := wired.GetWifiMode(); got != "" {
+		t.Fatalf("GetWifiMode() = %q for wired client, want empty", got)
+	}
+
+	lagged := NetworkClient{Port: 8, LagId: 3}
+	if got := lagged.GetAttachmentLagID(); got != "3" {
+		t.Fatalf("GetAttachmentLagID() = %q, want 3", got)
+	}
+
+	wireless := NetworkClient{Wireless: true, Port: 1, LagId: 3, WifiMode: 9}
+	if got := wireless.GetWifiMode(); got != "802.11bea" {
+		t.Fatalf("GetWifiMode() = %q, want 802.11bea", got)
+	}
+	if got := wireless.GetAttachmentPort(); got != "" {
+		t.Fatalf("GetAttachmentPort() = %q for wireless client, want empty", got)
+	}
+	if got := wireless.GetAttachmentLagID(); got != "" {
+		t.Fatalf("GetAttachmentLagID() = %q for wireless client, want empty", got)
 	}
 }

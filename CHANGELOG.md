@@ -1,5 +1,23 @@
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-05
+
+### Changed
+- Treat client `port` and `lag_id` labels as attachment metadata; LAG ownership remains with the parent switch/gateway.
+- Use metric-specific Home Assistant MQTT identities so mutable client topology, gateway, site display names, and Wi-Fi properties do not create duplicate entities.
+- Publish client tracker attributes only when labels or presence metadata change; `last_seen` is emitted once when a client leaves instead of being refreshed on every collection interval.
+
+### Fixed
+- Show only clients whose Home Assistant device tracker is currently `home`; retained client metrics no longer recreate inactive rows or display their stale traffic values, and retained tracker inventory now lets a restarted publisher mark absent clients `not_home`.
+- Stop labelling wired clients as `802.11a` or `LAG 0`, and clear wireless-only AP/SSID properties from wired clients.
+- Prevent Omada infrastructure devices that also appear in the active-client feed from creating duplicate client trackers/devices.
+- Keep switch LAG metrics owned by switches in the Home Assistant card instead of merging them into clients/controllers.
+- Give each DPI category and application its own MQTT entity identity.
+- Reconcile retained MQTT records only when a current semantic counterpart confirms that the old record was superseded; unrelated or unconfirmed records are preserved.
+- Reuse the newest retained counterpart during MQTT identity migration so existing Home Assistant entity IDs, history, automations, and customizations remain attached.
+- Retry superseded retained-entity cleanup when either MQTT tombstone publish fails instead of forgetting partially removed records.
+- Replay tracker attributes on each discovery cycle when MQTT retention is disabled, so Home Assistant and broker restarts do not lose client metadata.
+
 ## [2.3.2] - 2026-07-10
 ### Added
 - Expose optional VPN detail labels from Omada OpenAPI responses, including local IP, local/remote networks, allowed IPs, endpoint, and endpoint IP.

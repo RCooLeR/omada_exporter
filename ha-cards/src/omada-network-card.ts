@@ -716,7 +716,7 @@ export class OmadaNetworkCard extends LitElement {
                 <div class="row-top">
                   <div>
                     <div class="row-title">${client.name}</div>
-                    <div class="row-subtitle">${attachment}${client.port && !client.wireless ? ` · port ${client.port}` : ""}</div>
+                    <div class="row-subtitle">${attachment}${client.attachmentPort && !client.wireless ? ` · port ${client.attachmentPort}` : ""}</div>
                   </div>
                   <div class="metric-tag">${client.wireless ? "Wireless" : "Wired"}</div>
                 </div>
@@ -850,7 +850,7 @@ export class OmadaNetworkCard extends LitElement {
                       <td class="col-name" title=${client.name}>${client.name}</td>
                       <td class="col-ip" title=${client.ip || "-"}>${client.ip || "-"}</td>
                       <td class="col-signal">${client.wireless ? formatPercent(client.metrics.omada_client_signal_pct ?? 0) : "-"}</td>
-                      <td class="col-path" title=${client.wireless ? clientMeta.bandLabel : (client.port || "-")}>${client.wireless ? clientMeta.bandLabel : (client.port || "-")}</td>
+                      <td class="col-path" title=${client.wireless ? clientMeta.bandLabel : clientMeta.wiredPathLabel}>${client.wireless ? clientMeta.bandLabel : clientMeta.wiredPathLabel}</td>
                     </tr>
                   `;})}
                 </tbody>
@@ -932,7 +932,7 @@ export class OmadaNetworkCard extends LitElement {
                 ${client.wireless ? this.attributeRow("SSID", client.ssid) : nothing}
                 ${client.wireless ? this.attributeRow("AP", client.apName) : this.attributeRow("Switch", client.switchName)}
                 ${client.wireless ? this.attributeRow("Band", meta.bandLabel) : this.attributeRow("Gateway", client.gatewayName)}
-                ${!client.wireless ? this.attributeRow("Port", client.port) : nothing}
+                ${!client.wireless ? this.attributeRow("Attachment port", client.attachmentPort) : nothing}
               </tbody></table>
             </div>
           </div>
@@ -1088,25 +1088,23 @@ export class OmadaNetworkCard extends LitElement {
   }
 
   private wiredPathLabel(client: ClientRecord): string {
-    const lagId = String(client.attrs.lag_id ?? "").trim();
+    const lagId = client.attachmentLagId;
     if (lagId && lagId !== "0") {
-      return `LAG ${lagId}`;
+      const parent = client.switchName || client.gatewayName || "parent device";
+      return `${parent} / LAG ${lagId}`;
     }
 
-    return client.port ? `Port ${client.port}` : "-";
+    return client.attachmentPort ? `Port ${client.attachmentPort}` : "-";
   }
 
   private wiredLagPorts(client: ClientRecord): string {
-    const lagPorts = String(client.attrs.lag_ports ?? "").trim();
-    return lagPorts || "";
+    return client.attachmentLagPorts;
   }
 
   private wiredClientLinkSpeed(client: ClientRecord): string {
-    const lagId = String(client.attrs.lag_id ?? "").trim();
+    const lagId = client.attachmentLagId;
     if (lagId && lagId !== "0") {
-      const lagSpeed =
-        client.metrics.omada_lag_link_speed_mbps ??
-        Number(client.attrs.link_speed ?? client.attrs.max_speed ?? 0);
+      const lagSpeed = client.attachmentLinkSpeedMbps ?? 0;
       return formatSpeedMbps(lagSpeed);
     }
 
@@ -1127,11 +1125,11 @@ export class OmadaNetworkCard extends LitElement {
     }
 
     const deviceMac = client.switchMac || client.gatewayMac;
-    if (!deviceMac || !client.port) {
+    if (!deviceMac || !client.attachmentPort) {
       return undefined;
     }
 
-    return this._model.portByDeviceMacAndPort.get(`${deviceMac}:${client.port}`);
+    return this._model.portByDeviceMacAndPort.get(`${deviceMac}:${client.attachmentPort}`);
   }
 
   private clientLiveRate(client: ClientRecord): number {
@@ -1524,12 +1522,13 @@ export class OmadaNetworkCard extends LitElement {
   }
 
   private wiredConnectionLabel(client: ClientRecord): string {
-    const lagId = String(client.attrs.lag_id ?? "").trim();
+    const lagId = client.attachmentLagId;
     if (lagId && lagId !== "0") {
-      return `Wired via LAG ${lagId}`;
+      const parent = client.switchName || client.gatewayName || "parent device";
+      return `Wired via ${parent} LAG ${lagId}`;
     }
 
-    if (client.port && client.port !== "0") {
+    if (client.attachmentPort && client.attachmentPort !== "0") {
       return "Wired";
     }
 

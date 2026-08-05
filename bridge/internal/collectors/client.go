@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
+	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
 	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,6 +27,56 @@ type clientCollector struct {
 }
 
 const clientNegotiationRateBitsPerKbit = 1000
+
+// clientMetricLabels converts Omada's mixed client/topology response into
+// unambiguous metric labels. Port and LAG values describe the client's parent
+// attachment and never describe capabilities owned by the client itself.
+func clientMetricLabels(item model.NetworkClient, site, siteID string) []string {
+	switchMac := item.SwitchMac
+	switchName := item.SwitchName
+	attachmentPort := item.GetAttachmentPort()
+	attachmentLagID := item.GetAttachmentLagID()
+	apMac := ""
+	apName := ""
+	wifiMode := ""
+	ssid := ""
+
+	if item.Wireless {
+		switchMac = ""
+		switchName = ""
+		apMac = item.ApMac
+		apName = item.ApName
+		wifiMode = item.GetWifiMode()
+		ssid = item.Ssid
+	}
+
+	return []string{
+		item.Mac,
+		item.Ip,
+		fmt.Sprintf("%d", item.VlanId),
+		item.GetConnectType(),
+		item.GetName(),
+		item.SystemName,
+		item.HostName,
+		item.DeviceType,
+		item.DeviceCategory,
+		item.Vendor,
+		item.ConnectDevType,
+		item.GatewayMac,
+		item.GatewayName,
+		switchMac,
+		switchName,
+		attachmentPort,
+		attachmentLagID,
+		bools.ToString(item.Wireless),
+		apMac,
+		apName,
+		wifiMode,
+		ssid,
+		site,
+		siteID,
+	}
+}
 
 // Describe sends the collector metric descriptors to Prometheus.
 func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -63,32 +114,7 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 	totals := map[string]int{}
 
 	for _, item := range clients {
-		labels := []string{
-			item.Mac,
-			item.Ip,
-			fmt.Sprintf("%d", item.VlanId),
-			item.GetConnectType(),
-			item.GetName(),
-			item.SystemName,
-			item.HostName,
-			item.DeviceType,
-			item.DeviceCategory,
-			item.Vendor,
-			item.ConnectDevType,
-			item.GatewayMac,
-			item.GatewayName,
-			item.SwitchMac,
-			item.SwitchName,
-			fmt.Sprintf("%d", item.Port),
-			fmt.Sprintf("%d", item.LagId),
-			bools.ToString(item.Wireless),
-			item.ApMac,
-			item.ApName,
-			item.GetWifiMode(),
-			item.Ssid,
-			site,
-			client.SiteId,
-		}
+		labels := clientMetricLabels(item, site, client.SiteId)
 
 		if c.trackClientMetrics() {
 			ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficDown, prometheus.CounterValue, item.TrafficDown, labels...)

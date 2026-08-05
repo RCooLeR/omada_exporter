@@ -12,6 +12,44 @@ import type {
 import { toNumber } from "./format";
 
 const dashboardModelCache = new WeakMap<HomeAssistant["states"], Map<string, DashboardModel>>();
+const recordUpdatedAt = new WeakMap<object, number>();
+const metricUpdatedAt = new WeakMap<object, Map<string, number>>();
+
+function entityObservedAt(entity: HassEntity): number {
+  const value = String(entity.attributes.last_updated ?? entity.last_updated ?? "").trim();
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isLatestRecord(record: object, entity: HassEntity): boolean {
+  const observedAt = entityObservedAt(entity);
+  const previous = recordUpdatedAt.get(record) ?? -1;
+  if (observedAt < previous) {
+    return false;
+  }
+  recordUpdatedAt.set(record, observedAt);
+  return true;
+}
+
+function setLatestMetric(
+  record: { metrics: Record<string, number> },
+  metric: string,
+  value: number,
+  entity: HassEntity
+): void {
+  let timestamps = metricUpdatedAt.get(record);
+  if (!timestamps) {
+    timestamps = new Map<string, number>();
+    metricUpdatedAt.set(record, timestamps);
+  }
+
+  const observedAt = entityObservedAt(entity);
+  if (observedAt < (timestamps.get(metric) ?? -1)) {
+    return;
+  }
+  timestamps.set(metric, observedAt);
+  record.metrics[metric] = value;
+}
 
 function getMetric(entity: HassEntity): string {
   return String(entity.attributes.metric ?? "");
@@ -39,6 +77,16 @@ function firstString(entity: HassEntity, ...keys: string[]): string {
 
 function isClientTrackerEntity(entity: HassEntity): boolean {
   return entity.entity_id.startsWith("device_tracker.") && attrString(entity, "mac") !== "";
+}
+
+function clientMacKey(mac: string): string {
+  const normalized = mac.trim().toLowerCase();
+  const compact = normalized.replace(/[^0-9a-f]/g, "");
+  return compact.length === 12 ? compact : normalized;
+}
+
+function isActiveClientTracker(entity: HassEntity): boolean {
+  return isClientTrackerEntity(entity) && entity.state.trim().toLowerCase() === "home";
 }
 
 function isControllerEntity(entity: HassEntity): boolean {
@@ -209,19 +257,25 @@ function ensureDevice(map: Map<string, DeviceRecord>, entity: HassEntity): Devic
     map.set(key, existing);
   }
 
-  existing.name ||= attrString(entity, "device_name") || "Unnamed device";
-  existing.type ||= attrString(entity, "device_type") || "device";
-  existing.model ||= attrString(entity, "device_model") || attrString(entity, "device_show_model");
-  existing.status ||= attrString(entity, "device_status");
-  existing.ip ||= attrString(entity, "device_ip");
-  existing.version ||= attrString(entity, "device_version");
-  existing.site ||= attrString(entity, "site");
-  existing.attrs = { ...existing.attrs, ...entity.attributes };
+  if (isLatestRecord(existing, entity)) {
+    existing.name = attrString(entity, "device_name") || existing.name || "Unnamed device";
+    existing.type = attrString(entity, "device_type") || existing.type || "device";
+    existing.model = attrString(entity, "device_model") || attrString(entity, "device_show_model") || existing.model;
+    existing.status = attrString(entity, "device_status") || existing.status;
+    existing.ip = attrString(entity, "device_ip") || existing.ip;
+    existing.version = attrString(entity, "device_version") || existing.version;
+    existing.site = attrString(entity, "site") || existing.site;
+    existing.attrs = { ...entity.attributes };
+  }
 
   return existing;
 }
 
-function ensureControllerDevice(map: Map<string, DeviceRecord>, entity: HassEntity): DeviceRecord {
+function ensureControllerDevice(
+  map: Map<string, DeviceRecord>,
+  entity: HassEntity,
+  includeEntityAttributes = true
+): DeviceRecord {
   const mac = firstString(entity, "device_mac", "mac");
   const key = mac || firstString(entity, "device_name", "name") || entity.entity_id;
   let existing = map.get(key);
@@ -237,7 +291,7 @@ function ensureControllerDevice(map: Map<string, DeviceRecord>, entity: HassEnti
       mac,
       version: firstString(entity, "device_version"),
       site: attrString(entity, "site"),
-      attrs: { ...entity.attributes },
+      attrs: includeEntityAttributes ? { ...entity.attributes } : {},
       metrics: {},
       ports: [],
       radios: [],
@@ -246,15 +300,19 @@ function ensureControllerDevice(map: Map<string, DeviceRecord>, entity: HassEnti
     map.set(key, existing);
   }
 
-  existing.name ||= firstString(entity, "device_name", "name") || "Omada Controller";
-  existing.type = "controller";
-  existing.model ||= firstString(entity, "device_model", "device_show_model", "device_type") || "Controller";
-  existing.status ||= firstString(entity, "device_status");
-  existing.ip ||= firstString(entity, "device_ip", "ip");
-  existing.mac ||= mac;
-  existing.version ||= firstString(entity, "device_version");
-  existing.site ||= attrString(entity, "site");
-  existing.attrs = { ...existing.attrs, ...entity.attributes };
+  if (isLatestRecord(existing, entity)) {
+    existing.name = firstString(entity, "device_name", "name") || existing.name || "Omada Controller";
+    existing.type = "controller";
+    existing.model = firstString(entity, "device_model", "device_show_model", "device_type") || existing.model || "Controller";
+    existing.status = firstString(entity, "device_status") || existing.status;
+    existing.ip = firstString(entity, "device_ip", "ip") || existing.ip;
+    existing.mac = mac || existing.mac;
+    existing.version = firstString(entity, "device_version") || existing.version;
+    existing.site = attrString(entity, "site") || existing.site;
+    if (includeEntityAttributes) {
+      existing.attrs = { ...entity.attributes };
+    }
+  }
 
   if (!existing.status) {
     existing.status = entity.state === "not_home" ? "Disconnected" : "Connected";
@@ -266,7 +324,7 @@ function ensureControllerDevice(map: Map<string, DeviceRecord>, entity: HassEnti
 function ensurePort(map: Map<string, PortRecord>, entity: HassEntity): PortRecord {
   const deviceMac = attrString(entity, "device_mac");
   const port = attrString(entity, "port");
-  const key = `${deviceMac}:${port}:${attrString(entity, "name")}`;
+  const key = `${deviceMac}:${port}`;
   let existing = map.get(key);
 
   if (!existing) {
@@ -286,19 +344,21 @@ function ensurePort(map: Map<string, PortRecord>, entity: HassEntity): PortRecor
     map.set(key, existing);
   }
 
-  existing.name ||= attrString(entity, "name") || `Port ${port}`;
-  existing.kind ||= attrString(entity, "type");
-  existing.operation ||= attrString(entity, "operation");
-  existing.status ||= attrString(entity, "link_status");
-  existing.poe ||= attrString(entity, "poe") === "true";
-  existing.attrs = { ...existing.attrs, ...entity.attributes };
+  if (isLatestRecord(existing, entity)) {
+    existing.name = attrString(entity, "name") || `Port ${port}`;
+    existing.kind = attrString(entity, "type");
+    existing.operation = attrString(entity, "operation");
+    existing.status = attrString(entity, "link_status");
+    existing.poe = attrString(entity, "poe") === "true";
+    existing.attrs = { ...entity.attributes };
+  }
 
   return existing;
 }
 
-function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity, source: "metric" | "tracker" = "metric"): ClientRecord {
+function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity): ClientRecord {
   const mac = attrString(entity, "mac");
-  const key = mac || attrString(entity, "name") || entity.entity_id;
+  const key = clientMacKey(mac) || attrString(entity, "name") || entity.entity_id;
   let existing = map.get(key);
 
   if (!existing) {
@@ -318,7 +378,9 @@ function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity, source
       switchName: attrString(entity, "switch_name"),
       gatewayMac: attrString(entity, "gateway_mac"),
       gatewayName: attrString(entity, "gateway_name"),
-      port: attrString(entity, "port"),
+      attachmentPort: attrString(entity, "port"),
+      attachmentLagId: firstString(entity, "lag_id", "lagId"),
+      attachmentLagPorts: "",
       ssid: attrString(entity, "ssid"),
       vlanId: attrString(entity, "vlan_id"),
       wifiMode: attrString(entity, "wifi_mode"),
@@ -329,37 +391,36 @@ function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity, source
     map.set(key, existing);
   }
 
-  if (source === "tracker") {
-    const trackerName = preferredClientName(entity);
-    if (trackerName) {
-      existing.name = trackerName;
-    }
-  } else {
-    existing.name ||= preferredClientName(entity);
+  if (isLatestRecord(existing, entity)) {
+    const trackerState = isClientTrackerEntity(entity) ? entity.state : existing.attrs.tracker_state;
+    const incomingName = preferredClientName(entity);
+    existing.name = incomingName || existing.name;
+    existing.ip = attrString(entity, "ip");
+    existing.vendor = attrString(entity, "vendor");
+    existing.hostName = attrString(entity, "host_name") || attrString(entity, "system_name");
+    existing.category = attrString(entity, "device_category");
+    existing.clientType = attrString(entity, "device_type");
+    existing.wireless = attrString(entity, "wireless") === "true";
+    existing.apMac = attrString(entity, "ap_mac");
+    existing.apName = attrString(entity, "ap_name");
+    existing.switchMac = attrString(entity, "switch_mac");
+    existing.switchName = attrString(entity, "switch_name");
+    existing.gatewayMac = attrString(entity, "gateway_mac");
+    existing.gatewayName = attrString(entity, "gateway_name");
+    existing.attachmentPort = attrString(entity, "port");
+    existing.attachmentLagId = firstString(entity, "lag_id", "lagId");
+    existing.attachmentLagPorts = "";
+    existing.attachmentLinkSpeedMbps = undefined;
+    existing.ssid = existing.wireless ? attrString(entity, "ssid") : "";
+    existing.vlanId = attrString(entity, "vlan_id");
+    existing.wifiMode = existing.wireless ? attrString(entity, "wifi_mode") : "";
+    existing.site = attrString(entity, "site");
+    existing.attrs = {
+      ...entity.attributes,
+      entity_id: entity.entity_id,
+      tracker_state: trackerState
+    };
   }
-  existing.ip ||= attrString(entity, "ip");
-  existing.vendor ||= attrString(entity, "vendor");
-  existing.hostName ||= attrString(entity, "host_name") || attrString(entity, "system_name");
-  existing.category ||= attrString(entity, "device_category");
-  existing.clientType ||= attrString(entity, "device_type");
-  existing.apMac ||= attrString(entity, "ap_mac");
-  existing.apName ||= attrString(entity, "ap_name");
-  existing.switchMac ||= attrString(entity, "switch_mac");
-  existing.switchName ||= attrString(entity, "switch_name");
-  existing.gatewayMac ||= attrString(entity, "gateway_mac");
-  existing.gatewayName ||= attrString(entity, "gateway_name");
-  existing.port ||= attrString(entity, "port");
-  existing.ssid ||= attrString(entity, "ssid");
-  existing.vlanId ||= attrString(entity, "vlan_id");
-  existing.wifiMode ||= attrString(entity, "wifi_mode");
-  existing.site ||= attrString(entity, "site");
-  existing.wireless ||= attrString(entity, "wireless") === "true";
-  existing.attrs = {
-    ...existing.attrs,
-    ...entity.attributes,
-    entity_id: entity.entity_id,
-    tracker_state: isClientTrackerEntity(entity) ? entity.state : existing.attrs.tracker_state
-  };
 
   return existing;
 }
@@ -478,13 +539,41 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   const ports = new Map<string, PortRecord>();
   const radios = new Map<string, RadioRecord>();
   const clients = new Map<string, ClientRecord>();
-  const lags = new Map<string, { attrs: Record<string, unknown>; metrics: Record<string, number> }>();
+  const lags = new Map<
+    string,
+    { attrs: Record<string, unknown>; metrics: Record<string, number>; updatedAt: number; metricUpdatedAt: Map<string, number> }
+  >();
   const isps = new Map<string, LinkRow>();
   const vpns = new Map<string, LinkRow>();
   const vpnPeers = new Map<string, LinkRow>();
   const wans = new Map<string, LinkRow>();
   const deviceByMac = new Map<string, DeviceRecord>();
   const portByDeviceMacAndPort = new Map<string, PortRecord>();
+  const infrastructureEntityByMac = new Map<string, HassEntity>();
+  const clientTrackerByMac = new Map<string, HassEntity>();
+
+  for (const entity of Object.values(hass.states)) {
+    if (!matchSite(entity, siteFilter)) {
+      continue;
+    }
+    if (isClientTrackerEntity(entity)) {
+      const mac = clientMacKey(attrString(entity, "mac"));
+      const previous = clientTrackerByMac.get(mac);
+      if (!previous || entityObservedAt(entity) >= entityObservedAt(previous)) {
+        clientTrackerByMac.set(mac, entity);
+      }
+      continue;
+    }
+    const metric = getMetric(entity);
+    const deviceMac = attrString(entity, "device_mac");
+    if (deviceMac && (metric.startsWith("omada_device_") || metric.startsWith("omada_controller_"))) {
+      const key = clientMacKey(deviceMac);
+      const previous = infrastructureEntityByMac.get(key);
+      if (!previous || entityObservedAt(entity) >= entityObservedAt(previous)) {
+        infrastructureEntityByMac.set(key, entity);
+      }
+    }
+  }
 
   for (const entity of Object.values(hass.states)) {
     if (!matchSite(entity, siteFilter)) {
@@ -492,20 +581,24 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (isClientTrackerEntity(entity)) {
-      // Offline configured trackers are useful to Home Assistant itself, but
-      // they should not appear as active clients on the dashboard.
-      if (entity.state === "not_home") {
+      const mac = clientMacKey(attrString(entity, "mac"));
+      // The latest tracker state is the source of truth for dashboard
+      // presence. Retained metric sensors can outlive the network session and
+      // must not recreate clients that are away or unavailable.
+      if (clientTrackerByMac.get(mac) !== entity || !isActiveClientTracker(entity) || infrastructureEntityByMac.has(mac)) {
         continue;
       }
 
-      ensureClient(clients, entity, "tracker");
+      ensureClient(clients, entity);
       continue;
     }
 
     const metric = getMetric(entity);
     if (!metric) {
-      if (looksLikeClientEntity(entity) && entity.state !== "not_home") {
-        ensureClient(clients, entity, "tracker");
+      const mac = clientMacKey(attrString(entity, "mac"));
+      const activeTracker = clientTrackerByMac.get(mac);
+      if (looksLikeClientEntity(entity) && activeTracker && isActiveClientTracker(activeTracker)) {
+        ensureClient(clients, entity);
       }
       continue;
     }
@@ -517,7 +610,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       if (device.mac) {
         deviceByMac.set(device.mac, device);
       }
-      device.metrics[metric] = value;
+      setLatestMetric(device, metric, value, entity);
       continue;
     }
 
@@ -526,14 +619,14 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       if (device.mac) {
         deviceByMac.set(device.mac, device);
       }
-      device.metrics[metric] = value;
+      setLatestMetric(device, metric, value, entity);
       continue;
     }
 
     if (metric.startsWith("omada_port_")) {
       const port = ensurePort(ports, entity);
       portByDeviceMacAndPort.set(`${port.deviceMac}:${port.port}`, port);
-      port.metrics[metric] = value;
+      setLatestMetric(port, metric, value, entity);
       continue;
     }
 
@@ -563,30 +656,55 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       const deviceMac = attrString(entity, "device_mac");
       const lagId = attrString(entity, "lag_id");
       const key = `${deviceMac}:${lagId}`;
-      const existing = lags.get(key) ?? { attrs: {}, metrics: {} };
-      existing.attrs = { ...existing.attrs, ...entity.attributes };
-      existing.metrics[metric] = value;
+      const observedAt = entityObservedAt(entity);
+      const existing =
+        lags.get(key) ?? { attrs: {}, metrics: {}, updatedAt: -1, metricUpdatedAt: new Map<string, number>() };
+      if (observedAt >= existing.updatedAt) {
+        existing.attrs = { ...entity.attributes };
+        existing.updatedAt = observedAt;
+      }
+      if (observedAt >= (existing.metricUpdatedAt.get(metric) ?? -1)) {
+        existing.metrics[metric] = value;
+        existing.metricUpdatedAt.set(metric, observedAt);
+      }
       lags.set(key, existing);
       continue;
     }
 
     if (metric.startsWith("omada_client_")) {
-      if (!attrString(entity, "mac") || metric === "omada_client_connected_total") {
+      const mac = clientMacKey(attrString(entity, "mac"));
+      if (!mac || metric === "omada_client_connected_total") {
+        continue;
+      }
+      const infrastructureEntity = infrastructureEntityByMac.get(mac);
+      if (infrastructureEntity) {
+        const infrastructureMetric = getMetric(infrastructureEntity);
+        const device = infrastructureMetric.startsWith("omada_controller_")
+          ? ensureControllerDevice(devices, infrastructureEntity)
+          : ensureDevice(devices, infrastructureEntity);
+        if (device.mac) {
+          deviceByMac.set(device.mac, device);
+        }
+        setLatestMetric(device, metric, value, entity);
         continue;
       }
       // Older exports can make controller client-like metrics look similar to
       // real client metrics. If the labels say "controller", keep the data on
       // the controller device row instead of showing a fake client.
       if (isControllerEntity(entity)) {
-        const controller = ensureControllerDevice(devices, entity);
+        const controller = ensureControllerDevice(devices, entity, false);
         if (controller.mac) {
           deviceByMac.set(controller.mac, controller);
         }
-        controller.metrics[metric] = value;
+        setLatestMetric(controller, metric, value, entity);
         continue;
       }
-      const client = ensureClient(clients, entity, "metric");
-      client.metrics[metric] = value;
+      const activeTracker = clientTrackerByMac.get(mac);
+      if (!activeTracker || !isActiveClientTracker(activeTracker)) {
+        continue;
+      }
+      const client = ensureClient(clients, entity);
+      setLatestMetric(client, metric, value, entity);
       continue;
     }
 
@@ -669,21 +787,22 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   }
 
   for (const client of clients.values()) {
-    // Link aggregation metrics belong to a LAG, while clients usually report
-    // only the parent device and lag_id. Merge the LAG attributes into the
-    // client so the UI can show the attachment accurately.
-    const lagId = String(client.attrs.lag_id ?? client.attrs.lagId ?? "").trim();
+    // LAG metrics remain owned by the parent switch/gateway. Copy only the
+    // small set of attachment display values; never merge switch metrics or
+    // attributes into the client itself.
+    const lagId = client.attachmentLagId;
     const lagDeviceMac = client.switchMac || client.gatewayMac;
     if (lagId && lagId !== "0" && lagDeviceMac) {
       const lag = lags.get(`${lagDeviceMac}:${lagId}`);
       if (lag) {
-        client.attrs = { ...client.attrs, ...lag.attrs };
-        client.metrics = { ...client.metrics, ...lag.metrics };
+        client.attachmentLagPorts = String(lag.attrs.lag_ports ?? "").trim();
+        const linkSpeed = lag.metrics.omada_lag_link_speed_mbps ?? Number(lag.attrs.link_speed ?? 0);
+        client.attachmentLinkSpeedMbps = Number.isFinite(linkSpeed) ? linkSpeed : undefined;
       }
     }
 
-    if (client.switchMac && client.port) {
-      const port = portByDeviceMacAndPort.get(`${client.switchMac}:${client.port}`);
+    if (client.switchMac && client.attachmentPort) {
+      const port = portByDeviceMacAndPort.get(`${client.switchMac}:${client.attachmentPort}`);
       if (port) {
         port.clients.push(client);
       }
