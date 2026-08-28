@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/hamqtt"
@@ -13,7 +15,17 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
+)
+
+const (
+	exporterReadHeaderTimeout   = 5 * time.Second
+	exporterReadTimeout         = 10 * time.Second
+	exporterIdleTimeout         = 60 * time.Second
+	exporterShutdownTimeout     = 10 * time.Second
+	exporterMQTTShutdownTimeout = 15 * time.Second
+	exporterMaxHeaderBytes      = 1 << 20
+	exporterMaxHeaderValueCount = 100
 )
 
 // healthState tracks exporter readiness for the health endpoints.
@@ -39,7 +51,21 @@ func (h *healthState) readyz(w http.ResponseWriter, _ *http.Request) {
 }
 
 // runExporter configures the exporter and starts the HTTP server.
-func runExporter(c *cli.Context) error {
+func runExporter(ctx context.Context, _ *cli.Command) error {
+	missing := make([]string, 0, 3)
+	if conf.Host == "" {
+		missing = append(missing, "host")
+	}
+	if conf.Username == "" {
+		missing = append(missing, "username")
+	}
+	if conf.Password == "" {
+		missing = append(missing, "password")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("required flags %q not set", strings.Join(missing, ", "))
+	}
+
 	// set log level
 	level, err := zerolog.ParseLevel(conf.LogLevel)
 	if err != nil {
@@ -84,13 +110,17 @@ func runExporter(c *cli.Context) error {
 		mux.Handle(fmt.Sprintf("/metrics/%s", name), promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	}
 
+	var publisherDone <-chan struct{}
 	if conf.MQTTEnabled {
 		publisher, err := hamqtt.NewPublisher(client, collectors)
 		if err != nil {
 			log.Error().Err(err).Msg("home assistant mqtt publisher disabled")
 		} else {
+			done := make(chan struct{})
+			publisherDone = done
 			go func() {
-				if err := publisher.Run(context.Background()); err != nil && err != context.Canceled {
+				defer close(done)
+				if err := publisher.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 					log.Error().Err(err).Msg("home assistant mqtt publisher stopped")
 				}
 			}()
@@ -110,7 +140,7 @@ func runExporter(c *cli.Context) error {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(fmt.Sprintf(`<html>
     <head>
-	<title>Omada exporter<</title>
+	<title>Omada exporter</title>
 	</head>
     	<body>
 			<h1>Omada exporter</h1>
@@ -152,10 +182,57 @@ func runExporter(c *cli.Context) error {
 	mux.Handle("/metrics", promhttp.Handler())
 	health.ready.Store(true)
 
-	err = http.ListenAndServe(fmt.Sprintf(":%s", conf.Port), mux)
-	if err != nil {
+	server := newExporterHTTPServer(fmt.Sprintf(":%s", conf.Port), mux)
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serveErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), exporterShutdownTimeout)
+		defer cancel()
+		shutdownErr := server.Shutdown(shutdownCtx)
+		waitForPublisher(publisherDone, exporterMQTTShutdownTimeout)
+		if shutdownErr != nil {
+			return fmt.Errorf("shut down exporter HTTP server: %w", shutdownErr)
+		}
+
+		err := <-serveErr
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
 		return err
 	}
+}
 
-	return nil
+func waitForPublisher(done <-chan struct{}, timeout time.Duration) {
+	if done == nil {
+		return
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-timer.C:
+		log.Warn().Dur("timeout", timeout).Msg("timed out waiting for MQTT publisher shutdown")
+	}
+}
+
+func newExporterHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:                addr,
+		Handler:             handler,
+		ReadHeaderTimeout:   exporterReadHeaderTimeout,
+		ReadTimeout:         exporterReadTimeout,
+		IdleTimeout:         exporterIdleTimeout,
+		MaxHeaderBytes:      exporterMaxHeaderBytes,
+		MaxHeaderValueCount: exporterMaxHeaderValueCount,
+	}
 }

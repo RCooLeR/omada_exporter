@@ -50,7 +50,7 @@ func siteToSiteVpnTypeString(siteVpnType int8) string {
 func parseUptimeSeconds(uptime string) int64 {
 	var totalSeconds int64
 
-	for _, part := range strings.Fields(uptime) {
+	for part := range strings.FieldsSeq(uptime) {
 		value, unit, ok := splitNumericSuffix(part)
 		if !ok {
 			continue

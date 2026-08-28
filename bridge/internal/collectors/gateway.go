@@ -2,9 +2,9 @@ package collector
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -56,7 +56,7 @@ func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *m
 				port.Operation,
 				port.GetLinkStatus(),
 				fmt.Sprintf("%d", port.GetLinkSpeed()),
-				bools.ToString(port.Poe),
+				strconv.FormatBool(port.Poe),
 				port.GetLinkSpeedLabel(),
 			)
 			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.LinkStatus), portLabels...)

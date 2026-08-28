@@ -2,8 +2,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   define: {
-    "process.env.NODE_ENV": JSON.stringify("production"),
-    "process.env": "{}"
+    "process.env.NODE_ENV": JSON.stringify("production")
   },
   build: {
     target: "es2022",
@@ -15,7 +14,7 @@ export default defineConfig({
       formats: ["es"],
       fileName: () => "omada-network-card.js"
     },
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         assetFileNames: "assets/[name]-[hash][extname]"
       }

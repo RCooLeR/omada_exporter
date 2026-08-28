@@ -1,0 +1,56 @@
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: deps(ci)
+
+  - package-ecosystem: docker
+    directory: /bridge
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    groups:
+      container-images:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: deps(docker)
+
+  - package-ecosystem: gomod
+    directory: /bridge
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    groups:
+      go-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: deps(go)
+
+  - package-ecosystem: npm
+    directory: /ha-cards
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    groups:
+      npm-production:
+        dependency-type: production
+      npm-development:
+        dependency-type: development
+    commit-message:
+      prefix: deps(npm)

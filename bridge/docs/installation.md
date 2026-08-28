@@ -8,8 +8,10 @@ OmadaBridge is distributed as the `rcooler/omada_exporter` Docker image and as t
 - Omada service user credentials for the controller Web API.
 - For standard Omada controllers, an Omada OpenAPI client id and secret are recommended for OpenAPI-backed WAN, ISP, VPN, and client data.
 - For Omada Fusion gateways, username/password credentials are enough; the bridge can use Fusion's web-session OpenAPI path.
-- Docker, Docker Compose, or a local Go toolchain.
+- Docker or Docker Compose, or Go 1.27+ for a local source build.
 - Optional: MQTT broker reachable by both OmadaBridge and Home Assistant.
+
+Published container tags are multi-platform and support both `linux/amd64` and `linux/arm64`.
 
 ## Omada Credentials
 

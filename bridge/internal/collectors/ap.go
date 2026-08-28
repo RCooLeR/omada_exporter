@@ -2,9 +2,9 @@ package collector
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -27,8 +27,8 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		c.webClient.SiteId,
 	}
 	labels := append(deviceLabels,
-		bools.ToString(ap.AnyPoeEnable),
-		bools.ToString(ap.WirelessLinked),
+		strconv.FormatBool(ap.AnyPoeEnable),
+		strconv.FormatBool(ap.WirelessLinked),
 		ap.WlanGroup,
 	)
 	if ap.Wp2GHz != nil {
@@ -97,7 +97,7 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 				"switching",
 				port.GetLinkStatus(),
 				fmt.Sprintf("%d", port.GetLinkSpeed()),
-				bools.ToString(port.Poe),
+				strconv.FormatBool(port.Poe),
 				port.GetLinkSpeedLabel(),
 			)
 			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.LinkStatus), portLabels...)

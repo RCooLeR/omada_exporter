@@ -59,16 +59,14 @@ func TestFetchCachedDeduplicatesConcurrentMisses(t *testing.T) {
 	}
 
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			value, err := FetchCached(client, "shared-key", fetch)
 			if err != nil {
 				errorsCh <- err
 				return
 			}
 			results <- value
-		}()
+		})
 	}
 	wg.Wait()
 	close(results)

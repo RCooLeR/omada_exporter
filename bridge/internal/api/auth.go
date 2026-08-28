@@ -78,9 +78,18 @@ func (c *Client) getCid() (string, error) {
 
 // Login authenticates the web session against the Omada controller.
 func (c *Client) Login() error {
-
 	url := fmt.Sprintf("%s/%s/api/v2/login", c.Config.Host, c.OmadaCID)
-	jsonStr := []byte(fmt.Sprintf(`{"username":"%s","password":"%s"}`, c.Config.Username, c.Config.Password))
+	jsonStr, err := json.Marshal(struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		Username: c.Config.Username,
+		Password: c.Config.Password,
+	})
+	if err != nil {
+		return fmt.Errorf("encode web login request: %w", err)
+	}
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 	if err != nil {
 		return err
@@ -116,9 +125,20 @@ func (c *Client) Login() error {
 
 // LoginOpenApi authenticates against the Omada Open API.
 func (c *Client) LoginOpenApi() error {
-
 	url := fmt.Sprintf("%s/openapi/authorize/token?grant_type=client_credentials", c.Config.Host)
-	jsonStr := []byte(fmt.Sprintf(`{"omadacId":"%s","client_id":"%s","client_secret":"%s"}`, c.OmadaCID, c.Config.ClientId, c.Config.SecretId))
+	jsonStr, err := json.Marshal(struct {
+		OmadaCID     string `json:"omadacId"`
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+	}{
+		OmadaCID:     c.OmadaCID,
+		ClientID:     c.Config.ClientId,
+		ClientSecret: c.Config.SecretId,
+	})
+	if err != nil {
+		return fmt.Errorf("encode OpenAPI login request: %w", err)
+	}
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
 	if err != nil {
 		return err

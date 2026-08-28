@@ -410,7 +410,7 @@ function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity): Clien
     existing.attachmentPort = attrString(entity, "port");
     existing.attachmentLagId = firstString(entity, "lag_id", "lagId");
     existing.attachmentLagPorts = "";
-    existing.attachmentLinkSpeedMbps = undefined;
+    delete existing.attachmentLinkSpeedMbps;
     existing.ssid = existing.wireless ? attrString(entity, "ssid") : "";
     existing.vlanId = attrString(entity, "vlan_id");
     existing.wifiMode = existing.wireless ? attrString(entity, "wifi_mode") : "";
@@ -797,7 +797,11 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       if (lag) {
         client.attachmentLagPorts = String(lag.attrs.lag_ports ?? "").trim();
         const linkSpeed = lag.metrics.omada_lag_link_speed_mbps ?? Number(lag.attrs.link_speed ?? 0);
-        client.attachmentLinkSpeedMbps = Number.isFinite(linkSpeed) ? linkSpeed : undefined;
+        if (Number.isFinite(linkSpeed)) {
+          client.attachmentLinkSpeedMbps = linkSpeed;
+        } else {
+          delete client.attachmentLinkSpeedMbps;
+        }
       }
     }
 

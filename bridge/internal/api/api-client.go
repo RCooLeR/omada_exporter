@@ -285,8 +285,7 @@ func redactError(err error) error {
 		return nil
 	}
 
-	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
+	if urlErr, ok := errors.AsType[*url.Error](err); ok {
 		redacted := *urlErr
 		redacted.URL = redactURLString(urlErr.URL)
 		return &redacted

@@ -4,7 +4,6 @@ import (
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/webapi"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -147,7 +146,7 @@ func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceUptimeSeconds, prometheus.GaugeValue, device.GetUptime(), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceCpuPercentage, prometheus.GaugeValue, device.GetCpuUtilization(), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceMemPercentage, prometheus.GaugeValue, device.GetMemUtilization(), labels...)
-	ch <- prometheus.MustNewConstMetric(c.omadaDeviceNeedUpgrade, prometheus.GaugeValue, bools.ToFloat64(device.GetNeedUpgrade()), labels...)
+	ch <- prometheus.MustNewConstMetric(c.omadaDeviceNeedUpgrade, prometheus.GaugeValue, boolFloat64(device.GetNeedUpgrade()), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceDownload, prometheus.CounterValue, device.GetDownload(), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceUpload, prometheus.CounterValue, device.GetUpload(), labels...)
 	return nil

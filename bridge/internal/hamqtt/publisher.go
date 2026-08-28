@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"regexp"
 	"sort"
@@ -266,9 +267,7 @@ func (p *Publisher) publishDiscovery(ent entity, metricType dto.MetricType) {
 			config["device_class"] = deviceClass
 		}
 	} else {
-		for k, v := range sensorHints(ent.MetricName, metricType) {
-			config[k] = v
-		}
+		maps.Copy(config, sensorHints(ent.MetricName, metricType))
 	}
 
 	if p.client.Config.MQTTExpireAfter > 0 && ent.Component == "sensor" {
@@ -483,9 +482,7 @@ func (p *Publisher) publishClientTrackerAttributes(tracker clientTracker, config
 
 func copyClientLastSeen(source map[string]time.Time) map[string]time.Time {
 	copy := make(map[string]time.Time, len(source))
-	for id, observedAt := range source {
-		copy[id] = observedAt
-	}
+	maps.Copy(copy, source)
 	return copy
 }
 
@@ -795,9 +792,7 @@ snapshotComplete:
 			}
 		}
 	}
-	for id, tracker := range retainedClientTrackers {
-		p.knownClients[id] = tracker
-	}
+	maps.Copy(p.knownClients, retainedClientTrackers)
 	p.retainedLoaded = true
 	p.mu.Unlock()
 	return nil
@@ -917,9 +912,7 @@ func (p *Publisher) reconcileSupersededEntities(current map[string]entity) {
 	}
 	loaded := p.retainedLoaded
 	knownDiscovery := make(map[string]string, len(p.retainedDiscovery))
-	for topic, stateTopic := range p.retainedDiscovery {
-		knownDiscovery[topic] = stateTopic
-	}
+	maps.Copy(knownDiscovery, p.retainedDiscovery)
 	knownStates := make(map[string]map[string]string, len(p.retainedStates))
 	for topic, labels := range p.retainedStates {
 		knownStates[topic] = copyLabels(labels)
@@ -1444,9 +1437,7 @@ func firstNonEmpty(values ...string) string {
 // copyLabels returns a shallow copy of a metric label map.
 func copyLabels(labels map[string]string) map[string]string {
 	copied := make(map[string]string, len(labels))
-	for key, value := range labels {
-		copied[key] = value
-	}
+	maps.Copy(copied, labels)
 	return copied
 }
 
@@ -1530,9 +1521,7 @@ func deviceLabels(metricName string, labels map[string]string, ctx publishContex
 	if strings.HasPrefix(metricName, "omada_client_") && labels["mac"] != "" {
 		if infrastructure := ctx.infrastructureByMAC[trackerID(labels["mac"])]; infrastructure != nil {
 			enriched := copyLabels(labels)
-			for key, value := range infrastructure {
-				enriched[key] = value
-			}
+			maps.Copy(enriched, infrastructure)
 			return enriched
 		}
 	}

@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.18.0/www/docs/static/schema.json
+
 version: 2
 
 project_name: omada-exporter
@@ -9,6 +11,9 @@ builds:
     binary: omada-exporter
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - linux
       - windows
@@ -22,6 +27,11 @@ builds:
 archives:
   - formats:
       - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+          - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -29,12 +39,17 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
+  algorithm: sha256
+
+docker_digest:
+  name_template: "digests.txt"
 
 release:
   github:
     owner: RCooLeR
     name: omada_exporter
   draft: false
+  prerelease: auto
 
 dockers_v2:
   - id: omada_exporter
@@ -46,6 +61,21 @@ dockers_v2:
       - rcooler/omada-exporter
     tags:
       - "{{ .Version }}"
-      - latest
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}{{ .Major }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
     platforms:
       - linux/amd64
+      - linux/arm64
+    sbom: true
+    annotations:
+      "index,manifest:org.opencontainers.image.created": "{{ .Date }}"
+      "index,manifest:org.opencontainers.image.description": "Prometheus exporter and Home Assistant bridge for TP-Link Omada controllers"
+      "index,manifest:org.opencontainers.image.licenses": MIT
+      "index,manifest:org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "index,manifest:org.opencontainers.image.source": "{{ .GitURL }}"
+      "index,manifest:org.opencontainers.image.title": "{{ .ProjectName }}"
+      "index,manifest:org.opencontainers.image.version": "{{ .Version }}"
+    flags:
+      - "--pull=true"
+      - "--provenance=mode=max"

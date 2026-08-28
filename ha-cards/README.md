@@ -17,8 +17,10 @@ It ships:
 
 ## Development
 
+Use Node.js 22.12 or newer (Node.js 24 LTS is recommended) and npm 11.
+
 ```bash
-npm install
+npm ci
 npm run typecheck
 npm test
 npm run build

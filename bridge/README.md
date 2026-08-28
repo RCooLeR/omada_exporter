@@ -14,6 +14,8 @@ This directory contains the Go bridge that reads TP-Link Omada Controller data a
 
 ## Local Development
 
+Go 1.27 or newer is required. Docker image builds use Docker Buildx.
+
 ```bash
 go test ./...
 go build .

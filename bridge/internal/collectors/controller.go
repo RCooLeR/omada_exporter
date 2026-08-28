@@ -2,10 +2,10 @@ package collector
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/webapi"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -59,7 +59,7 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 		fmt.Sprintf("%d", controller.DeviceCapacity.AdoptedOltNum),
 		fmt.Sprintf("%d", controller.DeviceCapacity.ApAndSwitchCapacity),
 		fmt.Sprintf("%d", controller.DeviceCapacity.AdoptedApAndSwitchNum),
-		bools.ToString(controller.DeviceCapacity.ShareApAndSwitchCapacity),
+		strconv.FormatBool(controller.DeviceCapacity.ShareApAndSwitchCapacity),
 		site,
 		client.SiteId,
 	}
@@ -81,7 +81,7 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	for _, u := range controller.UpgradeList {
 		upgradeLabels := append([]string{u.GetChannel(), u.LatestVersion}, labels...)
-		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageUpgradeAvailable, prometheus.GaugeValue, bools.ToFloat64(u.UpdateAvailable), upgradeLabels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaControllerStorageUpgradeAvailable, prometheus.GaugeValue, boolFloat64(u.UpdateAvailable), upgradeLabels...)
 	}
 
 }

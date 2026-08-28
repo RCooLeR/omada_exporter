@@ -11,12 +11,12 @@ declare global {
 }
 
 export class OmadaLinksCard extends LitElement {
-  static properties = {
+  static override properties = {
     hass: { attribute: false },
     _model: { state: true }
   };
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       --bg: linear-gradient(135deg, #08131d, #0b1d2f 42%, #10253a);
@@ -131,13 +131,13 @@ export class OmadaLinksCard extends LitElement {
     return 5;
   }
 
-  protected willUpdate(changed: Map<string, unknown>): void {
+  protected override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("hass") && this.hass) {
       this._model = getDashboardModel(this.hass, this._config?.site);
     }
   }
 
-  protected render() {
+  protected override render() {
     if (!this._config) {
       return html`<ha-card><div class="empty">Card is not configured.</div></ha-card>`;
     }

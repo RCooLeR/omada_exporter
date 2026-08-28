@@ -2,11 +2,11 @@ package collector
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -68,7 +68,7 @@ func clientMetricLabels(item model.NetworkClient, site, siteID string) []string 
 		switchName,
 		attachmentPort,
 		attachmentLagID,
-		bools.ToString(item.Wireless),
+		strconv.FormatBool(item.Wireless),
 		apMac,
 		apName,
 		wifiMode,

@@ -39,7 +39,7 @@ type Selection = { kind: "device"; key: string } | { kind: "client"; key: string
 type DeviceMeta = {
   pendingUpdate: boolean;
   updateTarget: string;
-  poeBudget?: { used: number; remaining: number; total: number };
+  poeBudget: { used: number; remaining: number; total: number } | undefined;
   poePortCount: number;
   connectedPorts: number;
   uplinkMbps: number;
@@ -74,7 +74,7 @@ declare global {
 }
 
 export class OmadaNetworkCard extends LitElement {
-  static properties = {
+  static override properties = {
     hass: { attribute: false },
     _model: { state: true },
     _selection: { state: true },
@@ -82,7 +82,7 @@ export class OmadaNetworkCard extends LitElement {
     _deviceFilter: { state: true }
   };
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       --bg: linear-gradient(135deg, #08131d, #0b1d2f 42%, #10253a);
@@ -233,7 +233,7 @@ export class OmadaNetworkCard extends LitElement {
   public hass?: HomeAssistant;
   private _config?: LovelaceCardConfig;
   private _model?: DashboardModel;
-  private _selection?: Selection;
+  private _selection: Selection | undefined;
   private _clientFilter: "all" | "wireless" | "wired" = "all";
   private _deviceFilter: "all" | "controller" | "gateway" | "switch" | "ap" = "all";
   private _filteredClients: ClientRecord[] = [];
@@ -241,8 +241,8 @@ export class OmadaNetworkCard extends LitElement {
   private _visibleClients: ClientRecord[] = [];
   private _visibleDevices: DeviceRecord[] = [];
   private _pendingUpdateCount = 0;
-  private _selectedDevice?: DeviceRecord;
-  private _selectedClient?: ClientRecord;
+  private _selectedDevice: DeviceRecord | undefined;
+  private _selectedClient: ClientRecord | undefined;
   private readonly _charts = new Map<string, EChartsType>();
   private readonly _chartElements = new Map<string, HTMLElement>();
   private readonly _chartSignatures = new Map<string, string>();
@@ -252,7 +252,7 @@ export class OmadaNetworkCard extends LitElement {
   private readonly _deviceSecondaryOptionCache = new WeakMap<DeviceRecord, ChartOptionCacheEntry>();
   private readonly _clientPrimaryOptionCache = new WeakMap<ClientRecord, ChartOptionCacheEntry>();
   private readonly _clientSecondaryOptionCache = new WeakMap<ClientRecord, ChartOptionCacheEntry>();
-  private _resizeObserver?: ResizeObserver;
+  private _resizeObserver: ResizeObserver | undefined;
 
   public setConfig(config: LovelaceCardConfig): void {
     if (!config?.type) {
@@ -288,7 +288,7 @@ export class OmadaNetworkCard extends LitElement {
     return 16;
   }
 
-  protected willUpdate(changed: Map<string, unknown>): void {
+  protected override willUpdate(changed: Map<string, unknown>): void {
     let modelChanged = false;
     if (changed.has("hass") && this.hass) {
       this._model = getDashboardModel(this.hass, this._config?.site);
@@ -325,12 +325,12 @@ export class OmadaNetworkCard extends LitElement {
     }
   }
 
-  protected firstUpdated(): void {
+  protected override firstUpdated(): void {
     this._resizeObserver = new ResizeObserver(() => this._charts.forEach((chart) => chart.resize()));
     this._resizeObserver.observe(this);
   }
 
-  protected updated(changed: Map<string, unknown>): void {
+  protected override updated(changed: Map<string, unknown>): void {
     if (changed.has("_model") || changed.has("_selection")) {
       this.syncCharts();
     }
@@ -352,7 +352,7 @@ export class OmadaNetworkCard extends LitElement {
     this._selectedClient = this._selection.kind === "client" ? this._model.clientByKey.get(this._selection.key) : undefined;
   }
 
-  disconnectedCallback(): void {
+  override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._resizeObserver?.disconnect();
     this._charts.forEach((chart) => chart.dispose());
@@ -361,7 +361,7 @@ export class OmadaNetworkCard extends LitElement {
     this._chartSignatures.clear();
   }
 
-  protected render() {
+  protected override render() {
     if (!this._config) {
       return html`<ha-card><div class="empty">Card is not configured.</div></ha-card>`;
     }
@@ -978,7 +978,7 @@ export class OmadaNetworkCard extends LitElement {
     const poePortCount = device.ports.reduce((count, port) => count + (port.poe ? 1 : 0), 0);
     const connectedPorts = device.ports.reduce((count, port) => count + (port.status === "Connected" ? 1 : 0), 0);
     const uplinkMbps = device.ports.reduce((max, port) => Math.max(max, port.metrics.omada_port_link_speed_mbps ?? 0), 0);
-    const radioRows = [
+    const radioMetrics = [
       ["2.4 GHz RX", "omada_device_2g_rx_util"],
       ["2.4 GHz TX", "omada_device_2g_tx_util"],
       ["5 GHz RX", "omada_device_5g_rx_util"],
@@ -987,7 +987,8 @@ export class OmadaNetworkCard extends LitElement {
       ["5 GHz-2 TX", "omada_device_5g2_tx_util"],
       ["6 GHz RX", "omada_device_6g_rx_util"],
       ["6 GHz TX", "omada_device_6g_tx_util"]
-    ]
+    ] satisfies Array<[string, string]>;
+    const radioRows = radioMetrics
       .map(([label, metric]) => ({ label, value: device.metrics[metric] ?? -1 }))
       .filter((row) => row.value >= 0);
     const topPorts = device.ports

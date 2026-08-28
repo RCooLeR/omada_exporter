@@ -2,9 +2,9 @@ package collector
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -48,7 +48,7 @@ func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 				port.Operation,
 				port.PortStatus.GetLinkStatus(),
 				fmt.Sprintf("%d", port.PortStatus.GetLinkSpeed()),
-				bools.ToString(port.PortStatus.Poe),
+				strconv.FormatBool(port.PortStatus.Poe),
 				port.PortStatus.GetLinkSpeedLabel(),
 			)
 			ch <- prometheus.MustNewConstMetric(c.omadaPortLinkStatus, prometheus.GaugeValue, float64(port.PortStatus.LinkStatus), portLabels...)

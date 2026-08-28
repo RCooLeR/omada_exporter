@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "description": "Custom Lovelace cards for Omada exporter data",
   "scripts": {
     "build": "vite build",
@@ -15,8 +19,8 @@
     "lit": "^3.3.3"
   },
   "devDependencies": {
-    "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

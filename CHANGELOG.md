@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+### Added
+- Publish multi-platform `linux/amd64` and `linux/arm64` container images with SBOMs, build provenance, OCI annotations, and GitHub release attestations.
+- Add weekly Dependabot updates for Go, npm, Docker, and GitHub Actions dependencies, plus Go vulnerability and npm audit checks in CI.
+
+### Changed
+- Upgrade the bridge to Go 1.27 and current Go modules, migrate the CLI from `urfave/cli` v2 to v3, and use newer standard-library helpers and graceful process cancellation.
+- Upgrade the Home Assistant cards to the native TypeScript 7 compiler, Vite 8.2, and current Vitest, with stricter type checking and Vite's native Rolldown configuration.
+- Build containers from Go 1.27.0 and Alpine 3.24.1, run the final image as a non-root user, and use BuildKit cache mounts and reproducible base-image digests.
+- Upgrade and SHA-pin CI/release actions, add race-enabled Go tests, verify downloaded modules, and validate multi-platform container builds and GoReleaser configuration in CI.
+
+### Fixed
+- Encode Omada web and OpenAPI credentials with the JSON encoder so quotes, backslashes, and newlines cannot corrupt login requests.
+- Shut down the HTTP server and MQTT publisher cleanly on termination, and apply explicit HTTP request/header limits.
+- Remove the browser-global `process` shim from the Home Assistant card bundle.
+
 ## [2.4.0] - 2026-08-05
 
 ### Changed

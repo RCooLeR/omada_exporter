@@ -4,7 +4,6 @@ import (
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -35,7 +34,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 		for _, item := range vpn {
 			labels := []string{item.Id, item.Name, item.GetPurpose(), item.GetVpnMode(), item.GetVpnType(), item.RemoteIp, site, client.SiteId}
 			labels = append(labels, item.DetailLabels().Values()...)
-			ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, bools.ToFloat64(item.Status), labels...)
+			ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, boolFloat64(item.Status), labels...)
 			seenIDs[item.Id] = struct{}{}
 		}
 	}
@@ -52,7 +51,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		labels := []string{item.ID, item.Name, "Site-to-Site", "", item.GetVpnType(), "", site, client.SiteId}
 		labels = append(labels, item.DetailLabels("").Values()...)
-		ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, bools.ToFloat64(item.Status), labels...)
+		ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, boolFloat64(item.Status), labels...)
 	}
 }
 

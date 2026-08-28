@@ -1,9 +1,10 @@
 package collector
 
 import (
+	"strconv"
+
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/webapi"
-	"github.com/goki/ki/bools"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -30,7 +31,7 @@ func (c *alertCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 	labels := []string{
-		bools.ToString(alert.Obscured),
+		strconv.FormatBool(alert.Obscured),
 		site,
 		client.SiteId,
 	}

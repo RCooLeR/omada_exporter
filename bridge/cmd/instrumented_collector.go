@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -82,9 +83,7 @@ func (h *collectorHealth) Describe(ch chan<- *prometheus.Desc) {
 func (h *collectorHealth) Collect(ch chan<- prometheus.Metric) {
 	h.mu.RLock()
 	states := make(map[string]collectorState, len(h.states))
-	for name, state := range h.states {
-		states[name] = state
-	}
+	maps.Copy(states, h.states)
 	h.mu.RUnlock()
 
 	for name, state := range states {
