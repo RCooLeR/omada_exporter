@@ -19,13 +19,30 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+const maxAPIResponseBodyBytes int64 = 32 << 20
+
+type authTransitionGate struct {
+	once   sync.Once
+	permit chan struct{}
+}
+
+func (g *authTransitionGate) lock() func() {
+	g.once.Do(func() {
+		g.permit = make(chan struct{}, 1)
+		g.permit <- struct{}{}
+	})
+	<-g.permit
+	return func() { g.permit <- struct{}{} }
+}
+
 // Client coordinates authenticated access to the Omada APIs.
 type Client struct {
 	Config               *config.Config
 	httpClient           *http.Client
 	token                string
-	OmadaCID             string
-	SiteId               string
+	contextMu            sync.RWMutex
+	omadaCID             string
+	siteID               string
 	ControllerKind       string
 	OpenAPIAuthMode      string
 	authMu               sync.RWMutex
@@ -34,16 +51,34 @@ type Client struct {
 	accessTokenExpiresAt time.Time
 	cacheMu              sync.RWMutex
 	requestCache         map[string]cacheEntry
+	cacheGeneration      uint64
 	requestGroup         singleflight.Group
+	webAuthTransition    authTransitionGate
+	openAuthTransition   authTransitionGate
 	webAuthGroup         singleflight.Group
 	openAPIAuthGroup     singleflight.Group
+}
+
+// ContextIDs returns an atomic snapshot of the controller and site identifiers.
+func (c *Client) ContextIDs() (omadaCID, siteID string) {
+	c.contextMu.RLock()
+	defer c.contextMu.RUnlock()
+	return c.omadaCID, c.siteID
+}
+
+// SetContextIDs atomically replaces the controller and site identifiers.
+func (c *Client) SetContextIDs(omadaCID, siteID string) {
+	c.contextMu.Lock()
+	c.omadaCID = omadaCID
+	c.siteID = siteID
+	c.contextMu.Unlock()
 }
 
 // createHttpClient builds the shared HTTP client with TLS and timeout settings.
 func createHttpClient(insecure bool, timeout int) (*http.Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init cookiejar")
+		return nil, fmt.Errorf("failed to init cookiejar: %w", err)
 	}
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.MaxIdleConns = 100
@@ -75,13 +110,13 @@ func Configure(c *config.Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	client.OmadaCID = cid
+	client.SetContextIDs(cid, "")
 
 	sid, err := client.getSiteId(c.Site)
 	if err != nil {
 		return nil, err
 	}
-	client.SiteId = *sid
+	client.SetContextIDs(cid, *sid)
 
 	client.ControllerKind = client.detectControllerKind()
 	if err := client.configureOpenAPIAuth(); err != nil {
@@ -96,7 +131,6 @@ func (c *Client) makeRequest(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("User-Agent", "omada_exporter")
-	req.Header.Set("Connection", "keep-alive")
 
 	if token := c.currentWebToken(); token != "" {
 		req.Header.Set("Csrf-Token", token)
@@ -133,13 +167,70 @@ func readAndRestoreBody(resp *http.Response) ([]byte, error) {
 		return nil, nil
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBodyWithLimit(resp.Body, maxAPIResponseBodyBytes)
 	if err != nil {
 		return nil, err
 	}
 	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(body))
 	resp.ContentLength = int64(len(body))
+	return body, nil
+}
+
+// ReadResponseBody reads a successful Omada response with a bounded memory
+// footprint. HTTP errors include Omada's structured message when available,
+// without echoing arbitrary response bodies that may contain sensitive data.
+func ReadResponseBody(resp *http.Response, endpointName string) ([]byte, error) {
+	return readResponseBody(resp, endpointName, maxAPIResponseBodyBytes)
+}
+
+func readResponseBody(resp *http.Response, endpointName string, limit int64) ([]byte, error) {
+	if resp == nil {
+		return nil, fmt.Errorf("%s returned no HTTP response", endpointName)
+	}
+	if resp.Body == nil {
+		return nil, fmt.Errorf("%s returned an empty HTTP body", endpointName)
+	}
+	if resp.ContentLength > limit {
+		return nil, fmt.Errorf("%s response body exceeds %d bytes", endpointName, limit)
+	}
+
+	body, err := readBodyWithLimit(resp.Body, limit)
+	if err != nil {
+		return nil, fmt.Errorf("read %s response: %w", endpointName, err)
+	}
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		return body, nil
+	}
+
+	status := resp.Status
+	if status == "" {
+		status = fmt.Sprintf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+	var apiErr apiErrorResponse
+	if json.Unmarshal(body, &apiErr) == nil {
+		message := strings.TrimSpace(firstNonEmpty(apiErr.Msg, apiErr.ErrorMsg))
+		if code, ok := apiErr.errorCode(); ok {
+			if message != "" {
+				return nil, fmt.Errorf("%s returned HTTP %s: errorCode %d: %s", endpointName, status, code, message)
+			}
+			return nil, fmt.Errorf("%s returned HTTP %s: errorCode %d", endpointName, status, code)
+		}
+		if message != "" {
+			return nil, fmt.Errorf("%s returned HTTP %s: %s", endpointName, status, message)
+		}
+	}
+	return nil, fmt.Errorf("%s returned HTTP %s", endpointName, status)
+}
+
+func readBodyWithLimit(reader io.Reader, limit int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("response body exceeds %d bytes", limit)
+	}
 	return body, nil
 }
 
@@ -302,6 +393,16 @@ type apiErrorResponse struct {
 	ErrorMsg       string `json:"errorMsg"`
 }
 
+func (r apiErrorResponse) errorCode() (int, bool) {
+	if r.ErrorCodeSnake != nil {
+		return *r.ErrorCodeSnake, true
+	}
+	if r.ErrorCode != nil {
+		return *r.ErrorCode, true
+	}
+	return 0, false
+}
+
 // ValidateAPIResponse returns an error when Omada wraps a failed request in an
 // otherwise successful HTTP response.
 func ValidateAPIResponse(body []byte, endpointName string) error {
@@ -310,16 +411,7 @@ func ValidateAPIResponse(body []byte, endpointName string) error {
 		return nil
 	}
 
-	code := 0
-	hasCode := false
-	if apiErr.ErrorCode != nil {
-		code = *apiErr.ErrorCode
-		hasCode = true
-	}
-	if apiErr.ErrorCodeSnake != nil {
-		code = *apiErr.ErrorCodeSnake
-		hasCode = true
-	}
+	code, hasCode := apiErr.errorCode()
 	if !hasCode || code == 0 {
 		return nil
 	}
@@ -418,11 +510,67 @@ func isOpenAPIAuthFailure(resp *http.Response) (bool, error) {
 
 // doLoggedInRequest performs a request using the current web session.
 func (c *Client) doLoggedInRequest(req *http.Request) (*http.Response, error) {
-	cloned, err := cloneRequest(req)
+	contextual, err := c.requestWithCurrentContext(req)
+	if err != nil {
+		return nil, err
+	}
+	cloned, err := cloneRequest(contextual)
 	if err != nil {
 		return nil, err
 	}
 	return c.makeRequest(cloned)
+}
+
+// requestWithCurrentContext refreshes session-scoped IDs immediately before a
+// request is sent. A request can be built before another goroutine completes
+// reauthentication, so replaying its original URL or body verbatim may keep
+// using stale controller or site IDs.
+func (c *Client) requestWithCurrentContext(req *http.Request) (*http.Request, error) {
+	if req == nil || req.URL == nil {
+		return nil, fmt.Errorf("request URL is nil")
+	}
+
+	omadaCID, siteID := c.ContextIDs()
+	contextual := req.Clone(req.Context())
+	parts := strings.Split(contextual.URL.Path, "/")
+	cidIndex, apiStart := -1, -1
+	for i := 0; i+1 < len(parts); i++ {
+		switch {
+		case parts[i] == "api" && parts[i+1] == "v2" && i > 0:
+			cidIndex, apiStart = i-1, i+2
+		case parts[i] == "openapi" && (parts[i+1] == "v1" || parts[i+1] == "v2") && i+2 < len(parts):
+			cidIndex, apiStart = i+2, i+3
+		}
+	}
+	if cidIndex >= 0 && omadaCID != "" {
+		parts[cidIndex] = omadaCID
+	}
+	if siteID != "" {
+		for i := apiStart; i >= 0 && i+2 < len(parts); i++ {
+			if parts[i] == "sites" {
+				parts[i+1] = siteID
+				break
+			}
+		}
+	}
+	contextual.URL.Path = strings.Join(parts, "/")
+	contextual.URL.RawPath = ""
+
+	if contextual.Method == http.MethodPost && strings.HasSuffix(contextual.URL.Path, "/api/v2/sites/alert-count") {
+		body, err := json.Marshal(struct {
+			SiteIDs []string `json:"siteIds"`
+		}{SiteIDs: []string{siteID}})
+		if err != nil {
+			return nil, fmt.Errorf("encode refreshed alert request: %w", err)
+		}
+		contextual.Body = io.NopCloser(bytes.NewReader(body))
+		contextual.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(body)), nil
+		}
+		contextual.ContentLength = int64(len(body))
+	}
+
+	return contextual, nil
 }
 
 // ensureLoggedIn makes sure the web session is authenticated.
@@ -431,13 +579,17 @@ func (c *Client) ensureLoggedIn() error {
 	// a Prometheus scrape that touches several web API collectors can trigger
 	// several identical login attempts when the session expires.
 	_, err, _ := c.webAuthGroup.Do("web-auth", func() (any, error) {
+		unlock := c.webAuthTransition.lock()
+		defer unlock()
+
 		loggedIn, err := c.IsLoggedIn()
 		if err != nil {
 			return nil, err
 		}
 		if !loggedIn {
 			log.Info().Str("user", c.Config.Username).Msg("not logged in, logging in")
-			if err := c.Login(); err != nil || c.currentWebToken() == "" {
+			omadaCID, _ := c.ContextIDs()
+			if err := c.login(omadaCID); err != nil || c.currentWebToken() == "" {
 				log.Error().Err(err).Msg("failed to login")
 				return nil, err
 			}
@@ -454,18 +606,22 @@ func (c *Client) reauthenticateWebSession() error {
 	// successful refresh so callers do not keep serving data fetched with the
 	// old session context.
 	_, err, _ := c.webAuthGroup.Do("web-reauth", func() (any, error) {
-		if err := c.RefreshOmadaContext(); err != nil {
-			return nil, err
-		}
-		if err := c.Login(); err != nil {
-			return nil, err
-		}
+		unlock := c.webAuthTransition.lock()
+		defer unlock()
 
-		siteID, err := c.getSiteIdFromCurrentSession(c.Config.Site)
+		omadaCID, err := c.getCid()
 		if err != nil {
 			return nil, err
 		}
-		c.SiteId = *siteID
+		if err := c.login(omadaCID); err != nil {
+			return nil, err
+		}
+
+		siteID, err := c.getSiteIdFromCurrentSessionForCID(c.Config.Site, omadaCID)
+		if err != nil {
+			return nil, err
+		}
+		c.SetContextIDs(omadaCID, *siteID)
 		c.invalidateRequestCache()
 		return nil, nil
 	})
@@ -486,6 +642,7 @@ func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) 
 
 	authFailed, err := isWebAPIAuthFailure(resp)
 	if err != nil {
+		_ = resp.Body.Close()
 		return nil, err
 	}
 	if !authFailed {
@@ -494,7 +651,7 @@ func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) 
 
 	// Omada sometimes returns a JSON auth error with HTTP 200. We inspect the
 	// body, close the failed response, refresh the session, and replay the
-	// original request once.
+	// request once with current session-scoped IDs.
 	_ = resp.Body.Close()
 	log.Warn().Msg("web session expired during request, re-authenticating")
 	if err := c.reauthenticateWebSession(); err != nil {
@@ -507,6 +664,7 @@ func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) 
 	}
 	authFailed, err = isWebAPIAuthFailure(resp)
 	if err != nil {
+		_ = resp.Body.Close()
 		return nil, err
 	}
 	if authFailed {
@@ -519,7 +677,11 @@ func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) 
 
 // doOpenAPIRequest performs a request using the current Open API token.
 func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
-	cloned, err := cloneRequest(req)
+	contextual, err := c.requestWithCurrentContext(req)
+	if err != nil {
+		return nil, err
+	}
+	cloned, err := cloneRequest(contextual)
 	if err != nil {
 		return nil, err
 	}
@@ -527,7 +689,6 @@ func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 	cloned.Header.Set("Accept", "application/json")
 	cloned.Header.Set("X-Requested-With", "XMLHttpRequest")
 	cloned.Header.Set("User-Agent", "omada_exporter")
-	cloned.Header.Set("Connection", "keep-alive")
 	if c.OpenAPIAuthMode == config.OpenAPIAuthWebSession {
 		cloned.Header.Set("Csrf-Token", c.currentWebToken())
 		cloned.Header.Set("Omada-Request-Source", "web-local")
@@ -558,10 +719,13 @@ func (c *Client) ensureOpenAPIAccessToken() error {
 	// The refresh/login work is deduplicated for the same reason as web login:
 	// a single scrape can need several Open API collectors at the same time.
 	_, err, _ := c.openAPIAuthGroup.Do("openapi-auth", func() (any, error) {
+		unlock := c.openAuthTransition.lock()
+		defer unlock()
+
 		accessToken, refreshToken, expiresAt := c.currentOpenAPITokenState()
 		now := time.Now()
 		if now.After(expiresAt) && refreshToken != "" {
-			if err := c.RefreshOpenApiToken(); err != nil {
+			if err := c.refreshOpenAPIToken(); err != nil {
 				log.Warn().Err(err).Msg("failed to refresh OpenAPI token, requesting a new one")
 				c.clearOpenAPITokens()
 			}
@@ -569,7 +733,8 @@ func (c *Client) ensureOpenAPIAccessToken() error {
 
 		accessToken, _, expiresAt = c.currentOpenAPITokenState()
 		if expiresAt.IsZero() || time.Now().After(expiresAt) || accessToken == "" {
-			return nil, c.LoginOpenApi()
+			omadaCID, _ := c.ContextIDs()
+			return nil, c.loginOpenAPI(omadaCID)
 		}
 
 		return nil, nil
@@ -587,14 +752,20 @@ func (c *Client) reauthenticateOpenAPISession() error {
 	}
 
 	_, err, _ := c.openAPIAuthGroup.Do("openapi-reauth", func() (any, error) {
-		if err := c.RefreshOmadaContext(); err != nil {
+		unlock := c.openAuthTransition.lock()
+		defer unlock()
+
+		omadaCID, err := c.getCid()
+		if err != nil {
 			return nil, err
 		}
 
 		c.clearOpenAPITokens()
-		if err := c.LoginOpenApi(); err != nil {
+		if err := c.loginOpenAPI(omadaCID); err != nil {
 			return nil, err
 		}
+		_, siteID := c.ContextIDs()
+		c.SetContextIDs(omadaCID, siteID)
 		c.invalidateRequestCache()
 		return nil, nil
 	})
@@ -614,6 +785,7 @@ func (c *Client) MakeOpenApiRequest(req *http.Request) (*http.Response, error) {
 
 	authFailed, err := isOpenAPIAuthFailure(resp)
 	if err != nil {
+		_ = resp.Body.Close()
 		return nil, err
 	}
 	if !authFailed {
@@ -632,6 +804,7 @@ func (c *Client) MakeOpenApiRequest(req *http.Request) (*http.Response, error) {
 	}
 	authFailed, err = isOpenAPIAuthFailure(resp)
 	if err != nil {
+		_ = resp.Body.Close()
 		return nil, err
 	}
 	if authFailed {

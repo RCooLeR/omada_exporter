@@ -30,10 +30,11 @@ func (c *alertCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get controller")
 		return
 	}
+	_, siteID := client.ContextIDs()
 	labels := []string{
 		strconv.FormatBool(alert.Obscured),
 		site,
-		client.SiteId,
+		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaAlertNum, prometheus.GaugeValue, float64(alert.AlertNum), labels...)
 }

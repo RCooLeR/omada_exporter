@@ -33,5 +33,7 @@ describe("format helpers", () => {
     expect(qualityLabel(0, -60)).toBe("Good");
     expect(qualityLabel(55, -90)).toBe("Fair");
     expect(qualityLabel(10, -90)).toBe("Weak");
+    expect(qualityLabel(0, 0)).toBe("Unknown");
+    expect(qualityLabel(Number.NaN, Number.NaN)).toBe("Unknown");
   });
 });

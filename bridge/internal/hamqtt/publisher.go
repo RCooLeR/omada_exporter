@@ -87,6 +87,7 @@ var slugPattern = regexp.MustCompile(`[^a-z0-9_]+`)
 const (
 	mqttConnectTimeout       = 10 * time.Second
 	mqttConnectRetryInterval = 30 * time.Second
+	mqttWriteTimeout         = 10 * time.Second
 )
 
 // NewPublisher creates an MQTT publisher for the configured collectors.
@@ -117,35 +118,26 @@ func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector
 
 // Run connects to MQTT and publishes metric updates on a schedule.
 func (p *Publisher) Run(ctx context.Context) error {
-	opts := mqtt.NewClientOptions()
-	opts.AddBroker(normalizeBroker(p.client.Config.MQTTBroker))
-	opts.SetClientID(p.client.Config.MQTTClientID)
-	opts.SetUsername(p.client.Config.MQTTUsername)
-	opts.SetPassword(p.client.Config.MQTTPassword)
-	opts.SetAutoReconnect(true)
-	opts.SetMaxReconnectInterval(mqttConnectRetryInterval)
-	opts.SetConnectRetry(false)
-	opts.SetConnectTimeout(mqttConnectTimeout)
-	opts.SetCleanSession(true)
-	opts.SetWill(p.availabilityTopic, "offline", 0, true)
-	opts.OnConnect = func(client mqtt.Client) {
-		log.Info().Msg("connected to mqtt broker")
-		p.publishBytes(p.availabilityTopic, []byte("online"), true)
-	}
-	opts.OnConnectionLost = func(client mqtt.Client, err error) {
-		log.Warn().Err(err).Msg("mqtt connection lost")
-	}
-
-	p.mqtt = mqtt.NewClient(opts)
+	p.mqtt = mqtt.NewClient(p.mqttClientOptions())
 	if err := p.connect(ctx); err != nil {
 		return err
 	}
+	defer func() {
+		p.publishBytes(p.availabilityTopic, []byte("offline"), true)
+		p.mqtt.Disconnect(250)
+	}()
 
 	p.publishBytes(p.availabilityTopic, []byte("online"), true)
 	if p.client.Config.MQTTRetain {
 		if err := p.loadRetainedInventory(ctx); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			log.Warn().Err(err).Msg("retained mqtt inventory unavailable; automatic superseded-entity cleanup disabled")
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	p.publishAll()
 
@@ -159,8 +151,6 @@ func (p *Publisher) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			p.publishBytes(p.availabilityTopic, []byte("offline"), true)
-			p.mqtt.Disconnect(250)
 			return ctx.Err()
 		case <-ticker.C:
 			p.publishAll()
@@ -168,21 +158,69 @@ func (p *Publisher) Run(ctx context.Context) error {
 	}
 }
 
+func (p *Publisher) mqttClientOptions() *mqtt.ClientOptions {
+	opts := mqtt.NewClientOptions()
+	opts.AddBroker(normalizeBroker(p.client.Config.MQTTBroker))
+	opts.SetClientID(p.client.Config.MQTTClientID)
+	opts.SetUsername(p.client.Config.MQTTUsername)
+	opts.SetPassword(p.client.Config.MQTTPassword)
+	opts.SetAutoReconnect(true)
+	opts.SetMaxReconnectInterval(mqttConnectRetryInterval)
+	opts.SetConnectRetry(false)
+	opts.SetConnectTimeout(mqttConnectTimeout)
+	opts.SetWriteTimeout(mqttWriteTimeout)
+	opts.SetOrderMatters(false)
+	opts.SetCleanSession(true)
+	opts.SetWill(p.availabilityTopic, "offline", 0, true)
+	opts.OnConnect = func(client mqtt.Client) {
+		log.Info().Msg("connected to mqtt broker")
+		p.publishBytes(p.availabilityTopic, []byte("online"), true)
+	}
+	opts.OnConnectionLost = func(client mqtt.Client, err error) {
+		log.Warn().Err(err).Msg("mqtt connection lost")
+	}
+	return opts
+}
+
 func (p *Publisher) connect(ctx context.Context) error {
+	connected := false
+	defer func() {
+		if !connected && ctx.Err() != nil {
+			// Paho allows Disconnect during a pending Connect. It marks the
+			// transition as disconnecting so a late socket/CONNACK cannot leave
+			// a live client behind after the caller has canceled startup.
+			p.mqtt.Disconnect(250)
+		}
+	}()
+
 	for {
 		token := p.mqtt.Connect()
-		token.Wait()
-		if err := token.Error(); err == nil {
+		err := waitForMQTTToken(ctx, token)
+		if err == nil {
+			connected = true
 			return nil
-		} else {
-			log.Warn().Err(err).Dur("retry_after", mqttConnectRetryInterval).Msg("mqtt broker unavailable")
 		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		log.Warn().Err(err).Dur("retry_after", mqttConnectRetryInterval).Msg("mqtt broker unavailable")
 
+		timer := time.NewTimer(mqttConnectRetryInterval)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return ctx.Err()
-		case <-time.After(mqttConnectRetryInterval):
+		case <-timer.C:
 		}
+	}
+}
+
+func waitForMQTTToken(ctx context.Context, token mqtt.Token) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-token.Done():
+		return token.Error()
 	}
 }
 
@@ -523,6 +561,7 @@ func (p *Publisher) isExplicitlyTrackedClient(id string) bool {
 func (p *Publisher) configuredClientTrackers() map[string]clientTracker {
 	trackers := make(map[string]clientTracker, len(p.trackedClientMACs))
 	statePrefix := topicPrefix(p.client.Config.MQTTTopicPrefix)
+	_, siteID := p.client.ContextIDs()
 	for _, mac := range p.trackedClientMACs {
 		id := trackerID(mac)
 		labels := map[string]string{
@@ -531,8 +570,8 @@ func (p *Publisher) configuredClientTrackers() map[string]clientTracker {
 		if p.client.Config.Site != "" {
 			labels["site"] = p.client.Config.Site
 		}
-		if p.client.SiteId != "" {
-			labels["site_id"] = p.client.SiteId
+		if siteID != "" {
+			labels["site_id"] = siteID
 		}
 
 		trackers[id] = clientTracker{
@@ -1333,7 +1372,8 @@ func deviceInfo(client *api.Client, metricName string, labels map[string]string)
 		return compactDevice(device)
 	}
 
-	siteID := firstNonEmpty(labels["site_id"], client.SiteId, labels["site"], client.Config.Site)
+	_, configuredSiteID := client.ContextIDs()
+	siteID := firstNonEmpty(labels["site_id"], configuredSiteID, labels["site"], client.Config.Site)
 	siteName := firstNonEmpty(labels["site"], client.Config.Site, "Omada Site")
 	return compactDevice(map[string]any{
 		"identifiers":       []string{"omada_site_" + slug(siteID)},

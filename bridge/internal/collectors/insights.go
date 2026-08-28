@@ -36,13 +36,14 @@ func (c *insightsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	client := c.client
 	site := client.Config.Site
-	siteLabels := []string{site, client.SiteId}
 
 	insights, err := client.GetDPIInsights(insightWindowSeconds(client.Client))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get DPI insights")
 		return
 	}
+	_, siteID := client.ContextIDs()
+	siteLabels := []string{site, siteID}
 
 	ch <- prometheus.MustNewConstMetric(c.omadaDPIScrapeWindowSeconds, prometheus.GaugeValue, float64(insights.WindowSeconds), siteLabels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDPITotalTrafficBytes, prometheus.GaugeValue, insights.TotalTraffic, siteLabels...)
@@ -52,7 +53,7 @@ func (c *insightsCollector) Collect(ch chan<- prometheus.Metric) {
 			fmt.Sprintf("%d", category.FamilyID),
 			category.FamilyName,
 			site,
-			client.SiteId,
+			siteID,
 		}
 		ch <- prometheus.MustNewConstMetric(c.omadaDPICategoryTrafficBytes, prometheus.GaugeValue, category.Traffic, labels...)
 	}
@@ -64,7 +65,7 @@ func (c *insightsCollector) Collect(ch chan<- prometheus.Metric) {
 			fmt.Sprintf("%d", app.ApplicationID),
 			app.ApplicationName,
 			site,
-			client.SiteId,
+			siteID,
 		}
 		ch <- prometheus.MustNewConstMetric(c.omadaDPIApplicationTrafficBytes, prometheus.GaugeValue, app.Traffic, labels...)
 	}

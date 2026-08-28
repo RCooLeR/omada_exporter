@@ -3,19 +3,21 @@ package webapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 )
+
+const deviceEnrichmentConcurrency = 4
 
 // GetDevices returns cached device inventory enriched with related port, LAG,
 // and WAN details for the current site.
 func (c *Client) GetDevices() ([]model.DevicesInterface, error) {
-	return api.FetchCached(c.Client, "webapi:devices", c.getDevicesFresh)
+	return c.FetchCached("webapi:devices", c.getDevicesFresh)
 }
 
 // getDevicesFresh loads the base device inventory from the Web API, decodes the
@@ -26,7 +28,8 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 	openClient := &openapi.Client{
 		Client: c.Client,
 	}
-	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/devices", c.Config.Host, c.OmadaCID, c.SiteId)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/devices", c.Config.Host, omadaCID, siteID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -38,7 +41,7 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "devices")
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +58,7 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 		return nil, err
 	}
 
-	for _, d := range devicedata.Result {
+	enrichDevices(devicedata.Result, func(d model.DevicesInterface) {
 		switch dev := d.(type) {
 		case *model.Switch:
 			err := c.GetPortsAndLags(dev)
@@ -79,9 +82,21 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 				log.Error().Err(err).Msg("Error getting gateway ports")
 			}
 		}
-	}
+	})
 
 	return devicedata.Result, nil
+}
+
+func enrichDevices(devices []model.DevicesInterface, enrich func(model.DevicesInterface)) {
+	var group errgroup.Group
+	group.SetLimit(deviceEnrichmentConcurrency)
+	for _, device := range devices {
+		group.Go(func() error {
+			enrich(device)
+			return nil
+		})
+	}
+	_ = group.Wait()
 }
 
 // devicesResponse wraps the mixed-type device list returned by the Web API.

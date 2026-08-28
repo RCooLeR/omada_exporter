@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -13,17 +12,17 @@ import (
 
 // getSiteId returns the site identifier for the configured site name.
 func (c *Client) getSiteId(name string) (*string, error) {
-	return c.getSiteIdWithRequest(name, c.MakeLoggedInRequest)
+	omadaCID, _ := c.ContextIDs()
+	return c.getSiteIdWithRequest(name, omadaCID, c.MakeLoggedInRequest)
 }
 
-// getSiteIdFromCurrentSession returns the site identifier from the current session data.
-func (c *Client) getSiteIdFromCurrentSession(name string) (*string, error) {
-	return c.getSiteIdWithRequest(name, c.makeRequest)
+func (c *Client) getSiteIdFromCurrentSessionForCID(name, omadaCID string) (*string, error) {
+	return c.getSiteIdWithRequest(name, omadaCID, c.makeRequest)
 }
 
 // getSiteIdWithRequest resolves the site identifier using the provided request function.
-func (c *Client) getSiteIdWithRequest(name string, requestFn func(*http.Request) (*http.Response, error)) (*string, error) {
-	url := fmt.Sprintf("%s/%s/api/v2/users/current", c.Config.Host, c.OmadaCID)
+func (c *Client) getSiteIdWithRequest(name, omadaCID string, requestFn func(*http.Request) (*http.Response, error)) (*string, error) {
+	url := fmt.Sprintf("%s/%s/api/v2/users/current", c.Config.Host, omadaCID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -35,8 +34,11 @@ func (c *Client) getSiteIdWithRequest(name string, requestFn func(*http.Request)
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := ReadResponseBody(resp, "current user")
 	if err != nil {
+		return nil, err
+	}
+	if err := ValidateAPIResponse(body, "current user"); err != nil {
 		return nil, err
 	}
 

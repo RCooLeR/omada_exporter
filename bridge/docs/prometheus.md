@@ -20,6 +20,18 @@ The root `/metrics` endpoint contains every enabled collector. Per-collector end
 
 When optional DPI insight metrics are enabled, `/metrics/insights` is also registered.
 
+## Protocol And Scrape Controls
+
+All metric endpoints negotiate the Prometheus text format or OpenMetrics from the request's `Accept` header. They support gzip and zstd response compression when requested by the scraper. Responses also include `Process-Start-Time-Unix`, which lets compatible scrapers identify exporter restarts.
+
+Prometheus client 1.24 metric-family filtering is available through repeatable `name[]` query parameters. For example:
+
+```text
+/metrics?name[]=omada_device_cpu_percentage&name[]=omada_device_mem_percentage
+```
+
+The exporter uses a private registry instead of process-global registration. Overlapping requests to the same endpoint share one gather operation, and scrape concurrency and duration are bounded to prevent a slow controller from creating unbounded work.
+
 ## Scrape Config
 
 ```yaml

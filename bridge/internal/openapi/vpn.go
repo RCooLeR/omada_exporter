@@ -3,7 +3,6 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
@@ -13,7 +12,7 @@ import (
 
 // GetVpn returns cached VPN summary data loaded from the Open API.
 func (c *Client) GetVpn() ([]model.Vpn, error) {
-	return api.FetchCached(c.Client, "openapi:vpn", c.getVpnFresh)
+	return c.FetchCached("openapi:vpn", c.getVpnFresh)
 }
 
 // getVpnFresh fetches VPN summary data from the Open API and decodes the
@@ -22,7 +21,8 @@ func (c *Client) getVpnFresh() ([]model.Vpn, error) {
 	if err := c.requireOpenAPICredentials(); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/vpn", c.Config.Host, c.OmadaCID, c.SiteId)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/vpn", c.Config.Host, omadaCID, siteID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Error().Err(err).Msgf("Error creating GET request for %s", url)
@@ -34,17 +34,22 @@ func (c *Client) getVpnFresh() ([]model.Vpn, error) {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "VPN")
 	if err != nil {
 		return nil, err
 	}
 	log.Info().Msg("Received data from VPN endpoint")
 	log.Debug().Bytes("data", body).Msg("Received data from VPN endpoint")
+	if err := api.ValidateAPIResponse(body, "VPN"); err != nil {
+		return nil, err
+	}
 
 	vpndata := vpnResponse{}
-	err = json.Unmarshal(body, &vpndata)
+	if err := json.Unmarshal(body, &vpndata); err != nil {
+		return nil, err
+	}
 
-	return vpndata.Result.Data, err
+	return vpndata.Result.Data, nil
 }
 
 // vpnResponse represents the Open API response for VPN data.

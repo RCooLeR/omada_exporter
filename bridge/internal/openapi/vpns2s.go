@@ -3,7 +3,6 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
@@ -25,7 +24,7 @@ type openAPIGridResponse[T any] struct {
 
 // GetSiteToSiteVpnSummaries returns site-to-site VPN summary data.
 func (c *Client) GetSiteToSiteVpnSummaries() ([]model.SiteToSiteVpnSummary, error) {
-	return api.FetchCached(c.Client, "openapi:vpn:s2s:summary", c.getSiteToSiteVpnSummariesFresh)
+	return c.FetchCached("openapi:vpn:s2s:summary", c.getSiteToSiteVpnSummariesFresh)
 }
 
 // getSiteToSiteVpnSummariesFresh fetches fresh site-to-site VPN summary data from the Open API.
@@ -34,13 +33,14 @@ func (c *Client) getSiteToSiteVpnSummariesFresh() ([]model.SiteToSiteVpnSummary,
 		return nil, err
 	}
 
-	urlTemplate := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/vpn/site-to-site-vpns?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId)
-	return fetchOpenAPIGrid[model.SiteToSiteVpnSummary](c, "site-to-site VPN summary", urlTemplate)
+	omadaCID, siteID := c.ContextIDs()
+	urlTemplate := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/vpn/site-to-site-vpns?page=%%d&pageSize=%%d", c.Config.Host, omadaCID, siteID)
+	return c.fetchOpenAPIGrid[model.SiteToSiteVpnSummary]("site-to-site VPN summary", urlTemplate)
 }
 
 // GetSiteToSiteVpnStats returns site-to-site VPN statistics.
 func (c *Client) GetSiteToSiteVpnStats() ([]model.SiteToSiteVpnStats, error) {
-	return api.FetchCached(c.Client, "openapi:vpn:s2s:stats", c.getSiteToSiteVpnStatsFresh)
+	return c.FetchCached("openapi:vpn:s2s:stats", c.getSiteToSiteVpnStatsFresh)
 }
 
 // getSiteToSiteVpnStatsFresh fetches fresh site-to-site VPN statistics from the Open API.
@@ -50,9 +50,10 @@ func (c *Client) getSiteToSiteVpnStatsFresh() ([]model.SiteToSiteVpnStats, error
 	}
 
 	var all []model.SiteToSiteVpnStats
+	omadaCID, siteID := c.ContextIDs()
 	for _, vpnType := range []int{2, 4} {
-		urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/s2s?filters.vpnType=%d&page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId, vpnType)
-		items, err := fetchOpenAPIGrid[model.SiteToSiteVpnStats](c, fmt.Sprintf("site-to-site VPN stats type=%d", vpnType), urlTemplate)
+		urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/s2s?filters.vpnType=%d&page=%%d&pageSize=%%d", c.Config.Host, omadaCID, siteID, vpnType)
+		items, err := c.fetchOpenAPIGrid[model.SiteToSiteVpnStats](fmt.Sprintf("site-to-site VPN stats type=%d", vpnType), urlTemplate)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +66,7 @@ func (c *Client) getSiteToSiteVpnStatsFresh() ([]model.SiteToSiteVpnStats, error
 // GetSiteToSiteVpnPeerStats returns peer statistics for a site-to-site VPN tunnel.
 func (c *Client) GetSiteToSiteVpnPeerStats(tunnelID string) ([]model.SiteToSiteVpnPeerStats, error) {
 	cacheKey := fmt.Sprintf("openapi:vpn:s2s:peer:%s", tunnelID)
-	return api.FetchCached(c.Client, cacheKey, func() ([]model.SiteToSiteVpnPeerStats, error) {
+	return c.FetchCached(cacheKey, func() ([]model.SiteToSiteVpnPeerStats, error) {
 		return c.getSiteToSiteVpnPeerStatsFresh(tunnelID)
 	})
 }
@@ -76,8 +77,9 @@ func (c *Client) getSiteToSiteVpnPeerStatsFresh(tunnelID string) ([]model.SiteTo
 		return nil, err
 	}
 
-	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/s2s/%s/peer?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId, tunnelID)
-	return fetchOpenAPIGrid[model.SiteToSiteVpnPeerStats](c, fmt.Sprintf("site-to-site VPN peer stats tunnel=%s", tunnelID), urlTemplate)
+	omadaCID, siteID := c.ContextIDs()
+	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/s2s/%s/peer?page=%%d&pageSize=%%d", c.Config.Host, omadaCID, siteID, tunnelID)
+	return c.fetchOpenAPIGrid[model.SiteToSiteVpnPeerStats](fmt.Sprintf("site-to-site VPN peer stats tunnel=%s", tunnelID), urlTemplate)
 }
 
 // requireOpenAPICredentials validates that Open API credentials are configured.
@@ -92,7 +94,7 @@ func (c *Client) requireOpenAPICredentials() error {
 }
 
 // fetchOpenAPIGrid loads every page from a paginated Open API grid endpoint.
-func fetchOpenAPIGrid[T any](client *Client, endpointName, urlTemplate string) ([]T, error) {
+func (client *Client) fetchOpenAPIGrid[T any](endpointName, urlTemplate string) ([]T, error) {
 	var all []T
 
 	for page := 1; ; page++ {
@@ -125,7 +127,7 @@ func (c *Client) getOpenAPIJSON(url, endpointName string, target any) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, endpointName)
 	if err != nil {
 		return err
 	}

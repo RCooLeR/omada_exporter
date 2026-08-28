@@ -41,6 +41,7 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get controller")
 		return
 	}
+	_, siteID := client.ContextIDs()
 	labels := []string{
 		controller.Name,
 		controller.Model,
@@ -61,7 +62,7 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 		fmt.Sprintf("%d", controller.DeviceCapacity.AdoptedApAndSwitchNum),
 		strconv.FormatBool(controller.DeviceCapacity.ShareApAndSwitchCapacity),
 		site,
-		client.SiteId,
+		siteID,
 	}
 
 	ch <- prometheus.MustNewConstMetric(c.omadaControllerUptimeSeconds, prometheus.GaugeValue, controller.Uptime/1000, labels...)

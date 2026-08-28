@@ -126,7 +126,7 @@ func (c *DeviceCollector) buildPortLabels(baseLabels []string, port, maxSpeed, n
 }
 
 // collectDevice emits metrics for the device.
-func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device model.DeviceInterface) error {
+func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device model.DeviceInterface, siteID string) error {
 	labels := []string{
 		device.GetMac(),
 		device.GetType(),
@@ -141,7 +141,7 @@ func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 		device.GetName(),
 		device.GetStatus(),
 		c.webClient.Client.Config.Site,
-		c.webClient.SiteId,
+		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceUptimeSeconds, prometheus.GaugeValue, device.GetUptime(), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceCpuPercentage, prometheus.GaugeValue, device.GetCpuUtilization(), labels...)
@@ -159,38 +159,39 @@ func (c *DeviceCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get devices")
 		return
 	}
+	_, siteID := c.webClient.ContextIDs()
 
 	for _, d := range devices {
 		switch item := d.(type) {
 		case *model.Gateway:
-			err = c.collectDevice(ch, item)
+			err = c.collectDevice(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect device")
 			}
-			err = c.collectGateway(ch, item)
+			err = c.collectGateway(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect gateway")
 			}
 		case *model.Switch:
-			err = c.collectDevice(ch, item)
+			err = c.collectDevice(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect device")
 			}
-			err = c.collectSwitch(ch, item)
+			err = c.collectSwitch(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect switch")
 			}
 		case *model.AccessPoint:
-			err = c.collectDevice(ch, item)
+			err = c.collectDevice(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect device")
 			}
-			err := c.collectAccessPoint(ch, item)
+			err := c.collectAccessPoint(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect access point")
 			}
 		case *model.Olt:
-			err = c.collectDevice(ch, item)
+			err = c.collectDevice(ch, item, siteID)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to collect device")
 			}

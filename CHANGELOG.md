@@ -3,17 +3,27 @@
 ### Added
 - Publish multi-platform `linux/amd64` and `linux/arm64` container images with SBOMs, build provenance, OCI annotations, and GitHub release attestations.
 - Add weekly Dependabot updates for Go, npm, Docker, and GitHub Actions dependencies, plus Go vulnerability and npm audit checks in CI.
+- Support OpenMetrics negotiation, zstd-compressed metric responses, and `name[]` metric-family filtering on aggregate and per-collector scrape endpoints.
+- Add keyboard-accessible Home Assistant card selection/filter controls and descriptive ECharts ARIA output.
 
 ### Changed
 - Upgrade the bridge to Go 1.27 and current Go modules, migrate the CLI from `urfave/cli` v2 to v3, and use newer standard-library helpers and graceful process cancellation.
 - Upgrade the Home Assistant cards to the native TypeScript 7 compiler, Vite 8.2, and current Vitest, with stricter type checking and Vite's native Rolldown configuration.
-- Build containers from Go 1.27.0 and Alpine 3.24.1, run the final image as a non-root user, and use BuildKit cache mounts and reproducible base-image digests.
+- Build containers from Go 1.27.0 and Alpine 3.24.1, refresh installed Alpine security packages during image construction, run the final image as a non-root user, and use BuildKit cache mounts and reproducible base-image digests.
 - Upgrade and SHA-pin CI/release actions, add race-enabled Go tests, verify downloaded modules, and validate multi-platform container builds and GoReleaser configuration in CI.
+- Isolate exporter metrics in a dedicated Prometheus registry, coalesce overlapping gathers, and bound scrape concurrency and duration so slow controllers cannot create unbounded scrape work.
+- Use Go 1.27 parameterized methods for typed API caching and paginated OpenAPI requests, and fetch per-device port, LAG, and WAN enrichment concurrently within a fixed limit.
+- Validate controller URLs, ports, enums, timeouts, cache windows, insight limits, and MQTT intervals through `urfave/cli` v3 before startup; reject duplicate flags and suggest likely flag names for typos.
+- Bound Omada response bodies, return structured HTTP/API failures, and apply cancellable MQTT connection handling with bounded writes and concurrent retained-message callbacks.
+- Manage ECharts through a Lit reactive controller, coalesce resize work, use dirty-rectangle and lazy rendering, and skip card updates caused only by unrelated Home Assistant entities.
 
 ### Fixed
 - Encode Omada web and OpenAPI credentials with the JSON encoder so quotes, backslashes, and newlines cannot corrupt login requests.
 - Shut down the HTTP server and MQTT publisher cleanly on termination, and apply explicit HTTP request/header limits.
 - Remove the browser-global `process` shim from the Home Assistant card bundle.
+- Serialize web and OpenAPI authentication transitions, keep controller/site context snapshots synchronized during reauthentication, and prevent stale in-flight fetches from repopulating invalidated caches.
+- Make custom-card registration idempotent across Home Assistant resource reloads.
+- Recreate charts after a card reconnect, apply changed card configuration immediately, normalize MAC formats across topology joins, keep unnamed WAN/ISP rows distinct, and report missing Wi-Fi quality as unknown.
 
 ## [2.4.0] - 2026-08-05
 

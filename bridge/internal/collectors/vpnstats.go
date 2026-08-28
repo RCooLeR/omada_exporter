@@ -57,7 +57,8 @@ func (c *vpnStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get VPN stats")
 	} else {
-		seenPacketSeries = c.collectVpnTunnelMetrics(ch, site, vpn)
+		_, tunnelSiteID := client.ContextIDs()
+		seenPacketSeries = c.collectVpnTunnelMetrics(ch, site, tunnelSiteID, vpn)
 	}
 
 	summaries, err := client.GetSiteToSiteVpnSummaries()
@@ -87,16 +88,18 @@ func (c *vpnStatsCollector) Collect(ch chan<- prometheus.Metric) {
 		peerStatsByVpnID[vpnID] = append(peerStatsByVpnID[vpnID], peerStats...)
 	}
 
-	c.collectSiteToSiteVpnMetrics(ch, site, s2sStats, summaryByID, peerStatsByVpnID, seenPacketSeries)
-	c.collectSiteToSiteVpnPeerMetrics(ch, site, summaries, peerStatsByVpnID)
+	_, siteToSiteSiteID := client.ContextIDs()
+	c.collectSiteToSiteVpnMetrics(ch, site, siteToSiteSiteID, s2sStats, summaryByID, peerStatsByVpnID, seenPacketSeries)
+	_, peerSiteID := client.ContextIDs()
+	c.collectSiteToSiteVpnPeerMetrics(ch, site, peerSiteID, summaries, peerStatsByVpnID)
 }
 
 // collectVpnTunnelMetrics emits metrics for the VPN tunnel metrics.
-func (c *vpnStatsCollector) collectVpnTunnelMetrics(ch chan<- prometheus.Metric, site string, vpn []model.VpnStats) map[string]struct{} {
+func (c *vpnStatsCollector) collectVpnTunnelMetrics(ch chan<- prometheus.Metric, site, siteID string, vpn []model.VpnStats) map[string]struct{} {
 	seenPacketSeries := make(map[string]struct{}, len(vpn))
 
 	for _, item := range vpn {
-		labels := []string{item.Name, item.InterfaceName, item.GetVpnMode(), item.GetVpnType(), item.LocalIp, item.RemoteIp, site, c.client.SiteId}
+		labels := []string{item.Name, item.InterfaceName, item.GetVpnMode(), item.GetVpnType(), item.LocalIp, item.RemoteIp, site, siteID}
 		labels = append(labels, vpnDetailValuesWithoutLocalIP(item.DetailLabels())...)
 		ch <- prometheus.MustNewConstMetric(c.omadaVpnUptime, prometheus.GaugeValue, float64(item.GetUptime()), labels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaVpnDownPackets, prometheus.GaugeValue, float64(item.DownPkts), labels...)
@@ -110,7 +113,7 @@ func (c *vpnStatsCollector) collectVpnTunnelMetrics(ch chan<- prometheus.Metric,
 }
 
 // collectSiteToSiteVpnMetrics emits metrics for the site to site VPN metrics.
-func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Metric, site string, stats []model.SiteToSiteVpnStats, summaryByID map[string]model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats, seenPacketSeries map[string]struct{}) {
+func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Metric, site, siteID string, stats []model.SiteToSiteVpnStats, summaryByID map[string]model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats, seenPacketSeries map[string]struct{}) {
 	for _, item := range stats {
 		summary, ok := summaryByID[item.VpnID]
 		name := item.Name
@@ -136,11 +139,11 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Met
 			item.LocalPeerIP,
 			item.RemotePeerIP,
 			site,
-			c.client.SiteId,
+			siteID,
 		}
 		labels = append(labels, vpnDetailValuesWithoutLocalIP(detailLabels)...)
 
-		vpnPacketLabels := []string{name, item.InterfaceName, item.GetVpnMode(), vpnType, item.LocalIP, item.RemoteIP, site, c.client.SiteId}
+		vpnPacketLabels := []string{name, item.InterfaceName, item.GetVpnMode(), vpnType, item.LocalIP, item.RemoteIP, site, siteID}
 		vpnPacketLabels = append(vpnPacketLabels, vpnDetailValuesWithoutLocalIP(detailLabels)...)
 		packetSeriesKey := vpnPacketSeriesKey(name, item.InterfaceName, item.GetVpnMode(), vpnType, item.LocalIP, item.RemoteIP)
 		if shouldEmitVpnPacketSeries(item) {
@@ -163,7 +166,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Met
 			vpnType,
 			siteVpnType,
 			site,
-			c.client.SiteId,
+			siteID,
 		}
 		siteToSiteTrafficLabels = append(siteToSiteTrafficLabels, detailLabels.Values()...)
 		ch <- prometheus.MustNewConstMetric(c.omadaSiteToSiteVpnDownBytes, prometheus.GaugeValue, float64(downBytes), siteToSiteTrafficLabels...)
@@ -174,7 +177,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Met
 }
 
 // collectSiteToSiteVpnPeerMetrics emits metrics for the site to site VPN peer metrics.
-func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus.Metric, site string, summaries []model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats) {
+func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus.Metric, site, siteID string, summaries []model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats) {
 	for _, summary := range summaries {
 		for _, item := range peerStatsByVpnID[summary.ID] {
 			detailLabels := item.DetailLabels(summary)
@@ -189,7 +192,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus
 				item.RemoteIP,
 				strconv.Itoa(int(item.Port)),
 				site,
-				c.client.SiteId,
+				siteID,
 			}
 			labels = append(labels, vpnDetailValuesWithoutLocalIP(detailLabels)...)
 

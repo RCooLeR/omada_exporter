@@ -31,8 +31,9 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get vpn list")
 	} else {
+		_, siteID := client.ContextIDs()
 		for _, item := range vpn {
-			labels := []string{item.Id, item.Name, item.GetPurpose(), item.GetVpnMode(), item.GetVpnType(), item.RemoteIp, site, client.SiteId}
+			labels := []string{item.Id, item.Name, item.GetPurpose(), item.GetVpnMode(), item.GetVpnType(), item.RemoteIp, site, siteID}
 			labels = append(labels, item.DetailLabels().Values()...)
 			ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, boolFloat64(item.Status), labels...)
 			seenIDs[item.Id] = struct{}{}
@@ -44,12 +45,13 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get site-to-site vpn summary")
 		return
 	}
+	_, siteID := client.ContextIDs()
 
 	for _, item := range summaries {
 		if _, exists := seenIDs[item.ID]; exists {
 			continue
 		}
-		labels := []string{item.ID, item.Name, "Site-to-Site", "", item.GetVpnType(), "", site, client.SiteId}
+		labels := []string{item.ID, item.Name, "Site-to-Site", "", item.GetVpnType(), "", site, siteID}
 		labels = append(labels, item.DetailLabels("").Values()...)
 		ch <- prometheus.MustNewConstMetric(c.omadaVpnStatus, prometheus.GaugeValue, boolFloat64(item.Status), labels...)
 	}

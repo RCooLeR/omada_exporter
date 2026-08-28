@@ -9,7 +9,7 @@ import (
 )
 
 // collectAccessPoint emits metrics for the access point.
-func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *model.AccessPoint) error {
+func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *model.AccessPoint, siteID string) error {
 	deviceLabels := []string{
 		ap.GetMac(),
 		ap.GetType(),
@@ -24,7 +24,7 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		ap.GetName(),
 		ap.GetStatus(),
 		c.webClient.Client.Config.Site,
-		c.webClient.SiteId,
+		siteID,
 	}
 	labels := append(deviceLabels,
 		strconv.FormatBool(ap.AnyPoeEnable),

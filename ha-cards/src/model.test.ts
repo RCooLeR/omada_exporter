@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { HomeAssistant } from "./ha-types";
-import { buildDashboardModel, vpnModeLabel, vpnPeerLoginSeconds, vpnRemoteLabel, vpnTotalBytes } from "./model";
+import {
+  buildDashboardModel,
+  cardHassChanged,
+  getDashboardModel,
+  normalizeMacKey,
+  vpnModeLabel,
+  vpnPeerLoginSeconds,
+  vpnRemoteLabel,
+  vpnTotalBytes
+} from "./model";
 
 describe("buildDashboardModel", () => {
   it("groups Omada device, client metric, and online tracker entities", () => {
@@ -345,5 +354,134 @@ describe("buildDashboardModel", () => {
     expect(model.clients).toHaveLength(0);
     expect(model.devices[0]?.attrs.lag_id).toBeUndefined();
     expect(model.devices[0]?.attrs.wifi_mode).toBeUndefined();
+  });
+
+  it("normalizes MAC formats when joining devices, ports, and clients", () => {
+    const hass: HomeAssistant = {
+      states: {
+        "sensor.switch_cpu": {
+          entity_id: "sensor.switch_cpu",
+          state: "20",
+          attributes: {
+            metric: "omada_device_cpu_percentage",
+            device_mac: "AA-BB-CC-DD-EE-FF",
+            device_name: "Core Switch",
+            device_type: "switch",
+            device_status: "Connected"
+          }
+        },
+        "sensor.switch_port": {
+          entity_id: "sensor.switch_port",
+          state: "1000",
+          attributes: {
+            metric: "omada_port_link_speed_mbps",
+            device_mac: "aabb.ccdd.eeff",
+            port: "1",
+            name: "Port 1",
+            link_status: "Connected"
+          }
+        },
+        "device_tracker.desktop": {
+          entity_id: "device_tracker.desktop",
+          state: "home",
+          attributes: { mac: "11:22:33:44:55:66", name: "Desktop", wireless: "false" }
+        },
+        "sensor.desktop_traffic": {
+          entity_id: "sensor.desktop_traffic",
+          state: "1024",
+          attributes: {
+            metric: "omada_client_traffic_down_bytes",
+            mac: "11-22-33-44-55-66",
+            name: "Desktop",
+            wireless: "false",
+            switch_mac: "aa:bb:cc:dd:ee:ff",
+            switch_name: "Core Switch",
+            port: "1"
+          }
+        }
+      }
+    };
+
+    const model = buildDashboardModel(hass);
+    const normalizedSwitchMac = normalizeMacKey("AA-BB-CC-DD-EE-FF");
+    const device = model.deviceByMac.get(normalizedSwitchMac);
+    const port = model.portByDeviceMacAndPort.get(`${normalizedSwitchMac}:1`);
+
+    expect(model.devices).toHaveLength(1);
+    expect(device?.ports).toEqual([port]);
+    expect(device?.clients.map((client) => client.name)).toEqual(["Desktop"]);
+    expect(port?.clients.map((client) => client.name)).toEqual(["Desktop"]);
+  });
+
+  it("keeps unnamed ISP rows distinct by IP address", () => {
+    const hass: HomeAssistant = {
+      states: {
+        "binary_sensor.primary_isp": {
+          entity_id: "binary_sensor.primary_isp",
+          state: "on",
+          attributes: { metric: "omada_isp_status", ip: "192.0.2.1" }
+        },
+        "binary_sensor.secondary_isp": {
+          entity_id: "binary_sensor.secondary_isp",
+          state: "off",
+          attributes: { metric: "omada_isp_status", ip: "198.51.100.1" }
+        }
+      }
+    };
+
+    expect(buildDashboardModel(hass).isps.map((row) => row.key).sort()).toEqual(["192.0.2.1", "198.51.100.1"]);
+  });
+
+  it("reuses the cached model for the same Home Assistant state snapshot and site", () => {
+    const hass: HomeAssistant = { states: {} };
+
+    expect(getDashboardModel(hass, "Default")).toBe(getDashboardModel(hass, "Default"));
+    expect(getDashboardModel(hass, "Default")).not.toBe(getDashboardModel(hass, "Other"));
+  });
+});
+
+describe("cardHassChanged", () => {
+  const omadaEntity = {
+    entity_id: "sensor.omada_cpu",
+    state: "20",
+    attributes: { metric: "omada_device_cpu_percentage", device_mac: "aa:bb:cc:dd:ee:ff" }
+  };
+  const unrelatedEntity = {
+    entity_id: "sensor.temperature",
+    state: "21",
+    attributes: { device_class: "temperature" }
+  };
+
+  it("ignores unrelated Home Assistant state updates", () => {
+    const previous: HomeAssistant = {
+      states: { [omadaEntity.entity_id]: omadaEntity, [unrelatedEntity.entity_id]: unrelatedEntity },
+      themes: { darkMode: false }
+    };
+    const current: HomeAssistant = {
+      states: {
+        [omadaEntity.entity_id]: omadaEntity,
+        [unrelatedEntity.entity_id]: { ...unrelatedEntity, state: "22" }
+      },
+      themes: { darkMode: false }
+    };
+
+    expect(cardHassChanged(current, previous)).toBe(false);
+  });
+
+  it("detects replaced, removed, and newly added Omada entities", () => {
+    const previous: HomeAssistant = { states: { [omadaEntity.entity_id]: omadaEntity } };
+    const replaced: HomeAssistant = {
+      states: { [omadaEntity.entity_id]: { ...omadaEntity, state: "21" } }
+    };
+
+    expect(cardHassChanged(replaced, previous)).toBe(true);
+    expect(cardHassChanged({ states: {} }, previous)).toBe(true);
+    expect(cardHassChanged(previous, { states: {} })).toBe(true);
+  });
+
+  it("detects theme mode changes used by the network card logo", () => {
+    const states = { [omadaEntity.entity_id]: omadaEntity };
+
+    expect(cardHassChanged({ states, themes: { darkMode: true } }, { states, themes: { darkMode: false } })).toBe(true);
   });
 });

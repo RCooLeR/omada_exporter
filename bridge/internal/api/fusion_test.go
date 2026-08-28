@@ -12,7 +12,7 @@ import (
 func TestGetSiteIdUsesSingleSiteFallbackForAutoDefault(t *testing.T) {
 	client := &Client{Config: &config.Config{SystemType: config.SystemTypeAuto}}
 
-	siteID, err := client.getSiteIdWithRequest("Default", staticJSONResponse(`{
+	siteID, err := client.getSiteIdWithRequest("Default", "controller-id", staticJSONResponse(`{
 		"errorCode": 0,
 		"result": {
 			"privilege": {
@@ -31,7 +31,7 @@ func TestGetSiteIdUsesSingleSiteFallbackForAutoDefault(t *testing.T) {
 func TestGetSiteIdDoesNotFallbackForStandardController(t *testing.T) {
 	client := &Client{Config: &config.Config{SystemType: config.SystemTypeStandard}}
 
-	_, err := client.getSiteIdWithRequest("Default", staticJSONResponse(`{
+	_, err := client.getSiteIdWithRequest("Default", "controller-id", staticJSONResponse(`{
 		"errorCode": 0,
 		"result": {
 			"privilege": {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -15,7 +14,7 @@ import (
 
 // GetNetworkClients returns cached network client inventory loaded from the Open API.
 func (c *Client) GetNetworkClients() ([]model.NetworkClient, error) {
-	return api.FetchCached(c.Client, "openapi:clients", c.getNetworkClientsFresh)
+	return c.FetchCached("openapi:clients", c.getNetworkClientsFresh)
 }
 
 // getNetworkClientsFresh posts the active-client filter request to the Open API
@@ -38,7 +37,8 @@ func (c *Client) getNetworkClientsFresh() ([]model.NetworkClient, error) {
 }
 
 func (c *Client) getNetworkClientsV2Fresh() ([]model.NetworkClient, error) {
-	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, c.OmadaCID, c.SiteId)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/openapi/v2/%s/sites/%s/clients", c.Config.Host, omadaCID, siteID)
 	var all []model.NetworkClient
 
 	for page := 1; ; page++ {
@@ -67,7 +67,7 @@ func (c *Client) getNetworkClientsV2Fresh() ([]model.NetworkClient, error) {
 			return nil, err
 		}
 
-		body, err := io.ReadAll(resp.Body)
+		body, err := api.ReadResponseBody(resp, "clients")
 		_ = resp.Body.Close()
 		if err != nil {
 			return nil, err
@@ -94,8 +94,9 @@ func (c *Client) getNetworkClientsV2Fresh() ([]model.NetworkClient, error) {
 }
 
 func (c *Client) getNetworkClientsV1Fresh() ([]model.NetworkClient, error) {
-	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/clients?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId)
-	return fetchOpenAPIGrid[model.NetworkClient](c, "clients v1", urlTemplate)
+	omadaCID, siteID := c.ContextIDs()
+	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/clients?page=%%d&pageSize=%%d", c.Config.Host, omadaCID, siteID)
+	return c.fetchOpenAPIGrid[model.NetworkClient]("clients v1", urlTemplate)
 }
 
 func isUnsupportedClientsV2Error(err error) bool {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
@@ -23,15 +24,66 @@ func TestParseTrackedClientMACs(t *testing.T) {
 	}
 }
 
-func TestConfiguredClientTrackers(t *testing.T) {
+func TestMQTTClientOptionsBoundWritesAndAllowConcurrentHandlers(t *testing.T) {
 	publisher := &Publisher{
-		client: &api.Client{
-			Config: &config.Config{
-				MQTTTopicPrefix: "omada_exporter",
-				Site:            "Default",
-			},
-			SiteId: "site-id",
+		client: &api.Client{Config: &config.Config{
+			MQTTBroker:   "mqtt.example:1883",
+			MQTTClientID: "omada-test",
+		}},
+		availabilityTopic: "omada/status",
+	}
+
+	options := publisher.mqttClientOptions()
+	if options.WriteTimeout != mqttWriteTimeout {
+		t.Errorf("WriteTimeout = %v, want %v", options.WriteTimeout, mqttWriteTimeout)
+	}
+	if options.Order {
+		t.Error("Order = true, want concurrent callback delivery")
+	}
+	if options.ConnectTimeout != mqttConnectTimeout {
+		t.Errorf("ConnectTimeout = %v, want %v", options.ConnectTimeout, mqttConnectTimeout)
+	}
+	if len(options.Servers) != 1 || options.Servers[0].String() != "tcp://mqtt.example:1883" {
+		t.Fatalf("Servers = %v, want tcp://mqtt.example:1883", options.Servers)
+	}
+}
+
+func TestConnectStopsWhileTokenIsPendingWhenContextIsCanceled(t *testing.T) {
+	connectStarted := make(chan struct{}, 1)
+	mqttClient := &recordingMQTTClient{
+		connectStarted: connectStarted,
+		connectToken:   pendingToken{done: make(chan struct{})},
+	}
+	publisher := &Publisher{mqtt: mqttClient}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- publisher.connect(ctx) }()
+	<-connectStarted
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("connect() error = %v, want context.Canceled", err)
+		}
+		if mqttClient.disconnectCalls != 1 {
+			t.Fatalf("Disconnect() calls = %d, want 1", mqttClient.disconnectCalls)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("connect() did not stop after context cancellation")
+	}
+}
+
+func TestConfiguredClientTrackers(t *testing.T) {
+	client := &api.Client{
+		Config: &config.Config{
+			MQTTTopicPrefix: "omada_exporter",
+			Site:            "Default",
 		},
+	}
+	client.SetContextIDs("controller-id", "site-id")
+	publisher := &Publisher{
+		client:            client,
 		trackedClientMACs: []string{"aa:bb:cc:dd:ee:ff"},
 	}
 
@@ -66,8 +118,8 @@ func TestPublishConfiguredClientTrackerOffline(t *testing.T) {
 			MQTTRetain:          true,
 			Site:                "Default",
 		},
-		SiteId: "site-id",
 	}
+	client.SetContextIDs("controller-id", "site-id")
 	publisher := &Publisher{
 		client:            client,
 		mqtt:              &recordingMQTTClient{messages: map[string][]byte{}},
@@ -607,71 +659,89 @@ func TestRetainedClientTrackerRestoresDynamicPresence(t *testing.T) {
 }
 
 func TestLoadRetainedInventoryMarksAbsentClientNotHome(t *testing.T) {
-	const trackerStateTopic = "omada_exporter/device_trackers/aa_bb_cc_dd_ee_ff/state"
-	const trackerAttributesTopic = "omada_exporter/device_trackers/aa_bb_cc_dd_ee_ff/attributes"
-	mqttClient := &recordingMQTTClient{
-		messages: map[string][]byte{},
-		retainedMessages: map[string][]mqtt.Message{
-			"omada_exporter/device_trackers/+/state": {
-				retainedMessage{topic: trackerStateTopic, payload: []byte("home")},
-			},
-			"omada_exporter/device_trackers/+/attributes": {
-				retainedMessage{
-					topic:   trackerAttributesTopic,
-					payload: []byte(`{"host_name":"phone","last_seen":"2026-07-31T10:00:00Z","mac":"aa:bb:cc:dd:ee:ff"}`),
+	synctest.Test(t, func(t *testing.T) {
+		const trackerStateTopic = "omada_exporter/device_trackers/aa_bb_cc_dd_ee_ff/state"
+		const trackerAttributesTopic = "omada_exporter/device_trackers/aa_bb_cc_dd_ee_ff/attributes"
+		mqttClient := &recordingMQTTClient{
+			messages:            map[string][]byte{},
+			concurrentCallbacks: true,
+			retainedMessages: map[string][]mqtt.Message{
+				"omada_exporter/device_trackers/+/state": {
+					retainedMessage{topic: trackerStateTopic, payload: []byte("home")},
+				},
+				"omada_exporter/device_trackers/+/attributes": {
+					retainedMessage{
+						topic:   trackerAttributesTopic,
+						payload: []byte(`{"host_name":"phone","last_seen":"2026-07-31T10:00:00Z","mac":"aa:bb:cc:dd:ee:ff"}`),
+					},
 				},
 			},
-		},
-	}
-	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
-			MQTTDiscoveryPrefix: "homeassistant",
-			MQTTTopicPrefix:     "omada_exporter",
-			MQTTRetain:          true,
-		}},
-		mqtt:               mqttClient,
-		published:          map[string]struct{}{},
-		knownClients:       map[string]clientTracker{},
-		lastClientTrackers: map[string]clientTracker{},
-		retainedDiscovery:  map[string]string{},
-		retainedStates:     map[string]map[string]string{},
-	}
+		}
+		publisher := &Publisher{
+			client: &api.Client{Config: &config.Config{
+				MQTTDiscoveryPrefix: "homeassistant",
+				MQTTTopicPrefix:     "omada_exporter",
+				MQTTRetain:          true,
+			}},
+			mqtt:               mqttClient,
+			published:          map[string]struct{}{},
+			knownClients:       map[string]clientTracker{},
+			lastClientTrackers: map[string]clientTracker{},
+			retainedDiscovery:  map[string]string{},
+			retainedStates:     map[string]map[string]string{},
+		}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := publisher.loadRetainedInventory(ctx); err != nil {
-		t.Fatalf("loadRetainedInventory() error = %v", err)
-	}
-	if _, ok := publisher.knownClients["aa_bb_cc_dd_ee_ff"]; !ok {
-		t.Fatal("retained home tracker was not restored")
-	}
-	if got := publisher.knownClients["aa_bb_cc_dd_ee_ff"].Labels["host_name"]; got != "phone" {
-		t.Fatalf("retained tracker host_name = %q, want phone", got)
-	}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := publisher.loadRetainedInventory(ctx); err != nil {
+			t.Fatalf("loadRetainedInventory() error = %v", err)
+		}
+		if _, ok := publisher.knownClients["aa_bb_cc_dd_ee_ff"]; !ok {
+			t.Fatal("retained home tracker was not restored")
+		}
+		if got := publisher.knownClients["aa_bb_cc_dd_ee_ff"].Labels["host_name"]; got != "phone" {
+			t.Fatalf("retained tracker host_name = %q, want phone", got)
+		}
 
-	publisher.publishClientTrackers(map[string]clientTracker{})
-	if got := string(mqttClient.messages[trackerStateTopic]); got != "not_home" {
-		t.Fatalf("tracker state = %q, want not_home", got)
-	}
-	if got := mqttClient.publishCounts[trackerAttributesTopic]; got != 0 {
-		t.Fatalf("unchanged retained attributes published %d times, want 0", got)
-	}
+		publisher.publishClientTrackers(map[string]clientTracker{})
+		if got := string(mqttClient.messages[trackerStateTopic]); got != "not_home" {
+			t.Fatalf("tracker state = %q, want not_home", got)
+		}
+		if got := mqttClient.publishCounts[trackerAttributesTopic]; got != 0 {
+			t.Fatalf("unchanged retained attributes published %d times, want 0", got)
+		}
+	})
 }
 
 type recordingMQTTClient struct {
-	messages         map[string][]byte
-	publishCounts    map[string]int
-	publishFailures  map[string]int
-	retainedMessages map[string][]mqtt.Message
+	messages            map[string][]byte
+	publishCounts       map[string]int
+	publishFailures     map[string]int
+	retainedMessages    map[string][]mqtt.Message
+	connectStarted      chan<- struct{}
+	connectToken        mqtt.Token
+	disconnectCalls     int
+	concurrentCallbacks bool
 }
 
 func (c *recordingMQTTClient) IsConnected() bool { return true }
 
 func (c *recordingMQTTClient) IsConnectionOpen() bool { return true }
 
-func (c *recordingMQTTClient) Connect() mqtt.Token { return completedToken{} }
+func (c *recordingMQTTClient) Connect() mqtt.Token {
+	if c.connectStarted != nil {
+		select {
+		case c.connectStarted <- struct{}{}:
+		default:
+		}
+	}
+	if c.connectToken != nil {
+		return c.connectToken
+	}
+	return completedToken{}
+}
 
-func (c *recordingMQTTClient) Disconnect(uint) {}
+func (c *recordingMQTTClient) Disconnect(uint) { c.disconnectCalls++ }
 
 func (c *recordingMQTTClient) Publish(topic string, _ byte, _ bool, payload any) mqtt.Token {
 	if c.messages == nil {
@@ -698,7 +768,11 @@ func (c *recordingMQTTClient) Publish(topic string, _ byte, _ bool, payload any)
 
 func (c *recordingMQTTClient) Subscribe(filter string, _ byte, handler mqtt.MessageHandler) mqtt.Token {
 	for _, message := range c.retainedMessages[filter] {
-		handler(c, message)
+		if c.concurrentCallbacks {
+			go handler(c, message)
+		} else {
+			handler(c, message)
+		}
 	}
 	return completedToken{}
 }
@@ -730,6 +804,30 @@ func (completedToken) Done() <-chan struct{} {
 }
 
 func (t completedToken) Error() error { return t.err }
+
+type pendingToken struct {
+	done chan struct{}
+}
+
+func (t pendingToken) Wait() bool {
+	<-t.done
+	return true
+}
+
+func (t pendingToken) WaitTimeout(timeout time.Duration) bool {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-t.done:
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+func (t pendingToken) Done() <-chan struct{} { return t.done }
+
+func (pendingToken) Error() error { return nil }
 
 type retainedMessage struct {
 	topic   string

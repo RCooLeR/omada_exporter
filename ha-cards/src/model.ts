@@ -79,10 +79,53 @@ function isClientTrackerEntity(entity: HassEntity): boolean {
   return entity.entity_id.startsWith("device_tracker.") && attrString(entity, "mac") !== "";
 }
 
-function clientMacKey(mac: string): string {
+export function normalizeMacKey(mac: string): string {
   const normalized = mac.trim().toLowerCase();
   const compact = normalized.replace(/[^0-9a-f]/g, "");
   return compact.length === 12 ? compact : normalized;
+}
+
+function isDashboardEntity(entity: HassEntity): boolean {
+  return getMetric(entity).startsWith("omada_") || isClientTrackerEntity(entity) || looksLikeClientEntity(entity);
+}
+
+function dashboardStatesChanged(current: HomeAssistant["states"], previous: HomeAssistant["states"]): boolean {
+  if (Object.is(current, previous)) {
+    return false;
+  }
+
+  for (const [entityId, entity] of Object.entries(current)) {
+    if (isDashboardEntity(entity) && previous[entityId] !== entity) {
+      return true;
+    }
+  }
+
+  for (const [entityId, entity] of Object.entries(previous)) {
+    if (isDashboardEntity(entity) && current[entityId] !== entity) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Lit change detector for Home Assistant's frequently replaced `hass` object.
+ * Entity state objects are immutable in Home Assistant, so identity changes are
+ * sufficient to skip full dashboard rebuilds caused by unrelated integrations.
+ */
+export function cardHassChanged(current: HomeAssistant | undefined, previous: HomeAssistant | undefined): boolean {
+  if (Object.is(current, previous)) {
+    return false;
+  }
+  if (!current || !previous) {
+    return true;
+  }
+  if (current.themes?.darkMode !== previous.themes?.darkMode) {
+    return true;
+  }
+
+  return dashboardStatesChanged(current.states, previous.states);
 }
 
 function isActiveClientTracker(entity: HassEntity): boolean {
@@ -234,7 +277,7 @@ function matchSite(entity: HassEntity, siteFilter?: string): boolean {
 
 function ensureDevice(map: Map<string, DeviceRecord>, entity: HassEntity): DeviceRecord {
   const deviceMac = attrString(entity, "device_mac");
-  const key = deviceMac || attrString(entity, "device_name") || entity.entity_id;
+  const key = normalizeMacKey(deviceMac) || attrString(entity, "device_name") || entity.entity_id;
   let existing = map.get(key);
 
   if (!existing) {
@@ -277,7 +320,7 @@ function ensureControllerDevice(
   includeEntityAttributes = true
 ): DeviceRecord {
   const mac = firstString(entity, "device_mac", "mac");
-  const key = mac || firstString(entity, "device_name", "name") || entity.entity_id;
+  const key = normalizeMacKey(mac) || firstString(entity, "device_name", "name") || entity.entity_id;
   let existing = map.get(key);
 
   if (!existing) {
@@ -324,7 +367,7 @@ function ensureControllerDevice(
 function ensurePort(map: Map<string, PortRecord>, entity: HassEntity): PortRecord {
   const deviceMac = attrString(entity, "device_mac");
   const port = attrString(entity, "port");
-  const key = `${deviceMac}:${port}`;
+  const key = `${normalizeMacKey(deviceMac)}:${port}`;
   let existing = map.get(key);
 
   if (!existing) {
@@ -358,7 +401,7 @@ function ensurePort(map: Map<string, PortRecord>, entity: HassEntity): PortRecor
 
 function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity): ClientRecord {
   const mac = attrString(entity, "mac");
-  const key = clientMacKey(mac) || attrString(entity, "name") || entity.entity_id;
+  const key = normalizeMacKey(mac) || attrString(entity, "name") || entity.entity_id;
   let existing = map.get(key);
 
   if (!existing) {
@@ -445,6 +488,10 @@ function ensureLinkRow(map: Map<string, LinkRow>, entity: HassEntity, fallbackKe
   existing.attrs = { ...existing.attrs, ...entity.attributes };
 
   return existing;
+}
+
+function joinKeyParts(...parts: string[]): string {
+  return parts.map((part) => part.trim()).filter(Boolean).join(":");
 }
 
 function ensureVpnParentRow(map: Map<string, LinkRow>, entity: HassEntity): LinkRow {
@@ -557,7 +604,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       continue;
     }
     if (isClientTrackerEntity(entity)) {
-      const mac = clientMacKey(attrString(entity, "mac"));
+      const mac = normalizeMacKey(attrString(entity, "mac"));
       const previous = clientTrackerByMac.get(mac);
       if (!previous || entityObservedAt(entity) >= entityObservedAt(previous)) {
         clientTrackerByMac.set(mac, entity);
@@ -567,7 +614,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     const metric = getMetric(entity);
     const deviceMac = attrString(entity, "device_mac");
     if (deviceMac && (metric.startsWith("omada_device_") || metric.startsWith("omada_controller_"))) {
-      const key = clientMacKey(deviceMac);
+      const key = normalizeMacKey(deviceMac);
       const previous = infrastructureEntityByMac.get(key);
       if (!previous || entityObservedAt(entity) >= entityObservedAt(previous)) {
         infrastructureEntityByMac.set(key, entity);
@@ -581,7 +628,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (isClientTrackerEntity(entity)) {
-      const mac = clientMacKey(attrString(entity, "mac"));
+      const mac = normalizeMacKey(attrString(entity, "mac"));
       // The latest tracker state is the source of truth for dashboard
       // presence. Retained metric sensors can outlive the network session and
       // must not recreate clients that are away or unavailable.
@@ -595,7 +642,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     const metric = getMetric(entity);
     if (!metric) {
-      const mac = clientMacKey(attrString(entity, "mac"));
+      const mac = normalizeMacKey(attrString(entity, "mac"));
       const activeTracker = clientTrackerByMac.get(mac);
       if (looksLikeClientEntity(entity) && activeTracker && isActiveClientTracker(activeTracker)) {
         ensureClient(clients, entity);
@@ -608,7 +655,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     if (metric.startsWith("omada_device_")) {
       const device = ensureDevice(devices, entity);
       if (device.mac) {
-        deviceByMac.set(device.mac, device);
+        deviceByMac.set(normalizeMacKey(device.mac), device);
       }
       setLatestMetric(device, metric, value, entity);
       continue;
@@ -617,7 +664,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     if (metric.startsWith("omada_controller_")) {
       const device = ensureControllerDevice(devices, entity);
       if (device.mac) {
-        deviceByMac.set(device.mac, device);
+        deviceByMac.set(normalizeMacKey(device.mac), device);
       }
       setLatestMetric(device, metric, value, entity);
       continue;
@@ -625,7 +672,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     if (metric.startsWith("omada_port_")) {
       const port = ensurePort(ports, entity);
-      portByDeviceMacAndPort.set(`${port.deviceMac}:${port.port}`, port);
+      portByDeviceMacAndPort.set(`${normalizeMacKey(port.deviceMac)}:${port.port}`, port);
       setLatestMetric(port, metric, value, entity);
       continue;
     }
@@ -633,7 +680,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     if (metric.startsWith("omada_radio_") || metric.startsWith("omada_ap_radio_")) {
       const deviceMac = attrString(entity, "device_mac");
       const band = attrString(entity, "band") || attrString(entity, "radio_name") || metric;
-      const key = `${deviceMac}:${band}`;
+      const key = `${normalizeMacKey(deviceMac)}:${band}`;
       let radio = radios.get(key);
 
       if (!radio) {
@@ -655,7 +702,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     if (metric.startsWith("omada_lag_")) {
       const deviceMac = attrString(entity, "device_mac");
       const lagId = attrString(entity, "lag_id");
-      const key = `${deviceMac}:${lagId}`;
+      const key = `${normalizeMacKey(deviceMac)}:${lagId}`;
       const observedAt = entityObservedAt(entity);
       const existing =
         lags.get(key) ?? { attrs: {}, metrics: {}, updatedAt: -1, metricUpdatedAt: new Map<string, number>() };
@@ -672,7 +719,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (metric.startsWith("omada_client_")) {
-      const mac = clientMacKey(attrString(entity, "mac"));
+      const mac = normalizeMacKey(attrString(entity, "mac"));
       if (!mac || metric === "omada_client_connected_total") {
         continue;
       }
@@ -683,7 +730,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
           ? ensureControllerDevice(devices, infrastructureEntity)
           : ensureDevice(devices, infrastructureEntity);
         if (device.mac) {
-          deviceByMac.set(device.mac, device);
+          deviceByMac.set(normalizeMacKey(device.mac), device);
         }
         setLatestMetric(device, metric, value, entity);
         continue;
@@ -694,7 +741,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       if (isControllerEntity(entity)) {
         const controller = ensureControllerDevice(devices, entity, false);
         if (controller.mac) {
-          deviceByMac.set(controller.mac, controller);
+          deviceByMac.set(normalizeMacKey(controller.mac), controller);
         }
         setLatestMetric(controller, metric, value, entity);
         continue;
@@ -710,7 +757,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     if (metric.startsWith("omada_isp_")) {
       const row = ensureLinkRow(isps, entity, [
-        `${attrString(entity, "name")}:${attrString(entity, "port")}`,
+        joinKeyParts(attrString(entity, "name"), attrString(entity, "port")),
         attrString(entity, "ip")
       ]);
       row.metrics[metric] = value;
@@ -721,8 +768,8 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       const peer = ensureLinkRow(vpnPeers, entity, [
         vpnPeerRowKey(entity),
         attrString(entity, "peer_id"),
-        `${attrString(entity, "vpn_id")}:${attrString(entity, "peer_name")}`,
-        `${attrString(entity, "name")}:${attrString(entity, "peer_name")}`
+        joinKeyParts(attrString(entity, "vpn_id"), attrString(entity, "peer_name")),
+        joinKeyParts(attrString(entity, "name"), attrString(entity, "peer_name"))
       ]);
       peer.name = attrString(entity, "peer_name") || attrString(entity, "remote_ip") || attrString(entity, "peer_id") || peer.name;
       peer.metrics[metric] = value;
@@ -743,8 +790,8 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       const row = ensureLinkRow(vpns, entity, [
         vpnRowKey(entity),
         attrString(entity, "vpn_id"),
-        `${attrString(entity, "name")}:${attrString(entity, "vpn_mode")}:${attrString(entity, "vpn_type")}`,
-        `${attrString(entity, "name")}:${attrString(entity, "vpn_mode")}`
+        joinKeyParts(attrString(entity, "name"), attrString(entity, "vpn_mode"), attrString(entity, "vpn_type")),
+        joinKeyParts(attrString(entity, "name"), attrString(entity, "vpn_mode"))
       ]);
       const remoteIp = attrString(entity, "remote_ip");
       if (remoteIp) {
@@ -760,7 +807,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     if (metric.startsWith("omada_wan_")) {
       const row = ensureLinkRow(wans, entity, [
-        `${attrString(entity, "name")}:${attrString(entity, "port")}`,
+        joinKeyParts(attrString(entity, "name"), attrString(entity, "port")),
         attrString(entity, "ip")
       ]);
       row.metrics[metric] = value;
@@ -769,7 +816,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   }
 
   for (const port of ports.values()) {
-    const device = deviceByMac.get(port.deviceMac);
+    const device = deviceByMac.get(normalizeMacKey(port.deviceMac));
     if (device) {
       device.ports.push(port);
     }
@@ -780,7 +827,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   }
 
   for (const radio of radios.values()) {
-    const device = deviceByMac.get(radio.deviceMac);
+    const device = deviceByMac.get(normalizeMacKey(radio.deviceMac));
     if (device) {
       device.radios.push(radio);
     }
@@ -793,7 +840,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     const lagId = client.attachmentLagId;
     const lagDeviceMac = client.switchMac || client.gatewayMac;
     if (lagId && lagId !== "0" && lagDeviceMac) {
-      const lag = lags.get(`${lagDeviceMac}:${lagId}`);
+      const lag = lags.get(`${normalizeMacKey(lagDeviceMac)}:${lagId}`);
       if (lag) {
         client.attachmentLagPorts = String(lag.attrs.lag_ports ?? "").trim();
         const linkSpeed = lag.metrics.omada_lag_link_speed_mbps ?? Number(lag.attrs.link_speed ?? 0);
@@ -806,7 +853,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (client.switchMac && client.attachmentPort) {
-      const port = portByDeviceMacAndPort.get(`${client.switchMac}:${client.attachmentPort}`);
+      const port = portByDeviceMacAndPort.get(`${normalizeMacKey(client.switchMac)}:${client.attachmentPort}`);
       if (port) {
         port.clients.push(client);
       }
@@ -814,7 +861,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     const attachmentMac = client.apMac || client.switchMac || client.gatewayMac;
     if (attachmentMac) {
-      const device = deviceByMac.get(attachmentMac);
+      const device = deviceByMac.get(normalizeMacKey(attachmentMac));
       if (device) {
         device.clients.push(client);
       }

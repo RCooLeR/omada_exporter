@@ -110,11 +110,12 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get clients")
 		return
 	}
+	_, siteID := client.ContextIDs()
 
 	totals := map[string]int{}
 
 	for _, item := range clients {
-		labels := clientMetricLabels(item, site, client.SiteId)
+		labels := clientMetricLabels(item, site, siteID)
 
 		if c.trackClientMetrics() {
 			ch <- prometheus.MustNewConstMetric(c.omadaClientTrafficDown, prometheus.CounterValue, item.TrafficDown, labels...)
@@ -140,10 +141,10 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 	for connectionModeFmt, v := range totals {
 		if connectionModeFmt == "wired" {
 			ch <- prometheus.MustNewConstMetric(c.omadaClientConnectedTotal, prometheus.GaugeValue, float64(v),
-				site, client.SiteId, "wired", "")
+				site, siteID, "wired", "")
 		} else {
 			ch <- prometheus.MustNewConstMetric(c.omadaClientConnectedTotal, prometheus.GaugeValue, float64(v),
-				site, client.SiteId, "wireless", connectionModeFmt)
+				site, siteID, "wireless", connectionModeFmt)
 		}
 	}
 }

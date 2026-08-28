@@ -1,18 +1,22 @@
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import type { DashboardModel, HomeAssistant, LinkRow, LovelaceCardConfig } from "./ha-types";
 import { formatBytes, formatLatency, formatRateBytes, formatSpeedMbps, formatUptimeSeconds } from "./format";
-import { getDashboardModel, vpnModeLabel, vpnPeerLoginSeconds, vpnRemoteLabel, vpnTotalBytes, vpnUptimeSeconds } from "./model";
-
-declare global {
-  interface Window {
-    customCards?: Array<Record<string, unknown>>;
-  }
-}
+import {
+  cardHassChanged,
+  getDashboardModel,
+  vpnModeLabel,
+  vpnPeerLoginSeconds,
+  vpnRemoteLabel,
+  vpnTotalBytes,
+  vpnUptimeSeconds
+} from "./model";
+import { registerCustomCard } from "./register-card";
 
 export class OmadaLinksCard extends LitElement {
   static override properties = {
-    hass: { attribute: false },
+    hass: { attribute: false, hasChanged: cardHassChanged },
+    _config: { state: true },
     _model: { state: true }
   };
 
@@ -132,7 +136,7 @@ export class OmadaLinksCard extends LitElement {
   }
 
   protected override willUpdate(changed: Map<string, unknown>): void {
-    if (changed.has("hass") && this.hass) {
+    if ((changed.has("hass") || changed.has("_config")) && this.hass) {
       this._model = getDashboardModel(this.hass, this._config?.site);
     }
   }
@@ -244,7 +248,7 @@ export class OmadaLinksCard extends LitElement {
                   <td>${formatBytes(total)}</td>
                 </tr>
               `;
-            }) : ""}
+            }) : nothing}
           </tbody>
         </table>
       </div>
@@ -272,9 +276,7 @@ export class OmadaLinksCard extends LitElement {
   }
 }
 
-customElements.define("omada-links-card", OmadaLinksCard);
-window.customCards = window.customCards || [];
-window.customCards.push({
+registerCustomCard(customElements, window, "omada-links-card", OmadaLinksCard, {
   type: "omada-links-card",
   name: "Omada Links Card",
   description: "Compact ISP and VPN summary card for Home Assistant."

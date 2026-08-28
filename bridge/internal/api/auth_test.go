@@ -19,12 +19,12 @@ func TestLoginEncodesCredentialsAsJSON(t *testing.T) {
 			Username: username,
 			Password: password,
 		},
-		OmadaCID: "controller-id",
 		httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			decodeRequestJSON(t, req, &payload)
 			return jsonResponse(`{"errorCode":0,"result":{"token":"web-token"}}`), nil
 		})},
 	}
+	client.SetContextIDs("controller-id", "site-id")
 
 	if err := client.Login(); err != nil {
 		t.Fatalf("Login() returned error: %v", err)
@@ -48,12 +48,12 @@ func TestLoginOpenAPIEncodesCredentialsAsJSON(t *testing.T) {
 			ClientId: clientID,
 			SecretId: clientSecret,
 		},
-		OmadaCID: omadaCID,
 		httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			decodeRequestJSON(t, req, &payload)
 			return jsonResponse(`{"errorCode":0,"result":{"accessToken":"access-token","refreshToken":"refresh-token","expiresIn":3600}}`), nil
 		})},
 	}
+	client.SetContextIDs(omadaCID, "site-id")
 
 	if err := client.LoginOpenApi(); err != nil {
 		t.Fatalf("LoginOpenApi() returned error: %v", err)
@@ -63,6 +63,29 @@ func TestLoginOpenAPIEncodesCredentialsAsJSON(t *testing.T) {
 	}
 	if len(payload) != 3 {
 		t.Fatalf("OpenAPI login payload has %d fields, want 3: %#v", len(payload), payload)
+	}
+}
+
+func TestIsLoggedInTreatsUnauthorizedStatusAsLoggedOut(t *testing.T) {
+	client := &Client{
+		Config: &config.Config{Host: "https://omada.example"},
+		httpClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Status:     "401 Unauthorized",
+				Header:     make(http.Header),
+				Body:       http.NoBody,
+			}, nil
+		})},
+	}
+	client.SetContextIDs("controller-id", "site-id")
+
+	loggedIn, err := client.IsLoggedIn()
+	if err != nil {
+		t.Fatalf("IsLoggedIn() error = %v", err)
+	}
+	if loggedIn {
+		t.Fatal("IsLoggedIn() = true after HTTP 401")
 	}
 }
 

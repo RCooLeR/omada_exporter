@@ -9,7 +9,7 @@ import (
 )
 
 // collectSwitch emits metrics for the switch.
-func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.Switch) error {
+func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.Switch, siteID string) error {
 	labels := []string{
 		sw.GetMac(),
 		sw.GetType(),
@@ -24,7 +24,7 @@ func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 		sw.GetName(),
 		sw.GetStatus(),
 		c.webClient.Client.Config.Site,
-		c.webClient.SiteId,
+		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, sw.TxRate, labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceRxRate, prometheus.GaugeValue, sw.RxRate, labels...)

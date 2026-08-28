@@ -5,7 +5,7 @@ export default defineConfig({
     "process.env.NODE_ENV": JSON.stringify("production")
   },
   build: {
-    target: "es2022",
+    target: "baseline-widely-available",
     outDir: "dist",
     emptyOutDir: true,
     lib: {

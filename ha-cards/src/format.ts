@@ -148,15 +148,22 @@ export function formatLatency(value: number): string {
 }
 
 export function qualityLabel(signalPct: number, rssi: number): string {
-  if (signalPct >= 85 || rssi >= -55) {
+  const signal = Number.isFinite(signalPct) && signalPct > 0 ? signalPct : undefined;
+  const signalStrength = Number.isFinite(rssi) && rssi < 0 ? rssi : undefined;
+
+  if (signal === undefined && signalStrength === undefined) {
+    return "Unknown";
+  }
+
+  if ((signal ?? 0) >= 85 || (signalStrength ?? Number.NEGATIVE_INFINITY) >= -55) {
     return "Excellent";
   }
 
-  if (signalPct >= 70 || rssi >= -65) {
+  if ((signal ?? 0) >= 70 || (signalStrength ?? Number.NEGATIVE_INFINITY) >= -65) {
     return "Good";
   }
 
-  if (signalPct >= 50 || rssi >= -75) {
+  if ((signal ?? 0) >= 50 || (signalStrength ?? Number.NEGATIVE_INFINITY) >= -75) {
     return "Fair";
   }
 

@@ -1,6 +1,6 @@
 import { BarChart, GaugeChart, RadarChart } from "echarts/charts";
-import { GridComponent, RadarComponent } from "echarts/components";
-import { init, use, type EChartsType } from "echarts/core";
+import { AriaComponent, GridComponent, RadarComponent } from "echarts/components";
+import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import type { EChartsOption } from "echarts";
 import { css, html, LitElement, nothing } from "lit";
@@ -8,6 +8,8 @@ import { repeat } from "lit/directives/repeat.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import logoDark from "./assets/logo-dark.svg?raw";
 import logoLight from "./assets/logo-light.svg?raw";
+import { inspectionAriaLabel } from "./accessibility";
+import { ChartController, deviceResourceSummarySignature } from "./chart-controller";
 import {
   formatBytes,
   formatLatency,
@@ -27,13 +29,16 @@ import type {
   LovelaceCardConfig
 } from "./ha-types";
 import {
+  cardHassChanged,
   getDashboardModel,
+  normalizeMacKey,
   vpnModeLabel,
   vpnPeerLoginSeconds,
   vpnRemoteLabel,
   vpnTotalBytes,
   vpnUptimeSeconds
 } from "./model";
+import { registerCustomCard } from "./register-card";
 
 type Selection = { kind: "device"; key: string } | { kind: "client"; key: string };
 type DeviceMeta = {
@@ -65,17 +70,20 @@ type ChartOptionCacheEntry = {
   option: EChartsOption;
 };
 
-use([BarChart, GaugeChart, RadarChart, GridComponent, RadarComponent, CanvasRenderer]);
+use([BarChart, GaugeChart, RadarChart, AriaComponent, GridComponent, RadarComponent, CanvasRenderer]);
 
-declare global {
-  interface Window {
-    customCards?: Array<Record<string, unknown>>;
-  }
+function chartAria(description: string) {
+  return {
+    enabled: true,
+    label: { enabled: true, description },
+    decal: { show: true }
+  } as const;
 }
 
 export class OmadaNetworkCard extends LitElement {
   static override properties = {
-    hass: { attribute: false },
+    hass: { attribute: false, hasChanged: cardHassChanged },
+    _config: { state: true },
     _model: { state: true },
     _selection: { state: true },
     _clientFilter: { state: true },
@@ -178,12 +186,24 @@ export class OmadaNetworkCard extends LitElement {
     .table.tight th, .table.tight td { overflow: hidden; text-overflow: ellipsis; }
     .table.clickable tbody tr { cursor: pointer; }
     .table.clickable tbody tr:hover { background: rgba(84, 209, 255, 0.08); }
+    .table.clickable tbody tr:focus-within { background: rgba(84, 209, 255, 0.08); }
+    .client-row-action {
+      appearance: none;
+      padding: 0;
+      border: 0;
+      color: inherit;
+      background: none;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
     .col-name { width: 46%; }
     .col-ip { width: 24%; }
     .col-signal, .col-path { width: 15%; }
     .section-title, .row-top, .row-bottom, .list-toolbar, .detail-title { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
     .section-title, .row-title, .detail-name { font-weight: 600; }
     .row-title { font-size: 0.95rem; line-height: 1.2; }
+    .card-row .row-title, .card-row .row-subtitle { display: block; }
     .detail-name { font-size: clamp(1.35rem, 2vw, 1.9rem); line-height: 1.05; }
     .pill-row, .metric-group { display: flex; gap: 0.45rem; flex-wrap: wrap; }
     .mini-pill, .metric-tag {
@@ -195,13 +215,28 @@ export class OmadaNetworkCard extends LitElement {
       font-size: 0.74rem;
     }
     .mini-pill { cursor: pointer; color: var(--muted); }
+    .card-row:focus-visible, .mini-pill:focus-visible, .client-row-action:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
     .mini-pill.active, .card-row.selected { border-color: rgba(84, 209, 255, 0.35); background: linear-gradient(180deg, rgba(84, 209, 255, 0.12), rgba(255, 255, 255, 0.02)); }
     .list-panel, .detail-panel { min-height: 0; height: 100%; display: grid; overflow: hidden; }
     .list-shell { grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; height: 100%; }
     .list-scroll { overflow: auto; min-height: 0; height: calc(100% - 2rem); display: grid; gap: 0.7rem; align-content: start; padding-right: 0.2rem; }
-    .card-row { padding: 0.9rem; display: grid; gap: 0.55rem; cursor: pointer; transition: transform 120ms ease, border-color 120ms ease; }
+    .card-row {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 0.9rem;
+      display: grid;
+      gap: 0.55rem;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease;
+    }
     .card-row:hover { transform: translateY(-1px); border-color: rgba(84, 209, 255, 0.28); }
-    .signal-bar { height: 0.42rem; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+    .signal-bar { display: block; height: 0.42rem; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
     .signal-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--bad), var(--warn), var(--good)); }
     .status-dot { width: 0.7rem; height: 0.7rem; border-radius: 999px; display: inline-block; margin-right: 0.45rem; background: var(--muted); box-shadow: 0 0 18px currentColor; vertical-align: middle; }
     .status-up { color: var(--good); background: var(--good); }
@@ -243,45 +278,18 @@ export class OmadaNetworkCard extends LitElement {
   private _pendingUpdateCount = 0;
   private _selectedDevice: DeviceRecord | undefined;
   private _selectedClient: ClientRecord | undefined;
-  private readonly _charts = new Map<string, EChartsType>();
-  private readonly _chartElements = new Map<string, HTMLElement>();
-  private readonly _chartSignatures = new Map<string, string>();
+  private readonly _chartController = new ChartController(this, () => this.syncCharts());
   private readonly _deviceMeta = new WeakMap<DeviceRecord, DeviceMeta>();
   private readonly _clientMeta = new WeakMap<ClientRecord, ClientMeta>();
   private readonly _devicePrimaryOptionCache = new WeakMap<DeviceRecord, ChartOptionCacheEntry>();
   private readonly _deviceSecondaryOptionCache = new WeakMap<DeviceRecord, ChartOptionCacheEntry>();
   private readonly _clientPrimaryOptionCache = new WeakMap<ClientRecord, ChartOptionCacheEntry>();
   private readonly _clientSecondaryOptionCache = new WeakMap<ClientRecord, ChartOptionCacheEntry>();
-  private _resizeObserver: ResizeObserver | undefined;
-
   public setConfig(config: LovelaceCardConfig): void {
     if (!config?.type) {
       throw new Error("Card type is required");
     }
-    const previousSite = this._config?.site;
     this._config = { logo_mode: "auto", device_limit: 100, client_limit: 150, show_vpn_peers: true, ...config };
-
-    if (!this.hass) {
-      return;
-    }
-
-    if (!this._model || previousSite !== this._config.site) {
-      this._model = getDashboardModel(this.hass, this._config.site);
-      this._pendingUpdateCount = this._model.devices.reduce(
-        (count, device) => count + (this.getDeviceMeta(device).pendingUpdate ? 1 : 0),
-        0
-      );
-      if (!this._selection || !this.selectionExists(this._selection)) {
-        const device = this._model.devices[0];
-        const client = this.computeFilteredClients()[0];
-        this._selection = device ? { kind: "device", key: device.key } : client ? { kind: "client", key: client.key } : undefined;
-      }
-    }
-
-    this._filteredClients = this.computeFilteredClients();
-    this._filteredDevices = this.computeFilteredDevices();
-    this.refreshVisibleLists();
-    this.refreshSelectedRecords();
   }
 
   public getCardSize(): number {
@@ -290,7 +298,8 @@ export class OmadaNetworkCard extends LitElement {
 
   protected override willUpdate(changed: Map<string, unknown>): void {
     let modelChanged = false;
-    if (changed.has("hass") && this.hass) {
+    const configChanged = changed.has("_config");
+    if ((changed.has("hass") || configChanged) && this.hass) {
       this._model = getDashboardModel(this.hass, this._config?.site);
       modelChanged = true;
     }
@@ -316,23 +325,12 @@ export class OmadaNetworkCard extends LitElement {
       }
     }
 
-    if (modelChanged || changed.has("_clientFilter") || changed.has("_deviceFilter")) {
+    if (modelChanged || configChanged || changed.has("_clientFilter") || changed.has("_deviceFilter")) {
       this.refreshVisibleLists();
     }
 
     if (modelChanged || changed.has("_selection")) {
       this.refreshSelectedRecords();
-    }
-  }
-
-  protected override firstUpdated(): void {
-    this._resizeObserver = new ResizeObserver(() => this._charts.forEach((chart) => chart.resize()));
-    this._resizeObserver.observe(this);
-  }
-
-  protected override updated(changed: Map<string, unknown>): void {
-    if (changed.has("_model") || changed.has("_selection")) {
-      this.syncCharts();
     }
   }
 
@@ -350,15 +348,6 @@ export class OmadaNetworkCard extends LitElement {
 
     this._selectedDevice = this._selection.kind === "device" ? this._model.deviceByKey.get(this._selection.key) : undefined;
     this._selectedClient = this._selection.kind === "client" ? this._model.clientByKey.get(this._selection.key) : undefined;
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._resizeObserver?.disconnect();
-    this._charts.forEach((chart) => chart.dispose());
-    this._charts.clear();
-    this._chartElements.clear();
-    this._chartSignatures.clear();
   }
 
   protected override render() {
@@ -635,7 +624,7 @@ export class OmadaNetworkCard extends LitElement {
           <div class="section-title">Devices</div>
           <div class="row-subtitle">${this._filteredDevices.length} shown</div>
         </div>
-        <div class="pill-row">
+        <div class="pill-row" role="group" aria-label="Device filters">
           ${this.renderDeviceFilterPill("all", `All (${this._model!.devices.length})`)}
           ${this.renderDeviceFilterPill("controller", `Controller (${this._model!.siteSummary.controllers})`)}
           ${this.renderDeviceFilterPill("gateway", `Gateway (${this._model!.siteSummary.gateways})`)}
@@ -650,26 +639,32 @@ export class OmadaNetworkCard extends LitElement {
             const isUp = device.status === "Connected";
             const meta = this.getDeviceMeta(device);
             return html`
-              <div class="card-row ${selected ? "selected" : ""}" @click=${() => this.selectDevice(device.key)}>
-                <div class="row-top">
-                  <div>
-                    <div class="row-title">${device.name}</div>
-                    <div class="row-subtitle">${device.model || device.type}</div>
-                  </div>
-                  <div class="metric-tag"><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</div>
-                </div>
-                <div class="metric-group">
+              <button
+                type="button"
+                class="card-row ${selected ? "selected" : ""}"
+                aria-label=${inspectionAriaLabel("device", device.name)}
+                aria-pressed=${selected}
+                @click=${() => this.selectDevice(device.key)}
+              >
+                <span class="row-top">
+                  <span>
+                    <span class="row-title">${device.name}</span>
+                    <span class="row-subtitle">${device.model || device.type}</span>
+                  </span>
+                  <span class="metric-tag"><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</span>
+                </span>
+                <span class="metric-group">
                   <span class="metric-tag">${device.type}</span>
                   <span class="metric-tag">CPU ${formatPercent(cpu)}</span>
                   <span class="metric-tag">RAM ${formatPercent(mem)}</span>
                   ${meta.pendingUpdate ? html`<span class="metric-tag">Update ${meta.updateTarget || "pending"}</span>` : nothing}
                   <span class="metric-tag">${device.clients.length} clients</span>
-                </div>
-                <div class="row-bottom">
-                  <div class="row-subtitle">${device.ip || "No IP"} · ${device.version || "n/a"}</div>
-                  <div class="row-subtitle">${device.ports.length} ports</div>
-                </div>
-              </div>
+                </span>
+                <span class="row-bottom">
+                  <span class="row-subtitle">${device.ip || "No IP"} · ${device.version || "n/a"}</span>
+                  <span class="row-subtitle">${device.ports.length} ports</span>
+                </span>
+              </button>
             `;
           })}
         </div>
@@ -683,7 +678,9 @@ export class OmadaNetworkCard extends LitElement {
   ) {
     return html`
       <button
+        type="button"
         class="mini-pill ${this._deviceFilter === filter ? "active" : ""}"
+        aria-pressed=${this._deviceFilter === filter}
         @click=${() => this.setDeviceFilter(filter)}
       >
         ${label}
@@ -699,7 +696,7 @@ export class OmadaNetworkCard extends LitElement {
           <div class="section-title">Clients</div>
           <div class="row-subtitle">${this._filteredClients.length} shown</div>
         </div>
-        <div class="pill-row">
+        <div class="pill-row" role="group" aria-label="Client filters">
           ${this.renderClientFilterPill("all", "All")}
           ${this.renderClientFilterPill("wireless", "Wireless")}
           ${this.renderClientFilterPill("wired", "Wired")}
@@ -712,27 +709,33 @@ export class OmadaNetworkCard extends LitElement {
             const meta = this.getClientMeta(client);
             const attachment = meta.attachmentLabel;
             return html`
-              <div class="card-row ${selected ? "selected" : ""}" @click=${() => this.selectClient(client.key)}>
-                <div class="row-top">
-                  <div>
-                    <div class="row-title">${client.name}</div>
-                    <div class="row-subtitle">${attachment}${client.attachmentPort && !client.wireless ? ` · port ${client.attachmentPort}` : ""}</div>
-                  </div>
-                  <div class="metric-tag">${client.wireless ? "Wireless" : "Wired"}</div>
-                </div>
-                <div class="metric-group">
+              <button
+                type="button"
+                class="card-row ${selected ? "selected" : ""}"
+                aria-label=${inspectionAriaLabel("client", client.name)}
+                aria-pressed=${selected}
+                @click=${() => this.selectClient(client.key)}
+              >
+                <span class="row-top">
+                  <span>
+                    <span class="row-title">${client.name}</span>
+                    <span class="row-subtitle">${attachment}${client.attachmentPort && !client.wireless ? ` · port ${client.attachmentPort}` : ""}</span>
+                  </span>
+                  <span class="metric-tag">${client.wireless ? "Wireless" : "Wired"}</span>
+                </span>
+                <span class="metric-group">
                   ${client.ssid ? html`<span class="metric-tag">${client.ssid}</span>` : nothing}
                   ${client.vendor ? html`<span class="metric-tag">${client.vendor}</span>` : nothing}
                   <span class="metric-tag">${meta.liveRateLabel}</span>
                   <span class="metric-tag">${meta.quality}</span>
                   <span class="metric-tag">${rssi ? `${rssi} dBm` : "n/a"}</span>
-                </div>
-                <div class="signal-bar"><span style="width:${Math.max(0, Math.min(signal, 100))}%"></span></div>
-                <div class="row-bottom">
-                  <div class="row-subtitle">${client.ip || "No IP"} · VLAN ${client.vlanId || "-"}</div>
-                  <div class="row-subtitle">${meta.rateBreakdown}</div>
-                </div>
-              </div>
+                </span>
+                <span class="signal-bar"><span style="width:${Math.max(0, Math.min(signal, 100))}%"></span></span>
+                <span class="row-bottom">
+                  <span class="row-subtitle">${client.ip || "No IP"} · VLAN ${client.vlanId || "-"}</span>
+                  <span class="row-subtitle">${meta.rateBreakdown}</span>
+                </span>
+              </button>
             `;
           })}
         </div>
@@ -743,7 +746,9 @@ export class OmadaNetworkCard extends LitElement {
   private renderClientFilterPill(filter: "all" | "wireless" | "wired", label: string) {
     return html`
       <button
+        type="button"
         class="mini-pill ${this._clientFilter === filter ? "active" : ""}"
+        aria-pressed=${this._clientFilter === filter}
         @click=${() => this.setClientFilter(filter)}
       >
         ${label}
@@ -847,7 +852,17 @@ export class OmadaNetworkCard extends LitElement {
                   ${repeat(meta.clientPreview, (client) => client.key, (client) => {
                     const clientMeta = this.getClientMeta(client);
                     return html`<tr @click=${() => this.selectClient(client.key)}>
-                      <td class="col-name" title=${client.name}>${client.name}</td>
+                      <td class="col-name" title=${client.name}>
+                        <button
+                          type="button"
+                          class="client-row-action"
+                          aria-label=${inspectionAriaLabel("client", client.name)}
+                          @click=${(event: Event) => {
+                            event.stopPropagation();
+                            this.selectClient(client.key);
+                          }}
+                        >${client.name}</button>
+                      </td>
                       <td class="col-ip" title=${client.ip || "-"}>${client.ip || "-"}</td>
                       <td class="col-signal">${client.wireless ? formatPercent(client.metrics.omada_client_signal_pct ?? 0) : "-"}</td>
                       <td class="col-path" title=${client.wireless ? clientMeta.bandLabel : clientMeta.wiredPathLabel}>${client.wireless ? clientMeta.bandLabel : clientMeta.wiredPathLabel}</td>
@@ -1031,7 +1046,9 @@ export class OmadaNetworkCard extends LitElement {
       wiredLinkSpeed: this.wiredClientLinkSpeed(client),
       lagPorts: this.wiredLagPorts(client),
       attachmentLabel: client.wireless ? client.apName || "AP" : client.switchName || client.gatewayName || "Wired",
-      quality: qualityLabel(client.metrics.omada_client_signal_pct ?? 0, client.metrics.omada_client_rssi_dbm ?? 0)
+      quality: client.wireless
+        ? qualityLabel(client.metrics.omada_client_signal_pct ?? 0, client.metrics.omada_client_rssi_dbm ?? 0)
+        : "Wired"
     };
     this._clientMeta.set(client, meta);
     return meta;
@@ -1130,7 +1147,7 @@ export class OmadaNetworkCard extends LitElement {
       return undefined;
     }
 
-    return this._model.portByDeviceMacAndPort.get(`${deviceMac}:${client.attachmentPort}`);
+    return this._model.portByDeviceMacAndPort.get(`${normalizeMacKey(deviceMac)}:${client.attachmentPort}`);
   }
 
   private clientLiveRate(client: ClientRecord): number {
@@ -1183,6 +1200,7 @@ export class OmadaNetworkCard extends LitElement {
 
   private syncCharts(): void {
     if (!this._model) {
+      this._chartController.clear();
       return;
     }
     if (this._selection?.kind === "device" && this._selectedDevice) {
@@ -1219,6 +1237,8 @@ export class OmadaNetworkCard extends LitElement {
         ),
         secondarySignature
       );
+    } else {
+      this._chartController.clear();
     }
   }
 
@@ -1243,29 +1263,7 @@ export class OmadaNetworkCard extends LitElement {
     if (!element) {
       return;
     }
-
-    const currentElement = this._chartElements.get(key);
-    let chart = this._charts.get(key);
-    if (chart && currentElement && currentElement !== element) {
-      chart.dispose();
-      this._charts.delete(key);
-      this._chartElements.delete(key);
-      this._chartSignatures.delete(key);
-      chart = undefined;
-    }
-    if (!chart) {
-      chart = init(element, undefined, { renderer: "canvas" });
-      this._charts.set(key, chart);
-      this._chartElements.set(key, element);
-      chart.resize();
-    }
-
-    if (this._chartSignatures.get(key) === signature) {
-      return;
-    }
-
-    chart.setOption(option, true);
-    this._chartSignatures.set(key, signature);
+    this._chartController.render(key, element, option, signature);
   }
 
   private buildDevicePrimaryOption(device: DeviceRecord): EChartsOption {
@@ -1274,6 +1272,11 @@ export class OmadaNetworkCard extends LitElement {
     const clientDensity = Math.min(device.clients.length * 12, 100);
     const uplink = Math.min(meta.uplinkMbps / 100, 100);
     return {
+      aria: chartAria(
+        `${device.name} health: CPU ${formatPercent(device.metrics.omada_device_cpu_percentage ?? 0)}, ` +
+        `memory ${formatPercent(device.metrics.omada_device_mem_percentage ?? 0)}, ` +
+        `${meta.connectedPorts} connected ports and ${device.clients.length} clients.`
+      ),
       radar: {
         radius: "63%",
         indicator: [
@@ -1304,6 +1307,7 @@ export class OmadaNetworkCard extends LitElement {
       const rows = meta.radioRows;
       if (rows.length) {
         return {
+          aria: chartAria(`${device.name} radio utilization: ${rows.map((row) => `${row.label} ${formatPercent(row.value)}`).join(", ")}.`),
           grid: { top: 10, left: 14, right: 18, bottom: 12, containLabel: true },
           xAxis: {
             type: "value",
@@ -1325,6 +1329,10 @@ export class OmadaNetworkCard extends LitElement {
     const rows = meta.topPorts;
     if (!rows.length) {
       return {
+        aria: chartAria(
+          `${device.name} resource summary: CPU ${formatPercent(device.metrics.omada_device_cpu_percentage ?? 0)}, ` +
+          `memory ${formatPercent(device.metrics.omada_device_mem_percentage ?? 0)} and ${device.clients.length} clients.`
+        ),
         grid: { top: 10, left: 14, right: 18, bottom: 12, containLabel: true },
         xAxis: { type: "value", axisLabel: { color: "#97aac0" } },
         yAxis: { type: "category", data: ["CPU", "RAM", "Clients"], axisLabel: { color: "#edf4ff" } },
@@ -1341,6 +1349,11 @@ export class OmadaNetworkCard extends LitElement {
       };
     }
     return {
+      aria: chartAria(
+        `${device.name} port link speeds: ${rows
+          .map((port) => `${port.name} ${formatSpeedMbps(port.metrics.omada_port_link_speed_mbps ?? 0)}`)
+          .join(", ")}.`
+      ),
       grid: { top: 10, left: 14, right: 18, bottom: 12, containLabel: true },
       xAxis: {
         type: "value",
@@ -1360,6 +1373,10 @@ export class OmadaNetworkCard extends LitElement {
   private buildClientPrimaryOption(client: ClientRecord): EChartsOption {
     if (!client.wireless) {
       return {
+        aria: chartAria(
+          `${client.name} traffic: receive ${formatRateBits(client.metrics.omada_client_rx_rate ?? 0)}, ` +
+          `transmit ${formatRateBits(client.metrics.omada_client_tx_rate ?? 0)}.`
+        ),
         grid: { top: 10, left: 18, right: 18, bottom: 20, containLabel: true },
         xAxis: {
           type: "value",
@@ -1391,6 +1408,7 @@ export class OmadaNetworkCard extends LitElement {
     const meta = this.getClientMeta(client);
     const signal = client.metrics.omada_client_signal_pct ?? 0;
     return {
+      aria: chartAria(`${client.name} Wi-Fi signal is ${formatPercent(signal)}, rated ${meta.quality}.`),
       series: [{
         type: "gauge",
         center: ["50%", "58%"],
@@ -1413,6 +1431,7 @@ export class OmadaNetworkCard extends LitElement {
 
   private buildClientSecondaryOption(client: ClientRecord): EChartsOption {
     return {
+      aria: chartAria(`${client.name} receive, transmit, download, and upload activity.`),
       grid: { top: 10, left: 18, right: 18, bottom: 20, containLabel: true },
       xAxis: { type: "category", data: ["RX", "TX", "Down act.", "Up act."], axisLabel: { color: "#97aac0" } },
       yAxis: {
@@ -1441,6 +1460,7 @@ export class OmadaNetworkCard extends LitElement {
     const meta = this.getDeviceMeta(device);
     return [
       device.key,
+      device.name,
       device.metrics.omada_device_cpu_percentage ?? 0,
       device.metrics.omada_device_mem_percentage ?? 0,
       meta.connectedPorts,
@@ -1453,16 +1473,26 @@ export class OmadaNetworkCard extends LitElement {
   private deviceSecondarySignature(device: DeviceRecord): string {
     const meta = this.getDeviceMeta(device);
     if (device.type === "ap" && meta.radioRows.length) {
-      return `ap|${meta.radioRows.map((row) => `${row.label}:${row.value}`).join("|")}`;
+      return `ap|${device.name}|${meta.radioRows.map((row) => `${row.label}:${row.value}`).join("|")}`;
     }
 
-    return `ports|${meta.topPorts.map((port) => `${port.key}:${port.metrics.omada_port_link_speed_mbps ?? 0}:${port.poe ? 1 : 0}`).join("|")}`;
+    if (!meta.topPorts.length) {
+      return deviceResourceSummarySignature(
+        device.name,
+        device.metrics.omada_device_cpu_percentage ?? 0,
+        device.metrics.omada_device_mem_percentage ?? 0,
+        device.clients.length
+      );
+    }
+
+    return `ports|${device.name}|${meta.topPorts.map((port) => `${port.key}:${port.name}:${port.metrics.omada_port_link_speed_mbps ?? 0}:${port.poe ? 1 : 0}`).join("|")}`;
   }
 
   private clientPrimarySignature(client: ClientRecord): string {
     if (!client.wireless) {
       return [
         client.key,
+        client.name,
         client.metrics.omada_client_rx_rate ?? 0,
         client.metrics.omada_client_tx_rate ?? 0,
         client.metrics.omada_client_traffic_down_bytes ?? 0,
@@ -1472,6 +1502,7 @@ export class OmadaNetworkCard extends LitElement {
 
     return [
       client.key,
+      client.name,
       client.metrics.omada_client_signal_pct ?? 0,
       client.metrics.omada_client_rssi_dbm ?? 0
     ].join("|");
@@ -1480,6 +1511,7 @@ export class OmadaNetworkCard extends LitElement {
   private clientSecondarySignature(client: ClientRecord): string {
     return [
       client.key,
+      client.name,
       client.metrics.omada_client_rx_rate ?? 0,
       client.metrics.omada_client_tx_rate ?? 0,
       client.metrics.omada_client_download_activity_bytes ?? 0,
@@ -1537,9 +1569,7 @@ export class OmadaNetworkCard extends LitElement {
   }
 }
 
-customElements.define("omada-network-card", OmadaNetworkCard);
-window.customCards = window.customCards || [];
-window.customCards.push({
+registerCustomCard(customElements, window, "omada-network-card", OmadaNetworkCard, {
   type: "omada-network-card",
   name: "Omada Network Card",
   description: "Full-screen Omada operations card for Home Assistant."

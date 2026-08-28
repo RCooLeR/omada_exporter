@@ -9,7 +9,7 @@ import (
 )
 
 // collectGateway emits metrics for the gateway.
-func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *model.Gateway) error {
+func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *model.Gateway, siteID string) error {
 	labels := []string{
 		gateway.GetMac(),
 		gateway.GetType(),
@@ -24,7 +24,7 @@ func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *m
 		gateway.GetName(),
 		gateway.GetStatus(),
 		c.webClient.Client.Config.Site,
-		c.webClient.SiteId,
+		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTemp, prometheus.CounterValue, gateway.GetTemp(), labels...)
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, gateway.TxRate, labels...)

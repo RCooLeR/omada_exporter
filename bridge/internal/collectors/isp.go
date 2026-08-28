@@ -35,6 +35,7 @@ func (c *ispCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("Failed to get ISP list")
 		return
 	}
+	_, siteID := client.ContextIDs()
 
 	for _, item := range isp {
 		labels := []string{
@@ -49,7 +50,7 @@ func (c *ispCollector) Collect(ch chan<- prometheus.Metric) {
 			fmt.Sprintf("%d", item.MaxBandwidth),
 			fmt.Sprintf("%d", item.DownloadSpeedSet),
 			site,
-			client.SiteId,
+			siteID,
 		}
 		ch <- prometheus.MustNewConstMetric(c.omadaIspStatus, prometheus.GaugeValue, float64(item.Status), labels...)
 		ch <- prometheus.MustNewConstMetric(c.omadaIspDownloadSpeed, prometheus.GaugeValue, item.DownloadSpeed, labels...)

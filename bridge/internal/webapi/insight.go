@@ -3,7 +3,6 @@ package webapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -18,7 +17,7 @@ func (c *Client) GetDPIInsights(windowSeconds int) (*model.DPIInsights, error) {
 		windowSeconds = 86400
 	}
 	cacheKey := fmt.Sprintf("webapi:dpi:insights:%d", windowSeconds)
-	return api.FetchCached(c.Client, cacheKey, func() (*model.DPIInsights, error) {
+	return c.FetchCached(cacheKey, func() (*model.DPIInsights, error) {
 		return c.getDPIInsightsFresh(windowSeconds)
 	})
 }
@@ -26,14 +25,15 @@ func (c *Client) GetDPIInsights(windowSeconds int) (*model.DPIInsights, error) {
 func (c *Client) getDPIInsightsFresh(windowSeconds int) (*model.DPIInsights, error) {
 	end := time.Now().Unix()
 	start := end - int64(windowSeconds)
+	omadaCID, siteID := c.ContextIDs()
 
-	overviewURL := fmt.Sprintf("%s/%s/api/v2/sites/%s/stat/dpi/overview?start=%d&end=%d", c.Config.Host, c.OmadaCID, c.SiteId, start, end)
+	overviewURL := fmt.Sprintf("%s/%s/api/v2/sites/%s/stat/dpi/overview?start=%d&end=%d", c.Config.Host, omadaCID, siteID, start, end)
 	overview := dpiOverviewResponse{}
 	if err := c.getWebAPIJSON(overviewURL, "DPI overview", &overview); err != nil {
 		return nil, err
 	}
 
-	cardsURL := fmt.Sprintf("%s/%s/api/v2/sites/%s/stat/dpi/category/categoryCards?start=%d&end=%d&selectAll=true", c.Config.Host, c.OmadaCID, c.SiteId, start, end)
+	cardsURL := fmt.Sprintf("%s/%s/api/v2/sites/%s/stat/dpi/category/categoryCards?start=%d&end=%d&selectAll=true", c.Config.Host, omadaCID, siteID, start, end)
 	cards := dpiCategoryCardsResponse{}
 	if err := c.getWebAPIJSON(cardsURL, "DPI category cards", &cards); err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (c *Client) getWebAPIJSON(url, endpointName string, target any) error {
 		return err
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, endpointName)
 	_ = resp.Body.Close()
 	if err != nil {
 		return err

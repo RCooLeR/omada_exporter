@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 )
 
 // IsLoggedIn reports whether the current web session is still authenticated.
 func (c *Client) IsLoggedIn() (bool, error) {
-	url := fmt.Sprintf("%s/%s/api/v2/loginStatus", c.Config.Host, c.OmadaCID)
+	omadaCID, _ := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/loginStatus", c.Config.Host, omadaCID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err
@@ -25,7 +26,10 @@ func (c *Client) IsLoggedIn() (bool, error) {
 	}
 
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
+	if isHTTPAuthStatus(res.StatusCode) {
+		return false, nil
+	}
+	body, err := ReadResponseBody(res, "login status")
 	if err != nil {
 		return false, err
 	}
@@ -36,7 +40,11 @@ func (c *Client) IsLoggedIn() (bool, error) {
 		return false, nil
 	}
 	if loginstatus.ErrorCode != 0 {
-		return false, fmt.Errorf("invalid error code returned from API. Response Body: %s", string(body))
+		message := strings.TrimSpace(loginstatus.Msg)
+		if message == "" {
+			return false, fmt.Errorf("login status returned error code %d", loginstatus.ErrorCode)
+		}
+		return false, fmt.Errorf("login status returned error code %d: %s", loginstatus.ErrorCode, message)
 	}
 
 	return loginstatus.Result.Login, err
@@ -56,6 +64,13 @@ func (c *Client) getCid() (string, error) {
 	}
 
 	defer res.Body.Close()
+	body, err := ReadResponseBody(res, "controller info")
+	if err != nil {
+		return "", err
+	}
+	if err := ValidateAPIResponse(body, "controller info"); err != nil {
+		return "", err
+	}
 
 	var infoResponse struct {
 		ErrorCode int    `json:"errorCode"`
@@ -64,8 +79,7 @@ func (c *Client) getCid() (string, error) {
 			OmadaCID string `json:"omadacId"`
 		}
 	}
-	err = json.NewDecoder(res.Body).Decode(&infoResponse)
-	if err != nil {
+	if err := json.Unmarshal(body, &infoResponse); err != nil {
 		return "", err
 	}
 
@@ -78,7 +92,15 @@ func (c *Client) getCid() (string, error) {
 
 // Login authenticates the web session against the Omada controller.
 func (c *Client) Login() error {
-	url := fmt.Sprintf("%s/%s/api/v2/login", c.Config.Host, c.OmadaCID)
+	unlock := c.webAuthTransition.lock()
+	defer unlock()
+
+	omadaCID, _ := c.ContextIDs()
+	return c.login(omadaCID)
+}
+
+func (c *Client) login(omadaCID string) error {
+	url := fmt.Sprintf("%s/%s/api/v2/login", c.Config.Host, omadaCID)
 	jsonStr, err := json.Marshal(struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -102,7 +124,7 @@ func (c *Client) Login() error {
 	}
 
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
+	body, err := ReadResponseBody(res, "web login")
 	if err != nil {
 		return err
 	}
@@ -125,13 +147,21 @@ func (c *Client) Login() error {
 
 // LoginOpenApi authenticates against the Omada Open API.
 func (c *Client) LoginOpenApi() error {
+	unlock := c.openAuthTransition.lock()
+	defer unlock()
+
+	omadaCID, _ := c.ContextIDs()
+	return c.loginOpenAPI(omadaCID)
+}
+
+func (c *Client) loginOpenAPI(omadaCID string) error {
 	url := fmt.Sprintf("%s/openapi/authorize/token?grant_type=client_credentials", c.Config.Host)
 	jsonStr, err := json.Marshal(struct {
 		OmadaCID     string `json:"omadacId"`
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
 	}{
-		OmadaCID:     c.OmadaCID,
+		OmadaCID:     omadaCID,
 		ClientID:     c.Config.ClientId,
 		ClientSecret: c.Config.SecretId,
 	})
@@ -151,7 +181,7 @@ func (c *Client) LoginOpenApi() error {
 	}
 
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
+	body, err := ReadResponseBody(res, "OpenAPI login")
 	if err != nil {
 		return err
 	}
@@ -179,7 +209,8 @@ type controllerSystemStatus struct {
 }
 
 func (c *Client) getControllerSystemStatus() (controllerSystemStatus, error) {
-	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, c.OmadaCID)
+	omadaCID, _ := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, omadaCID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return controllerSystemStatus{}, err
@@ -190,6 +221,13 @@ func (c *Client) getControllerSystemStatus() (controllerSystemStatus, error) {
 		return controllerSystemStatus{}, err
 	}
 	defer resp.Body.Close()
+	body, err := ReadResponseBody(resp, "system status")
+	if err != nil {
+		return controllerSystemStatus{}, err
+	}
+	if err := ValidateAPIResponse(body, "system status"); err != nil {
+		return controllerSystemStatus{}, err
+	}
 
 	var statusResponse struct {
 		ErrorCode int    `json:"errorCode"`
@@ -200,7 +238,7 @@ func (c *Client) getControllerSystemStatus() (controllerSystemStatus, error) {
 			Category  string `json:"category"`
 		} `json:"result"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&statusResponse); err != nil {
+	if err := json.Unmarshal(body, &statusResponse); err != nil {
 		return controllerSystemStatus{}, err
 	}
 	if statusResponse.ErrorCode != 0 {
@@ -216,6 +254,12 @@ func (c *Client) getControllerSystemStatus() (controllerSystemStatus, error) {
 
 // RefreshOpenApiToken refreshes the Open API access token.
 func (c *Client) RefreshOpenApiToken() error {
+	unlock := c.openAuthTransition.lock()
+	defer unlock()
+	return c.refreshOpenAPIToken()
+}
+
+func (c *Client) refreshOpenAPIToken() error {
 	_, refreshToken, _ := c.currentOpenAPITokenState()
 	if refreshToken == "" {
 		return fmt.Errorf("OpenApi token refresh requested without a refresh token")
@@ -239,7 +283,7 @@ func (c *Client) RefreshOpenApiToken() error {
 	}
 
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
+	body, err := ReadResponseBody(res, "OpenAPI token refresh")
 	if err != nil {
 		return err
 	}
@@ -276,18 +320,9 @@ type loginResponse struct {
 
 // loginStatus stores login status data.
 type loginStatus struct {
-	ErrorCode int `json:"errorCode"`
+	ErrorCode int    `json:"errorCode"`
+	Msg       string `json:"msg"`
 	Result    struct {
 		Login bool `json:"login"`
 	} `json:"result"`
-}
-
-// RefreshOmadaContext refreshes cached Omada session and site context data.
-func (c *Client) RefreshOmadaContext() error {
-	cid, err := c.getCid()
-	if err != nil {
-		return err
-	}
-	c.OmadaCID = cid
-	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
@@ -14,18 +13,25 @@ import (
 
 // GetAlert returns cached site alert counts loaded from the Web API.
 func (c *Client) GetAlert() (*model.Alert, error) {
-	return api.FetchCached(c.Client, "webapi:alert", c.getAlertFresh)
+	return c.FetchCached("webapi:alert", c.getAlertFresh)
 }
 
 // getAlertFresh posts the site alert-count request and returns the first alert
 // summary from the Web API response when one is present.
 func (c *Client) getAlertFresh() (*model.Alert, error) {
-	url := fmt.Sprintf("%s/%s/api/v2/sites/alert-count", c.Config.Host, c.OmadaCID)
-	jsonStr := []byte(fmt.Sprintf(`{"siteIds":["%s"]}`, c.SiteId))
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/sites/alert-count", c.Config.Host, omadaCID)
+	requestBody, err := json.Marshal(struct {
+		SiteIDs []string `json:"siteIds"`
+	}{SiteIDs: []string{siteID}})
+	if err != nil {
+		return nil, fmt.Errorf("encode alert request: %w", err)
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewReader(requestBody))
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.MakeLoggedInRequest(req)
 	if err != nil {
@@ -33,7 +39,7 @@ func (c *Client) getAlertFresh() (*model.Alert, error) {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "alert")
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +59,7 @@ func (c *Client) getAlertFresh() (*model.Alert, error) {
 		firstAlert := alertsData.Result[0]
 		return &firstAlert, nil
 	}
-	return nil, fmt.Errorf("alert response did not include a result for site %s", c.SiteId)
+	return nil, fmt.Errorf("alert response did not include a result for site %s", siteID)
 }
 
 // alertsResponse represents the Web API response for alerts.

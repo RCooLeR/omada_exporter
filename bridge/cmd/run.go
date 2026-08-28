@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
+	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/RCooLeR/omada_exporter/internal/hamqtt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	_ "github.com/prometheus/client_golang/prometheus/promhttp/zstd"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v3"
@@ -24,9 +27,13 @@ const (
 	exporterIdleTimeout         = 60 * time.Second
 	exporterShutdownTimeout     = 10 * time.Second
 	exporterMQTTShutdownTimeout = 15 * time.Second
+	exporterMetricsTimeout      = 2 * time.Minute
+	exporterMetricsConcurrency  = 4
 	exporterMaxHeaderBytes      = 1 << 20
 	exporterMaxHeaderValueCount = 100
 )
+
+var exporterProcessStartTime = time.Now()
 
 // healthState tracks exporter readiness for the health endpoints.
 type healthState struct {
@@ -50,8 +57,11 @@ func (h *healthState) readyz(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("ready"))
 }
 
-// runExporter configures the exporter and starts the HTTP server.
-func runExporter(ctx context.Context, _ *cli.Command) error {
+// runExporterWithConfig configures the exporter and starts the HTTP server.
+func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Config) error {
+	if conf == nil {
+		return fmt.Errorf("exporter configuration is nil")
+	}
 	missing := make([]string, 0, 3)
 	if conf.Host == "" {
 		missing = append(missing, "host")
@@ -73,41 +83,42 @@ func runExporter(ctx context.Context, _ *cli.Command) error {
 	}
 	zerolog.SetGlobalLevel(level)
 
-	if conf.GoCollectorDisabled {
-		// remove Go collector
-		prometheus.Unregister(prometheus.NewGoCollector())
-	}
-
-	if conf.ProcessCollectorDisabled {
-		// remove Process collector
-		prometheus.Unregister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	}
-
 	// check if host is properly formatted
 	if strings.HasSuffix(conf.Host, "/") {
 		// remove trailing slash if it exists
 		conf.Host = strings.TrimRight(conf.Host, "/")
 	}
 
-	client, err := api.Configure(&conf)
+	client, err := api.Configure(conf)
 	if err != nil {
 		return err
 	}
 	mux := http.NewServeMux()
 	health := &healthState{}
+	registry, err := newExporterRegistry(conf.GoCollectorDisabled, conf.ProcessCollectorDisabled)
+	if err != nil {
+		return err
+	}
 
 	collectors := initCollectors(client)
 	collectorHealth := newCollectorHealth()
-	prometheus.MustRegister(collectorHealth)
+	if err := registry.Register(collectorHealth); err != nil {
+		return fmt.Errorf("register collector health metrics: %w", err)
+	}
 
 	// register omada collectors
 	for name, c := range collectors {
 		instrumented := newInstrumentedCollector(name, c, collectorHealth)
 		collectors[name] = instrumented
-		prometheus.MustRegister(instrumented)
-		reg := prometheus.NewRegistry()
-		reg.MustRegister(instrumented)
-		mux.Handle(fmt.Sprintf("/metrics/%s", name), promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+		if err := registry.Register(instrumented); err != nil {
+			return fmt.Errorf("register %s collector: %w", name, err)
+		}
+
+		collectorRegistry := prometheus.NewRegistry()
+		if err := collectorRegistry.Register(instrumented); err != nil {
+			return fmt.Errorf("register %s collector endpoint: %w", name, err)
+		}
+		mux.Handle(fmt.Sprintf("/metrics/%s", name), newMetricsHandler(collectorRegistry, collectorRegistry))
 	}
 
 	var publisherDone <-chan struct{}
@@ -179,7 +190,8 @@ func runExporter(ctx context.Context, _ *cli.Command) error {
     </html>`, insightsLink)))
 	})
 
-	mux.Handle("/metrics", promhttp.Handler())
+	metricsHandler := newMetricsHandler(registry, registry)
+	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(registry, metricsHandler))
 	health.ready.Store(true)
 
 	server := newExporterHTTPServer(fmt.Sprintf(":%s", conf.Port), mux)
@@ -208,6 +220,36 @@ func runExporter(ctx context.Context, _ *cli.Command) error {
 			return nil
 		}
 		return err
+	}
+}
+
+func newExporterRegistry(goCollectorDisabled, processCollectorDisabled bool) (*prometheus.Registry, error) {
+	registry := prometheus.NewRegistry()
+	if !goCollectorDisabled {
+		if err := registry.Register(collectors.NewGoCollector()); err != nil {
+			return nil, fmt.Errorf("register Go collector: %w", err)
+		}
+	}
+	if !processCollectorDisabled {
+		if err := registry.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})); err != nil {
+			return nil, fmt.Errorf("register process collector: %w", err)
+		}
+	}
+	return registry, nil
+}
+
+func newMetricsHandler(gatherer prometheus.Gatherer, registerer prometheus.Registerer) http.Handler {
+	return promhttp.HandlerFor(gatherer, newMetricsHandlerOptions(registerer))
+}
+
+func newMetricsHandlerOptions(registerer prometheus.Registerer) promhttp.HandlerOpts {
+	return promhttp.HandlerOpts{
+		Registry:            registerer,
+		MaxRequestsInFlight: exporterMetricsConcurrency,
+		CoalesceGather:      true,
+		Timeout:             exporterMetricsTimeout,
+		EnableOpenMetrics:   true,
+		ProcessStartTime:    exporterProcessStartTime,
 	}
 }
 

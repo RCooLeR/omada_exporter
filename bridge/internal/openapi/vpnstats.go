@@ -3,13 +3,12 @@ package openapi
 import (
 	"fmt"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 )
 
 // GetVpnStats returns cached VPN tunnel statistics loaded from the Open API.
 func (c *Client) GetVpnStats() ([]model.VpnStats, error) {
-	return api.FetchCached(c.Client, "openapi:vpnstats", c.getVpnStatsFresh)
+	return c.FetchCached("openapi:vpnstats", c.getVpnStatsFresh)
 }
 
 // getVpnStatsFresh fetches VPN tunnel statistics from the Open API and decodes
@@ -19,6 +18,7 @@ func (c *Client) getVpnStatsFresh() ([]model.VpnStats, error) {
 		return nil, err
 	}
 
-	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/tunnel?page=%%d&pageSize=%%d", c.Config.Host, c.OmadaCID, c.SiteId)
-	return fetchOpenAPIGrid[model.VpnStats](c, "VPNStats", urlTemplate)
+	omadaCID, siteID := c.ContextIDs()
+	urlTemplate := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/setting/vpn/stats/tunnel?page=%%d&pageSize=%%d", c.Config.Host, omadaCID, siteID)
+	return c.fetchOpenAPIGrid[model.VpnStats]("VPNStats", urlTemplate)
 }

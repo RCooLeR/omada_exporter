@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -17,13 +16,14 @@ const controllerUpgradeChannelTimeout = 5 * time.Second
 
 // GetController returns cached controller status data combined with upgrade-channel information.
 func (c *Client) GetController() (*model.Controller, error) {
-	return api.FetchCached(c.Client, "webapi:controller", c.getControllerFresh)
+	return c.FetchCached("webapi:controller", c.getControllerFresh)
 }
 
 // getControllerFresh fetches controller status and available upgrade channels
 // from separate Web API endpoints and merges them into one Controller value.
 func (c *Client) getControllerFresh() (*model.Controller, error) {
-	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, c.OmadaCID)
+	omadaCID, _ := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/settings/system/status", c.Config.Host, omadaCID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "controllerStatus")
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,8 @@ func (c *Client) getControllerFresh() (*model.Controller, error) {
 }
 
 func (c *Client) getControllerUpgradeList() ([]model.ControllerUpdate, error) {
-	url := fmt.Sprintf("%s/%s/api/v2/maintenance/software/channelUpdate", c.Config.Host, c.OmadaCID)
+	omadaCID, _ := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/maintenance/software/channelUpdate", c.Config.Host, omadaCID)
 	ctx, cancel := context.WithTimeout(context.Background(), c.controllerUpgradeTimeout())
 	defer cancel()
 
@@ -77,7 +78,7 @@ func (c *Client) getControllerUpgradeList() ([]model.ControllerUpdate, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "controllerChannelUpdate")
 	if err != nil {
 		return nil, err
 	}

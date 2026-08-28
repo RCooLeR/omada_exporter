@@ -3,9 +3,9 @@ package webapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
+	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/rs/zerolog/log"
 )
@@ -13,7 +13,8 @@ import (
 // GetPortsAndLags fetches switch details from the Web API and copies the
 // decoded port, LAG, uplink, traffic, power, and temperature fields onto sw.
 func (c *Client) GetPortsAndLags(sw *model.Switch) error {
-	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/switches/%s", c.Config.Host, c.OmadaCID, c.SiteId, sw.Mac)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/switches/%s", c.Config.Host, omadaCID, siteID, sw.Mac)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -25,15 +26,20 @@ func (c *Client) GetPortsAndLags(sw *model.Switch) error {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "switch ports")
 	if err != nil {
 		return err
 	}
 	log.Info().Msg(fmt.Sprintf("Received data from ports endpoint for %s", sw.Mac))
 	log.Debug().Bytes("data", body).Msg("Received data from ports endpoint")
+	if err := api.ValidateAPIResponse(body, "switch ports"); err != nil {
+		return err
+	}
 
 	portdata := portResponse{}
-	err = json.Unmarshal(body, &portdata)
+	if err := json.Unmarshal(body, &portdata); err != nil {
+		return err
+	}
 	sw.Temp = portdata.Result.Temp
 	sw.TotalPower = portdata.Result.TotalPower
 	sw.Uplink = portdata.Result.Uplink
@@ -41,13 +47,14 @@ func (c *Client) GetPortsAndLags(sw *model.Switch) error {
 	sw.TxRate = portdata.Result.TxRate
 	sw.Ports = portdata.Result.Ports
 	sw.Lags = portdata.Result.Lags
-	return err
+	return nil
 }
 
 // GetApPorts fetches the LAN port list for the provided access point and stores
 // the decoded ports on ap.
 func (c *Client) GetApPorts(ap *model.AccessPoint) error {
-	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/eaps/%s/ports", c.Config.Host, c.OmadaCID, c.SiteId, ap.Mac)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/eaps/%s/ports", c.Config.Host, omadaCID, siteID, ap.Mac)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -59,23 +66,29 @@ func (c *Client) GetApPorts(ap *model.AccessPoint) error {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "access point ports")
 	if err != nil {
 		return err
 	}
 	log.Info().Msg(fmt.Sprintf("Received data from ports endpoint for AP %s", ap.Mac))
 	log.Debug().Bytes("data", body).Msg("Received data from ports endpoint for AP")
+	if err := api.ValidateAPIResponse(body, "access point ports"); err != nil {
+		return err
+	}
 
 	portdata := apPortResponse{}
-	err = json.Unmarshal(body, &portdata)
+	if err := json.Unmarshal(body, &portdata); err != nil {
+		return err
+	}
 	ap.Ports = portdata.Result
-	return err
+	return nil
 }
 
 // GetGatewayPorts fetches gateway port telemetry, derives each port's maximum
 // supported speed from the capability list, and stores the result on gw.
 func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
-	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/gateways/%s", c.Config.Host, c.OmadaCID, c.SiteId, gw.Mac)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/gateways/%s", c.Config.Host, omadaCID, siteID, gw.Mac)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -87,15 +100,20 @@ func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "gateway ports")
 	if err != nil {
 		return err
 	}
 	log.Info().Msg(fmt.Sprintf("Received data from ports endpoint for %s", gw.Mac))
 	log.Debug().Bytes("data", body).Msg("Received data from ports endpoint")
+	if err := api.ValidateAPIResponse(body, "gateway ports"); err != nil {
+		return err
+	}
 
 	portdata := gatewayResponse{}
-	err = json.Unmarshal(body, &portdata)
+	if err := json.Unmarshal(body, &portdata); err != nil {
+		return err
+	}
 	for i, p := range portdata.Result.Ports {
 		portdata.Result.Ports[i].MaxSpeed = portdata.GetMaxLinkSpeed(p.Port)
 	}
@@ -103,7 +121,7 @@ func (c *Client) GetGatewayPorts(gw *model.Gateway) error {
 	gw.Ports = portdata.Result.Ports
 	gw.RxRate = portdata.Result.RxRate
 	gw.TxRate = portdata.Result.TxRate
-	return err
+	return nil
 }
 
 // portResponse wraps the Web API payload returned for switch details.

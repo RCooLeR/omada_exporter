@@ -3,7 +3,6 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
@@ -14,7 +13,7 @@ import (
 // GetIsp returns cached ISP load data and includes the gateway metadata copied
 // from the Open API response for each ISP entry.
 func (c *Client) GetIsp() ([]model.Isp, error) {
-	return api.FetchCached(c.Client, "openapi:isp", c.getIspFresh)
+	return c.FetchCached("openapi:isp", c.getIspFresh)
 }
 
 // getIspFresh loads ISP dashboard data from the Open API and flattens the
@@ -23,7 +22,8 @@ func (c *Client) getIspFresh() ([]model.Isp, error) {
 	if err := c.requireOpenAPICredentials(); err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/dashboard/gateway/isp/load", c.Config.Host, c.OmadaCID, c.SiteId)
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/openapi/v1/%s/sites/%s/dashboard/gateway/isp/load", c.Config.Host, omadaCID, siteID)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Error().Err(err).Msgf("Error creating GET request for %s", url)
@@ -35,7 +35,7 @@ func (c *Client) getIspFresh() ([]model.Isp, error) {
 	}
 
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := api.ReadResponseBody(resp, "ISP")
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,9 @@ func (c *Client) getIspFresh() ([]model.Isp, error) {
 	}
 
 	ispdata := ispResponse{}
-	err = json.Unmarshal(body, &ispdata)
+	if err := json.Unmarshal(body, &ispdata); err != nil {
+		return nil, err
+	}
 	var result []model.Isp
 	for _, d := range ispdata.Result.Data {
 		for _, isp := range d.IspInfo.IspArr {
@@ -58,7 +60,7 @@ func (c *Client) getIspFresh() ([]model.Isp, error) {
 		}
 	}
 
-	return result, err
+	return result, nil
 }
 
 // ispResponse represents the Open API response for ISP data.
