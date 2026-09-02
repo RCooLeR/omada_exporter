@@ -144,6 +144,13 @@ VPN collection includes:
 - site-to-site peer status, packets, and traffic when returned by Omada
 - site-to-site peer login timestamp
 
+Some controller releases return the same site-to-site statistics through more
+than one filtered API query. OmadaBridge coalesces those duplicate records before
+Prometheus exposition: each aggregate byte label set is emitted once, VPN-level
+peer-derived aggregate byte totals are attached to one representative label set
+per VPN, and distinct tunnel and peer identities remain separate. No Prometheus
+relabeling or other user-side deduplication is required.
+
 The MQTT publisher also creates derived speed sensors from VPN byte counters:
 
 - `omada_vpn_down_speed`

@@ -16,6 +16,7 @@
 - Validate controller URLs, ports, enums, timeouts, cache windows, insight limits, and MQTT intervals through `urfave/cli` v3 before startup; reject duplicate flags and suggest likely flag names for typos.
 - Bound Omada response bodies, return structured HTTP/API failures, and apply cancellable MQTT connection handling with bounded writes and concurrent retained-message callbacks.
 - Manage ECharts through a Lit reactive controller, coalesce resize work, use dirty-rectangle and lazy rendering, and skip card updates caused only by unrelated Home Assistant entities.
+- Document partial metric availability on older Omada Controller releases and distinguish unsupported controller API paths from Grafana or Prometheus configuration errors.
 
 ### Fixed
 - Encode Omada web and OpenAPI credentials with the JSON encoder so quotes, backslashes, and newlines cannot corrupt login requests.
@@ -24,6 +25,7 @@
 - Serialize web and OpenAPI authentication transitions, keep controller/site context snapshots synchronized during reauthentication, and prevent stale in-flight fetches from repopulating invalidated caches.
 - Make custom-card registration idempotent across Home Assistant resource reloads.
 - Recreate charts after a card reconnect, apply changed card configuration immediately, normalize MAC formats across topology joins, keep unnamed WAN/ISP rows distinct, and report missing Wi-Fi quality as unknown.
+- Coalesce duplicate site-to-site VPN statistics returned by overlapping Omada API queries without dropping distinct tunnel or peer identities.
 
 ## [2.4.0] - 2026-08-05
 

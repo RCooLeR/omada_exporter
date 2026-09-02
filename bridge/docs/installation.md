@@ -13,6 +13,24 @@ OmadaBridge is distributed as the `rcooler/omada_exporter` Docker image and as t
 
 Published container tags are multi-platform and support both `linux/amd64` and `linux/arm64`.
 
+## Controller Compatibility
+
+OmadaBridge targets the API paths used by current tested Omada Controller
+releases; endpoint availability varies by controller model and firmware. Older
+firmware can authenticate and expose part of the metric set while rejecting newer
+endpoints. The OC200 Controller 5.13.30.20 / firmware 1.29.4 combination reported
+in [issue #11](https://github.com/RCooLeR/omada_exporter/issues/11) is known not
+to expose controller-status collection. An error such as
+`controllerStatus returned errorCode -1600: Unsupported request path` means the
+controller does not provide the status endpoint used by the current bridge; it is
+not a Grafana or Prometheus configuration error. Upgrade the controller when this
+occurs.
+
+If an older controller must remain in service, expect its controller metrics and
+dependent dashboard panels to be unavailable while other supported collectors may
+continue to work. `/healthz` reports bridge process health, not support for every
+controller endpoint.
+
 ## Omada Credentials
 
 If you are setting this up for the first time, read [Omada Credentials](./omada-credentials.md). It explains how to create:

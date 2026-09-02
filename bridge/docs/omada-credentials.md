@@ -217,6 +217,6 @@ OpenAPI authentication or unsupported endpoint messages.
 | Login fails | Wrong `OMADA_USER` / `OMADA_PASS`, or the account must change password on first login. | Log in manually as that user once, then retry. |
 | TLS/certificate error | Controller uses a self-signed certificate. | Set `OMADA_INSECURE=true`. |
 | OpenAPI client id/secret rejected | Wrong app credentials, wrong mode, or copied normal username instead. | Create an OpenAPI app in Client Credentials mode and copy Client ID/Secret. |
+| `controllerStatus returned errorCode -1600: Unsupported request path` | The controller release does not expose the controller-status Web API used by OmadaBridge; this is known on older firmware. | Verify the controller URL and system type, then upgrade the controller. Other collectors may continue, but controller metrics and related dashboard panels will show no data. |
 | Platform Integration only shows Webhooks | Fusion firmware or controller without OpenAPI app support. | For Fusion use `OMADA_OPENAPI_AUTH=auto`; for standard use `disabled` or update firmware. |
 | Web API metrics work but WAN/VPN/client details are missing | OpenAPI is disabled or unavailable. | Add OpenAPI app credentials on standard controllers, or check Fusion auto mode. |
-

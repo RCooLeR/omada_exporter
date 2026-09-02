@@ -26,7 +26,9 @@ The dashboards refresh every 30 seconds, matching the scrape interval in the
 Some comprehensive panels intentionally show no data when their collector is
 disabled or unsupported by the controller. Per-client, per-port, and DPI panels
 depend on `OMADA_TRACK_CLIENT_METRICS`, `OMADA_TRACK_PORT_METRICS`, and
-`OMADA_TRACK_INSIGHT_METRICS`, respectively.
+`OMADA_TRACK_INSIGHT_METRICS`, respectively. Older controller firmware can also
+provide only part of the metric set; see
+[Controller Compatibility](../installation.md#controller-compatibility).
 
 ## Maintenance
 
