@@ -46,7 +46,7 @@ jobs:
       - name: Verify generated Grafana dashboards are current
         run: |
           go generate ./docs/dashboards
-          git diff --exit-code -- docs/dashboards/dashboard.json docs/dashboards/simple-omada-dashboard.json
+          git diff --exit-code -- docs/dashboards/*.json
         working-directory: bridge
 
       - name: Lint Grafana dashboards
@@ -60,8 +60,9 @@ jobs:
             --output "/tmp/${archive}"
           echo "${DASHBOARD_LINTER_ARCHIVE_SHA256}  /tmp/${archive}" | sha256sum --check --strict
           tar --extract --gzip --file "/tmp/${archive}" --directory /tmp dashboard-linter
-          /tmp/dashboard-linter lint --strict docs/dashboards/dashboard.json
-          /tmp/dashboard-linter lint --strict docs/dashboards/simple-omada-dashboard.json
+          for dashboard in docs/dashboards/*.json; do
+            /tmp/dashboard-linter lint --strict "${dashboard}"
+          done
         working-directory: bridge
 
       - name: Run Go tests with the race detector

@@ -881,12 +881,19 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current CPU utilization by device.",
+      "description": "Current CPU utilization by device. Select a series to open the portable device drill-down.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Open device details",
+              "url": "/d/omada-device-details/omada-device-details?${datasource:queryparam}\u0026${job:queryparam}\u0026${instance:queryparam}\u0026${Site:queryparam}\u0026var-Device=${__field.labels.device_mac}\u0026from=${__from}\u0026to=${__to}"
+            }
+          ],
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -1504,6 +1511,6 @@
   "timezone": "browser",
   "title": "Simple Omada dashboard",
   "uid": "ad5dtmf",
-  "version": 6,
+  "version": 7,
   "weekStart": ""
 }

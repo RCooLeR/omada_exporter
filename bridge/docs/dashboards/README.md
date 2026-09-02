@@ -1,13 +1,17 @@
 # Grafana dashboards
 
 These dashboards target the current `omada_exporter` Prometheus metric and label
-contract. Both use Grafana's portable Classic dashboard model (`schemaVersion`
+contract. All use Grafana's portable Classic dashboard model (`schemaVersion`
 42) and selectable Prometheus datasource, scrape job, instance, and site
 filters.
 
 - [`dashboard.json`](./dashboard.json) is the comprehensive dashboard. It adds a
   device filter and covers exporter health, clients, device and radio health,
   ports, LAGs, WAN/ISP, VPN peers, controller storage, and DPI insights.
+- [`omada-device-details.json`](./omada-device-details.json) is a portable
+  device-centric drill-down. Its friendly-name selector resolves to a stable
+  device MAC and drives compact health, traffic, attached-client, radio, port,
+  LAG, PoE, and gateway WAN views without hard-coded hardware layouts.
 - [`simple-omada-dashboard.json`](./simple-omada-dashboard.json) is the compact
   health and traffic overview.
 
@@ -17,7 +21,12 @@ filters.
 2. Upload one of the JSON files.
 3. Select the Prometheus datasource and exporter job/instance.
 4. Choose one or more sites. The comprehensive dashboard can also filter by
-   device MAC.
+   device MAC. The device-details dashboard is optimized for one selected
+   device and shows unsupported hardware-specific panels as no data.
+
+The comprehensive dashboard's **Device uptime** series and the simple
+dashboard's **Device CPU** series link directly to the matching device-details
+view while preserving the datasource, filters, and time range.
 
 The dashboards refresh every 30 seconds, matching the scrape interval in the
 [Prometheus setup example](../prometheus.md). Rate panels use
@@ -41,7 +50,7 @@ set; see
 ## Maintenance
 
 The JSON files are generated from [`generate.go`](./generate.go). From the
-`bridge` directory, regenerate both with:
+`bridge` directory, regenerate all of them with:
 
 ```shell
 go generate ./docs/dashboards

@@ -26,7 +26,8 @@ var (
 	groupByPattern              = regexp.MustCompile("\\b(sum|avg|max|min|count)\\s+by\\s*\\(([^)]*)\\)")
 	legendPattern               = regexp.MustCompile("\\{\\{\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\}\\}")
 	fixedRangePattern           = regexp.MustCompile("\\[[0-9]+[smhdwy]\\]")
-	exactVariableMatcherPattern = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*\\s*=\\s*"\\$(?:\\{[^}]+\\}|[a-zA-Z_][a-zA-Z0-9_]*)"`)
+	exactVariableMatcherPattern = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*"\$(?:\{[^}]+\}|[a-zA-Z_][a-zA-Z0-9_]*)"`)
+	literalDeviceMACPattern     = regexp.MustCompile(`device_mac\s*(?:=|=~)\s*"[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}"`)
 )
 
 type grafanaDashboard struct {
@@ -55,12 +56,14 @@ type grafanaVariable struct {
 	Name       string
 	Query      json.RawMessage
 	Refresh    int
+	Regex      string
 	Type       string
 }
 
 type grafanaPanel struct {
 	Datasource  *grafanaDatasource
 	Description string
+	FieldConfig json.RawMessage
 	GridPos     struct {
 		H int
 		W int
@@ -94,8 +97,8 @@ func TestGrafanaDashboardsMatchExporterContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) < 2 {
-		t.Fatalf("dashboard count = %d, want at least 2", len(paths))
+	if len(paths) < 3 {
+		t.Fatalf("dashboard count = %d, want at least 3", len(paths))
 	}
 	slices.Sort(paths)
 
@@ -144,6 +147,9 @@ func TestGrafanaDashboardsMatchExporterContract(t *testing.T) {
 				validateDashboardPanel(t, &dashboard.Panels[i], contract, panelIDs, referenced)
 			}
 			expressions := strings.Join(dashboardExpressions(dashboard.Panels), "\n")
+			if literalDeviceMACPattern.MatchString(expressions) {
+				t.Error("distributable dashboard contains a hard-coded device MAC selector")
+			}
 			for _, selector := range []string{
 				`device_status=~"^Connected.*$"`,
 				`device_status!~"^Connected.*$"`,
@@ -153,7 +159,12 @@ func TestGrafanaDashboardsMatchExporterContract(t *testing.T) {
 				}
 			}
 
-			if filepath.Base(path) == "dashboard.json" {
+			switch filepath.Base(path) {
+			case "dashboard.json":
+				if !strings.Contains(string(data), "/d/omada-device-details/omada-device-details?") ||
+					!strings.Contains(string(data), "var-Device=${__field.labels.device_mac}") {
+					t.Error("full dashboard does not link device uptime series to the device details dashboard")
+				}
 				required := []string{
 					"omada_client_connected_total",
 					"omada_collector_last_scrape_completed",
@@ -169,6 +180,31 @@ func TestGrafanaDashboardsMatchExporterContract(t *testing.T) {
 					if _, ok := referenced[metric]; !ok {
 						t.Errorf("full dashboard no longer covers %s", metric)
 					}
+				}
+			case "omada-device-details.json":
+				required := []string{
+					"omada_client_traffic_down_bytes",
+					"omada_device_6g_tx_util",
+					"omada_device_rx_rate",
+					"omada_device_tx_rate",
+					"omada_lag_link_speed_mbps",
+					"omada_port_link_speed_mbps",
+					"omada_wan_internet_state",
+				}
+				for _, metric := range required {
+					if _, ok := referenced[metric]; !ok {
+						t.Errorf("device details dashboard no longer covers %s", metric)
+					}
+				}
+				for _, topologyLabel := range []string{"ap_mac", "switch_mac", "gateway_mac"} {
+					if !strings.Contains(expressions, topologyLabel+`=~"${Device:regex}"`) {
+						t.Errorf("device details dashboard does not scope clients by %s", topologyLabel)
+					}
+				}
+			case "simple-omada-dashboard.json":
+				if !strings.Contains(string(data), "/d/omada-device-details/omada-device-details?") ||
+					!strings.Contains(string(data), "var-Device=${__field.labels.device_mac}") {
+					t.Error("simple dashboard does not link device CPU series to the device details dashboard")
 				}
 			}
 		})
@@ -200,6 +236,10 @@ func validateDashboardVariables(t *testing.T, variables []grafanaVariable, contr
 			continue
 		}
 		validatePrometheusDatasource(t, variable.Datasource, "variable "+variable.Name)
+		if variable.Name == "Device" && !variable.Multi && !variable.IncludeAll {
+			validateSingleDeviceVariable(t, variable, contract)
+			continue
+		}
 		if !variable.Multi || !variable.IncludeAll {
 			t.Errorf("variable %s must support multi-select and Include All", variable.Name)
 		}
@@ -239,6 +279,41 @@ func validateDashboardVariables(t *testing.T, variables []grafanaVariable, contr
 		}
 		if _, ok := contract[metrics[0]][query.Label]; !ok && !isScrapeLabel(query.Label) {
 			t.Errorf("variable %s label %q is not exported by %s", variable.Name, query.Label, metrics[0])
+		}
+	}
+}
+
+func validateSingleDeviceVariable(t *testing.T, variable grafanaVariable, contract map[string]map[string]struct{}) {
+	t.Helper()
+	if variable.Refresh != 2 {
+		t.Errorf("variable Device refresh = %d, want On Time Range Change (2)", variable.Refresh)
+	}
+	for _, capture := range []string{"(?<value>", "(?<text>"} {
+		if !strings.Contains(variable.Regex, capture) {
+			t.Errorf("variable Device regex %q is missing %s capture", variable.Regex, capture)
+		}
+	}
+
+	var query struct {
+		Query   string
+		QryType int
+	}
+	if err := json.Unmarshal(variable.Query, &query); err != nil {
+		t.Errorf("variable Device query is not a structured Prometheus query: %v", err)
+		return
+	}
+	if query.QryType != 3 || !strings.HasPrefix(query.Query, "query_result(") {
+		t.Errorf("variable Device query = type %d %q, want Query result (3)", query.QryType, query.Query)
+	}
+	validateDashboardQueryScope(t, "variable Device", query.Query, contract)
+	metrics := validatePromQLContract(t, "variable Device", query.Query, "", contract)
+	if len(metrics) != 1 {
+		t.Errorf("variable Device query references %d metrics, want 1", len(metrics))
+		return
+	}
+	for _, label := range []string{"device_mac", "device_name"} {
+		if _, ok := contract[metrics[0]][label]; !ok {
+			t.Errorf("variable Device query metric %s does not export %s", metrics[0], label)
 		}
 	}
 }
@@ -313,6 +388,12 @@ func validateDashboardPanel(t *testing.T, panel *grafanaPanel, contract map[stri
 
 func validateDashboardPanelSemantics(t *testing.T, panel *grafanaPanel, location string) {
 	t.Helper()
+	for _, target := range panel.Targets {
+		if strings.Contains(target.Expr, "omada_wan_status{") {
+			validateWANStatusMapping(t, panel.FieldConfig, location)
+			break
+		}
+	}
 
 	switch panel.Title {
 	case "DPI-classified traffic", "DPI insight window":
@@ -341,6 +422,53 @@ func validateDashboardPanelSemantics(t *testing.T, panel *grafanaPanel, location
 				t.Errorf("%s query does not contain required fallback fragment %q", location, fragment)
 			}
 		}
+	}
+}
+
+func validateWANStatusMapping(t *testing.T, raw json.RawMessage, location string) {
+	t.Helper()
+	var fieldConfig struct {
+		Defaults struct {
+			Mappings []struct {
+				Options map[string]struct {
+					Color string
+					Text  string
+				}
+			}
+			Thresholds struct {
+				Steps []struct {
+					Color string
+					Value *float64
+				}
+			}
+		}
+	}
+	if err := json.Unmarshal(raw, &fieldConfig); err != nil {
+		t.Errorf("%s has invalid fieldConfig: %v", location, err)
+		return
+	}
+	if len(fieldConfig.Defaults.Mappings) == 0 {
+		t.Errorf("%s has no WAN status value mapping", location)
+		return
+	}
+	options := fieldConfig.Defaults.Mappings[0].Options
+	for value, want := range map[string]struct {
+		text  string
+		color string
+	}{
+		"0": {text: "Disconnected", color: "red"},
+		"1": {text: "Connected", color: "green"},
+	} {
+		got, ok := options[value]
+		if !ok || got.Text != want.text || got.Color != want.color {
+			t.Errorf("%s WAN status %s mapping = %+v, want %s/%s", location, value, got, want.text, want.color)
+		}
+	}
+
+	steps := fieldConfig.Defaults.Thresholds.Steps
+	if len(steps) != 2 || steps[0].Value != nil || steps[0].Color != "red" ||
+		steps[1].Value == nil || *steps[1].Value != 1 || steps[1].Color != "green" {
+		t.Errorf("%s WAN status thresholds = %+v, want red below 1 and green from 1", location, steps)
 	}
 }
 

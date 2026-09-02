@@ -1698,12 +1698,19 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current uptime for each selected device.",
+      "description": "Current uptime for each selected device. Select a series to open the portable device drill-down.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Open device details",
+              "url": "/d/omada-device-details/omada-device-details?${datasource:queryparam}\u0026${job:queryparam}\u0026${instance:queryparam}\u0026${Site:queryparam}\u0026var-Device=${__field.labels.device_mac}\u0026from=${__from}\u0026to=${__to}"
+            }
+          ],
           "mappings": [],
           "min": 0,
           "thresholds": {
@@ -3139,7 +3146,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Omada encodes WAN administrative state as 0 Enabled and 1 Disabled.",
+      "description": "Current connected or disconnected state reported for each WAN interface.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3151,12 +3158,12 @@
                 "0": {
                   "color": "red",
                   "index": 0,
-                  "text": "Enabled"
+                  "text": "Disconnected"
                 },
                 "1": {
                   "color": "green",
                   "index": 1,
-                  "text": "Disabled"
+                  "text": "Connected"
                 }
               },
               "type": "value"
@@ -3168,11 +3175,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
-                "color": "red",
+                "color": "green",
                 "value": 1
               }
             ]
@@ -3221,7 +3228,7 @@
           "refId": "A"
         }
       ],
-      "title": "WAN administrative state",
+      "title": "WAN link state",
       "type": "stat"
     },
     {
@@ -4826,6 +4833,6 @@
   "timezone": "browser",
   "title": "Omada Overview",
   "uid": "omada-overview",
-  "version": 10,
+  "version": 11,
   "weekStart": ""
 }
