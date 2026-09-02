@@ -88,12 +88,12 @@ func TestSiteToSiteVpnPeerSourceKeyPreservesDistinctPeersWithoutIDs(t *testing.T
 	second.Name = "peer-b"
 	second.AllowedIPs = model.StringList{"10.1.0.0/24"}
 
-	if siteToSiteVpnPeerSourceKey(first) == siteToSiteVpnPeerSourceKey(second) {
+	if siteToSiteVpnPeerSourceKey(first, model.SiteToSiteVpnSummary{}) == siteToSiteVpnPeerSourceKey(second, model.SiteToSiteVpnSummary{}) {
 		t.Fatal("distinct no-ID peers produced the same source key")
 	}
 	enriched := first
 	enriched.Endpoint = "peer.example.test"
-	if siteToSiteVpnPeerSourceKey(first) != siteToSiteVpnPeerSourceKey(enriched) {
+	if siteToSiteVpnPeerSourceKey(first, model.SiteToSiteVpnSummary{}) != siteToSiteVpnPeerSourceKey(enriched, model.SiteToSiteVpnSummary{}) {
 		t.Fatal("optional endpoint enrichment changed a no-ID peer source key")
 	}
 }
@@ -357,6 +357,53 @@ func TestSiteToSiteVPNMetricsCoalesceEnrichedSnapshotsWithoutIDs(t *testing.T) {
 	traffic := requireMetricFamily(t, families, "omada_site_to_site_vpn_down_bytes")
 	if got := metricLabels(traffic.Metric[0])["endpoint"]; got != "gw.example.test" {
 		t.Errorf("representative endpoint = %q, want enriched endpoint", got)
+	}
+}
+
+func TestSiteToSiteVpnStatsSourceKeyPreservesTypeAndModeWithoutIDs(t *testing.T) {
+	first := model.SiteToSiteVpnStats{Name: "Legacy VPN", Direction: "in", Spi: 1001, VpnMode: 0, VpnType: 2}
+	differentType := first
+	differentType.VpnType = 4
+	differentMode := first
+	differentMode.VpnMode = 1
+
+	firstKey := siteToSiteVpnStatsSourceKey(first)
+	if firstKey == siteToSiteVpnStatsSourceKey(differentType) {
+		t.Fatal("different no-ID VPN types produced the same source key")
+	}
+	if firstKey == siteToSiteVpnStatsSourceKey(differentMode) {
+		t.Fatal("different no-ID VPN modes produced the same source key")
+	}
+}
+
+func TestSiteToSiteVPNMetricsPreserveDistinctNamesWithoutIDs(t *testing.T) {
+	collector := NewVpnStatsCollector(nil)
+	rows := []model.SiteToSiteVpnStats{
+		{Name: "Legacy VPN A", Direction: "in", Spi: 1001, VpnType: 2, DownBytes: 100},
+		{Name: "Legacy VPN B", Direction: "in", Spi: 1001, VpnType: 2, DownBytes: 200},
+	}
+
+	families := gatherCollectorFixture(t, &fixtureCollector{
+		describe: collector.Describe,
+		collect: func(ch chan<- prometheus.Metric) {
+			collector.collectSiteToSiteVpnMetrics(ch, "Default", "site-1", rows, nil, nil, nil, map[string]struct{}{})
+		},
+	})
+
+	family := requireMetricFamily(t, families, "omada_site_to_site_vpn_down_bytes")
+	if got := len(family.Metric); got != 2 {
+		t.Fatalf("omada_site_to_site_vpn_down_bytes has %d series, want 2", got)
+	}
+	wantByName := map[string]float64{"Legacy VPN A": 100, "Legacy VPN B": 200}
+	for _, metric := range family.Metric {
+		name := metricLabels(metric)["name"]
+		if got, want := metric.GetGauge().GetValue(), wantByName[name]; got != want {
+			t.Errorf("VPN %q value = %v, want %v", name, got, want)
+		}
+		delete(wantByName, name)
+	}
+	if len(wantByName) != 0 {
+		t.Errorf("missing VPNs: %v", wantByName)
 	}
 }
 
@@ -645,6 +692,41 @@ func TestSiteToSiteVPNPeerMetricsCoalesceEnrichedSnapshots(t *testing.T) {
 	}
 }
 
+func TestSiteToSiteVPNPeerMetricsNormalizeSummaryInheritedLabels(t *testing.T) {
+	collector := NewVpnStatsCollector(nil)
+	summary := model.SiteToSiteVpnSummary{
+		ID:         "vpn-1",
+		Name:       "Branch VPN",
+		VpnType:    4,
+		AllowedIPs: model.StringList{"10.0.0.0/24"},
+	}
+	first := model.SiteToSiteVpnPeerStats{Name: "Remote peer", RemoteIP: "192.0.2.2", Port: 51820, DownBytes: 100, UpBytes: 200}
+	explicit := first
+	explicit.AllowedIPs = model.StringList{"10.0.0.0/24"}
+	explicit.DownBytes = 150
+	explicit.UpBytes = 250
+
+	families := gatherCollectorFixture(t, &fixtureCollector{
+		describe: collector.Describe,
+		collect: func(ch chan<- prometheus.Metric) {
+			collector.collectSiteToSiteVpnPeerMetrics(
+				ch,
+				"Default",
+				"site-1",
+				[]model.SiteToSiteVpnSummary{summary},
+				map[string][]model.SiteToSiteVpnPeerStats{summary.ID: {first, explicit}},
+			)
+		},
+	})
+
+	assertGaugeFamily(t, families, "omada_site_to_site_vpn_peer_down_bytes", []float64{150})
+	assertGaugeFamily(t, families, "omada_site_to_site_vpn_peer_up_bytes", []float64{250})
+	traffic := requireMetricFamily(t, families, "omada_site_to_site_vpn_peer_down_bytes")
+	if got := metricLabels(traffic.Metric[0])["allowed_ips"]; got != "10.0.0.0/24" {
+		t.Errorf("allowed_ips = %q, want summary-normalized value", got)
+	}
+}
+
 func TestAggregateSiteToSitePeerBytesDeduplicatesSnapshotsAndSumsPeers(t *testing.T) {
 	firstSnapshot := model.SiteToSiteVpnPeerStats{
 		ID:        "row-1",
@@ -669,7 +751,7 @@ func TestAggregateSiteToSitePeerBytesDeduplicatesSnapshotsAndSumsPeers(t *testin
 		firstSnapshot,
 		newerSnapshot,
 		secondPeer,
-	})
+	}, model.SiteToSiteVpnSummary{})
 
 	if downBytes != 160 {
 		t.Errorf("down bytes = %d, want 160", downBytes)
@@ -679,74 +761,96 @@ func TestAggregateSiteToSitePeerBytesDeduplicatesSnapshotsAndSumsPeers(t *testin
 	}
 }
 
-func TestVpnStatsCollectorGatherDeduplicatesOverlappingOpenAPIQueries(t *testing.T) {
-	var siteToSiteRequests atomic.Int32
-	var peerRequests atomic.Int32
+func TestVpnStatsCollectorGatherDeduplicatesOverlappingQueries(t *testing.T) {
+	tests := []struct {
+		name           string
+		failSecondPeer bool
+		wantDownBytes  float64
+		wantUpBytes    float64
+	}{
+		{name: "complete peer totals replace raw counters", wantDownBytes: 1000, wantUpBytes: 1300},
+		{name: "partial peer totals fall back to raw counters", failSecondPeer: true, wantDownBytes: 140, wantUpBytes: 100},
+	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch req.URL.Path {
-		case "/api/info":
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"omadacId":"cid"}}`))
-		case "/cid/api/v2/loginStatus":
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"login":true}}`))
-		case "/cid/api/v2/users/current":
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"privilege":{"sites":[{"name":"Default","key":"site-id"}]}}}`))
-		case "/openapi/authorize/token":
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"accessToken":"access-token","refreshToken":"refresh-token","expiresIn":3600}}`))
-		case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/tunnel":
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":0,"currentPage":1,"currentSize":0,"data":[]}}`))
-		case "/openapi/v2/cid/sites/site-id/vpn/site-to-site-vpns":
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":1,"currentPage":1,"currentSize":1,"data":[{"id":"vpn-1","name":"Branch VPN","vpnType":2,"siteVpnType":1}]}}`))
-		case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/s2s":
-			vpnType := req.URL.Query().Get("filters.vpnType")
-			if vpnType != "2" && vpnType != "4" {
-				t.Errorf("unexpected vpnType filter %q", vpnType)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var siteToSiteRequests atomic.Int32
+			var peerRequests atomic.Int32
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch req.URL.Path {
+				case "/api/info":
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"omadacId":"cid"}}`))
+				case "/cid/api/v2/loginStatus":
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"login":true}}`))
+				case "/cid/api/v2/users/current":
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"privilege":{"sites":[{"name":"Default","key":"site-id"}]}}}`))
+				case "/openapi/authorize/token":
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"accessToken":"access-token","refreshToken":"refresh-token","expiresIn":3600}}`))
+				case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/tunnel":
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":0,"currentPage":1,"currentSize":0,"data":[]}}`))
+				case "/openapi/v2/cid/sites/site-id/vpn/site-to-site-vpns":
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":1,"currentPage":1,"currentSize":1,"data":[{"id":"vpn-1","name":"Branch VPN","vpnType":2,"siteVpnType":1}]}}`))
+				case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/s2s":
+					vpnType := req.URL.Query().Get("filters.vpnType")
+					if vpnType != "2" && vpnType != "4" {
+						t.Errorf("unexpected vpnType filter %q", vpnType)
+					}
+					siteToSiteRequests.Add(1)
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":2,"currentPage":1,"currentSize":2,"data":[{"id":"tunnel-1","vpnId":"vpn-1","name":"Branch VPN","direction":"in","spi":1001,"vpnType":2,"downBytes":100,"upBytes":20,"totalRemoteNum":1},{"id":"tunnel-2","vpnId":"vpn-1","name":"Branch VPN","direction":"out","spi":1002,"vpnType":2,"downBytes":40,"upBytes":80,"totalRemoteNum":1}]}}`))
+				case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/s2s/tunnel-1/peer":
+					peerRequests.Add(1)
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":1,"currentPage":1,"currentSize":1,"data":[{"id":"peer-row-1","vpnId":"peer-1","downBytes":700,"upBytes":900}]}}`))
+				case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/s2s/tunnel-2/peer":
+					peerRequests.Add(1)
+					if tt.failSecondPeer {
+						w.WriteHeader(http.StatusInternalServerError)
+						_, _ = w.Write([]byte(`{"errorCode":-1,"msg":"peer endpoint unavailable"}`))
+						return
+					}
+					_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":1,"currentPage":1,"currentSize":1,"data":[{"id":"peer-row-2","vpnId":"peer-2","downBytes":300,"upBytes":400}]}}`))
+				default:
+					t.Errorf("unexpected request path %s", req.URL.Path)
+					http.Error(w, "unexpected request", http.StatusNotFound)
+				}
+			}))
+			t.Cleanup(server.Close)
+
+			apiClient, err := api.Configure(&config.Config{
+				Host:        server.URL,
+				Username:    "user",
+				Password:    "pass",
+				ClientId:    "client-id",
+				SecretId:    "client-secret",
+				SystemType:  config.SystemTypeStandard,
+				OpenAPIAuth: config.OpenAPIAuthClientCredentials,
+				Site:        "Default",
+				Timeout:     5,
+			})
+			if err != nil {
+				t.Fatalf("configure API client: %v", err)
 			}
-			siteToSiteRequests.Add(1)
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":1,"currentPage":1,"currentSize":1,"data":[{"id":"tunnel-1","vpnId":"vpn-1","name":"Branch VPN","direction":"in","spi":1001,"vpnType":2,"downBytes":123,"upBytes":456,"totalRemoteNum":1}]}}`))
-		case "/openapi/v1/cid/sites/site-id/setting/vpn/stats/s2s/tunnel-1/peer":
-			peerRequests.Add(1)
-			_, _ = w.Write([]byte(`{"errorCode":0,"result":{"totalRows":0,"currentPage":1,"currentSize":0,"data":[]}}`))
-		default:
-			t.Errorf("unexpected request path %s", req.URL.Path)
-			http.Error(w, "unexpected request", http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(server.Close)
 
-	apiClient, err := api.Configure(&config.Config{
-		Host:        server.URL,
-		Username:    "user",
-		Password:    "pass",
-		ClientId:    "client-id",
-		SecretId:    "client-secret",
-		SystemType:  config.SystemTypeStandard,
-		OpenAPIAuth: config.OpenAPIAuthClientCredentials,
-		Site:        "Default",
-		Timeout:     5,
-	})
-	if err != nil {
-		t.Fatalf("configure API client: %v", err)
-	}
+			registry := prometheus.NewPedanticRegistry()
+			if err := registry.Register(NewVpnStatsCollector(apiClient)); err != nil {
+				t.Fatalf("register VPN collector: %v", err)
+			}
+			families, err := registry.Gather()
+			if err != nil {
+				t.Fatalf("gather VPN collector: %v", err)
+			}
 
-	registry := prometheus.NewPedanticRegistry()
-	if err := registry.Register(NewVpnStatsCollector(apiClient)); err != nil {
-		t.Fatalf("register VPN collector: %v", err)
-	}
-	families, err := registry.Gather()
-	if err != nil {
-		t.Fatalf("gather VPN collector: %v", err)
-	}
-
-	assertGaugeFamily(t, families, "omada_site_to_site_vpn_down_bytes", []float64{123})
-	assertGaugeFamily(t, families, "omada_site_to_site_vpn_up_bytes", []float64{456})
-	assertGaugeFamily(t, families, "omada_site_to_site_vpn_total_peers", []float64{1})
-	if got := siteToSiteRequests.Load(); got != 2 {
-		t.Errorf("site-to-site stats requests = %d, want 2", got)
-	}
-	if got := peerRequests.Load(); got != 1 {
-		t.Errorf("peer stats requests = %d, want 1 unique tunnel request", got)
+			assertGaugeFamily(t, families, "omada_site_to_site_vpn_down_bytes", []float64{tt.wantDownBytes})
+			assertGaugeFamily(t, families, "omada_site_to_site_vpn_up_bytes", []float64{tt.wantUpBytes})
+			assertGaugeFamily(t, families, "omada_site_to_site_vpn_total_peers", []float64{1, 1})
+			if got := siteToSiteRequests.Load(); got != 2 {
+				t.Errorf("site-to-site stats requests = %d, want 2", got)
+			}
+			if got := peerRequests.Load(); got != 2 {
+				t.Errorf("peer stats requests = %d, want both unique tunnel requests", got)
+			}
+		})
 	}
 }
 

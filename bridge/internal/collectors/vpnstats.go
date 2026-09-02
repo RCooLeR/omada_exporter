@@ -235,7 +235,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Met
 	totalPeerSourceOrder := make([]string, 0, len(stats))
 	peerTotalsByVpnID := make(map[string]siteToSiteTrafficValue, len(peerStatsByVpnID))
 	for vpnID, peerStats := range peerStatsByVpnID {
-		downBytes, upBytes := aggregateSiteToSitePeerBytes(peerStats)
+		downBytes, upBytes := aggregateSiteToSitePeerBytes(peerStats, summaryByID[vpnID])
 		peerTotalsByVpnID[vpnID] = siteToSiteTrafficValue{downBytes: downBytes, upBytes: upBytes}
 	}
 
@@ -437,8 +437,8 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnMetrics(ch chan<- prometheus.Met
 
 // collectSiteToSiteVpnPeerMetrics emits metrics for the site to site VPN peer metrics.
 func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus.Metric, site, siteID string, summaries []model.SiteToSiteVpnSummary, peerStatsByVpnID map[string][]model.SiteToSiteVpnPeerStats) {
-	seriesByKey := make(map[string]*siteToSitePeerSeries)
-	seriesOrder := make([]string, 0)
+	sourceByKey := make(map[string]*siteToSitePeerSeries)
+	sourceOrder := make([]string, 0)
 
 	for _, summary := range summaries {
 		for _, item := range peerStatsByVpnID[summary.ID] {
@@ -459,13 +459,13 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus
 			labels = append(labels, vpnDetailValuesWithoutLocalIP(detailLabels)...)
 			seriesKey := prometheusLabelValuesKey([]string{
 				siteToSiteVpnSummarySourceKey(summary),
-				siteToSiteVpnPeerSourceKey(item),
+				siteToSiteVpnPeerSourceKey(item, summary),
 			})
-			series, exists := seriesByKey[seriesKey]
+			series, exists := sourceByKey[seriesKey]
 			if !exists {
 				series = &siteToSitePeerSeries{labels: labels}
-				seriesByKey[seriesKey] = series
-				seriesOrder = append(seriesOrder, seriesKey)
+				sourceByKey[seriesKey] = series
+				sourceOrder = append(sourceOrder, seriesKey)
 			} else if preferMetricLabels(labels, series.labels) {
 				series.labels = labels
 			}
@@ -486,6 +486,22 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus
 			series.upBytes = max(series.upBytes, item.UpBytes)
 			series.loginTimestamp = max(series.loginTimestamp, normalizeUnixTimestampSeconds(item.LoginTime))
 		}
+	}
+
+	seriesByKey := make(map[string]*siteToSitePeerSeries, len(sourceByKey))
+	seriesOrder := make([]string, 0, len(sourceByKey))
+	for _, sourceKey := range sourceOrder {
+		source := sourceByKey[sourceKey]
+		seriesKey := prometheusLabelValuesKey(source.labels)
+		series, exists := seriesByKey[seriesKey]
+		if !exists {
+			copiedSeries := *source
+			series = &copiedSeries
+			seriesByKey[seriesKey] = series
+			seriesOrder = append(seriesOrder, seriesKey)
+			continue
+		}
+		mergeSiteToSitePeerSeries(series, source)
 	}
 
 	for _, key := range seriesOrder {
@@ -680,6 +696,26 @@ func preferMetricLabels(candidate, current []string) bool {
 	return prometheusLabelValuesKey(candidate) < prometheusLabelValuesKey(current)
 }
 
+// mergeSiteToSitePeerSeries coalesces two sources that project to the same
+// final Prometheus label set.
+func mergeSiteToSitePeerSeries(target, source *siteToSitePeerSeries) {
+	if source.hasStatus {
+		target.hasStatus = true
+		target.status = max(target.status, source.status)
+	}
+	if source.hasDownPackets {
+		target.hasDownPackets = true
+		target.downPackets = max(target.downPackets, source.downPackets)
+	}
+	target.downBytes = max(target.downBytes, source.downBytes)
+	if source.hasUpPackets {
+		target.hasUpPackets = true
+		target.upPackets = max(target.upPackets, source.upPackets)
+	}
+	target.upBytes = max(target.upBytes, source.upBytes)
+	target.loginTimestamp = max(target.loginTimestamp, source.loginTimestamp)
+}
+
 // siteToSiteVpnStatsSourceKey identifies one logical tunnel statistics row.
 // Counters are deliberately excluded so duplicate snapshots can be coalesced
 // by taking the highest value without double-counting them.
@@ -695,7 +731,7 @@ func siteToSiteVpnStatsSourceKey(item model.SiteToSiteVpnStats) string {
 	}
 
 	if item.VpnID != "" || item.Spi != 0 || item.Direction != "" {
-		return prometheusLabelValuesKey([]string{
+		values := []string{
 			"runtime",
 			item.VpnID,
 			strconv.FormatInt(item.Spi, 10),
@@ -705,12 +741,18 @@ func siteToSiteVpnStatsSourceKey(item model.SiteToSiteVpnStats) string {
 			item.LocalIP,
 			item.RemoteIP,
 			item.InterfaceName,
-		})
+		}
+		if item.VpnID == "" {
+			values = append(values, item.Name, item.GetVpnMode(), item.GetVpnType())
+		}
+		return prometheusLabelValuesKey(values)
 	}
 
 	values := []string{
 		"connection",
 		item.Name,
+		item.GetVpnMode(),
+		item.GetVpnType(),
 		item.LocalPeerIP,
 		item.RemotePeerIP,
 		item.LocalIP,
@@ -731,10 +773,10 @@ func shouldEmitVpnPacketSeries(item model.SiteToSiteVpnStats) bool {
 
 // aggregateSiteToSitePeerBytes coalesces repeated snapshots of each peer by
 // taking its highest counters, then sums counters across distinct peers.
-func aggregateSiteToSitePeerBytes(peerStats []model.SiteToSiteVpnPeerStats) (int64, int64) {
+func aggregateSiteToSitePeerBytes(peerStats []model.SiteToSiteVpnPeerStats, summary model.SiteToSiteVpnSummary) (int64, int64) {
 	sources := make(map[string]siteToSiteTrafficValue, len(peerStats))
 	for _, item := range peerStats {
-		key := siteToSiteVpnPeerSourceKey(item)
+		key := siteToSiteVpnPeerSourceKey(item, summary)
 		source := sources[key]
 		source.downBytes = max(source.downBytes, item.DownBytes)
 		source.upBytes = max(source.upBytes, item.UpBytes)
@@ -753,12 +795,12 @@ func aggregateSiteToSitePeerBytes(peerStats []model.SiteToSiteVpnPeerStats) (int
 
 // siteToSiteVpnPeerSourceKey identifies one logical peer independently from
 // counters that can differ between repeated snapshots.
-func siteToSiteVpnPeerSourceKey(item model.SiteToSiteVpnPeerStats) string {
+func siteToSiteVpnPeerSourceKey(item model.SiteToSiteVpnPeerStats, summary model.SiteToSiteVpnSummary) string {
 	if peerID := siteToSitePeerID(item); peerID != "" {
 		return prometheusLabelValuesKey([]string{"id", peerID})
 	}
 
-	detail := item.DetailLabels(model.SiteToSiteVpnSummary{})
+	detail := item.DetailLabels(summary)
 	values := []string{
 		"attributes",
 		item.Name,
