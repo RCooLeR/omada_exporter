@@ -16,6 +16,7 @@ import (
 const (
 	dashboardDatasourceUID = "$datasource"
 	dashboardRateMinStep   = "1m"
+	dashboardNoDataColor   = "#808080"
 )
 
 var scrapeLabels = map[string]struct{}{"instance": {}, "job": {}}
@@ -348,6 +349,7 @@ func validateDashboardPanel(t *testing.T, panel *grafanaPanel, contract map[stri
 		t.Errorf("%s has an empty description", location)
 	}
 	validatePrometheusDatasource(t, panel.Datasource, location)
+	validateNeutralNoDataThreshold(t, panel.FieldConfig, location)
 	if len(panel.Targets) == 0 {
 		t.Errorf("%s has no query targets", location)
 		return
@@ -391,11 +393,18 @@ func validateDashboardPanelSemantics(t *testing.T, panel *grafanaPanel, location
 	for _, target := range panel.Targets {
 		if strings.Contains(target.Expr, "omada_wan_status{") {
 			validateWANStatusMapping(t, panel.FieldConfig, location)
-			break
+		}
+		if panel.Type == "stat" && (strings.Contains(target.Expr, "omada_port_link_speed_mbps{") ||
+			strings.Contains(target.Expr, "omada_lag_link_speed_mbps{")) {
+			t.Errorf("%s renders a potentially high-cardinality link-speed query as unreadable stat tiles", location)
 		}
 	}
 
 	switch panel.Title {
+	case "Port link speeds", "LAG link speeds":
+		if panel.Type != "bargauge" {
+			t.Errorf("%s type = %q, want readable bargauge", location, panel.Type)
+		}
 	case "DPI-classified traffic", "DPI insight window":
 		if len(panel.Targets) != 1 {
 			t.Errorf("%s has %d targets, want 1", location, len(panel.Targets))
@@ -422,6 +431,28 @@ func validateDashboardPanelSemantics(t *testing.T, panel *grafanaPanel, location
 				t.Errorf("%s query does not contain required fallback fragment %q", location, fragment)
 			}
 		}
+	}
+}
+
+func validateNeutralNoDataThreshold(t *testing.T, raw json.RawMessage, location string) {
+	t.Helper()
+	var fieldConfig struct {
+		Defaults struct {
+			Thresholds struct {
+				Steps []struct {
+					Color string
+					Value *float64
+				}
+			}
+		}
+	}
+	if err := json.Unmarshal(raw, &fieldConfig); err != nil {
+		t.Errorf("%s has invalid fieldConfig: %v", location, err)
+		return
+	}
+	steps := fieldConfig.Defaults.Thresholds.Steps
+	if len(steps) == 0 || steps[0].Value != nil || steps[0].Color != dashboardNoDataColor {
+		t.Errorf("%s base threshold = %+v, want neutral %s for unavailable data", location, steps, dashboardNoDataColor)
 	}
 }
 
@@ -466,9 +497,10 @@ func validateWANStatusMapping(t *testing.T, raw json.RawMessage, location string
 	}
 
 	steps := fieldConfig.Defaults.Thresholds.Steps
-	if len(steps) != 2 || steps[0].Value != nil || steps[0].Color != "red" ||
-		steps[1].Value == nil || *steps[1].Value != 1 || steps[1].Color != "green" {
-		t.Errorf("%s WAN status thresholds = %+v, want red below 1 and green from 1", location, steps)
+	if len(steps) != 3 || steps[0].Value != nil || steps[0].Color != dashboardNoDataColor ||
+		steps[1].Value == nil || *steps[1].Value != 0 || steps[1].Color != "red" ||
+		steps[2].Value == nil || *steps[2].Value != 1 || steps[2].Color != "green" {
+		t.Errorf("%s WAN status thresholds = %+v, want neutral unavailable data, red 0, and green 1", location, steps)
 	}
 }
 

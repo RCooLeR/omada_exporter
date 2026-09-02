@@ -1,11 +1,12 @@
 ## [Unreleased]
 
 ### Added
-- Add a portable Omada Device Details Grafana dashboard with a friendly single-device selector, compact port and LAG maps, AP client and radio views, and gateway WAN details.
+- Add a portable Omada Device Details Grafana dashboard with a friendly single-device selector, readable port and LAG inventories, AP client and radio views, and gateway WAN details.
 
 ### Fixed
 - Give Grafana rate queries a one-minute Min step so dashboards work when Omada is scraped every 60 seconds, show site-to-site peer session age when generic VPN uptime is unavailable, and stop presenting disabled DPI insights as real zero values.
 - Map the exporter WAN status value correctly as disconnected or connected in the bundled Grafana dashboards.
+- Render device port and LAG speeds as readable scrollable gauges, identify hardware-specific sections where no data is expected, and show unavailable panel data neutrally instead of as healthy or failed.
 
 ## [2.4.1] - 2026-09-02
 

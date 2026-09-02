@@ -47,7 +47,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current uptime for the selected device.",
+      "description": "Current uptime for the selected device; the legend also identifies its hardware type.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -59,8 +59,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -100,10 +104,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, device_model) (omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (device_name, device_mac, device_type, device_model) (omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_model}}",
+          "legendFormat": "{{device_name}} · {{device_type}} · {{device_model}}",
           "range": false,
           "refId": "A"
         }
@@ -129,8 +133,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -207,8 +215,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -283,8 +295,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": -100
               },
               {
                 "color": "yellow",
@@ -360,8 +376,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -429,8 +449,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -498,8 +522,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "green",
@@ -571,8 +599,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -661,8 +693,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -734,8 +770,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -848,8 +888,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -927,8 +971,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -991,7 +1039,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current negotiated link rates for wireless clients associated with the selected access point.",
+      "description": "Current negotiated link rates for wireless clients associated with the selected access point. No data is expected when the selected device is not an access point or the AP has no associated wireless clients.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1003,8 +1051,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -1081,7 +1133,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current signal quality for wireless clients associated with the selected access point.",
+      "description": "Current signal quality for wireless clients associated with the selected access point. No data is expected when the selected device is not an access point or the AP has no associated wireless clients.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1094,8 +1146,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -1171,7 +1227,7 @@
       },
       "id": 17,
       "panels": [],
-      "title": "Access-point radios",
+      "title": "Access-point radios (AP only)",
       "type": "row"
     },
     {
@@ -1192,8 +1248,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -1291,8 +1351,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -1390,8 +1454,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -1489,8 +1557,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -1580,7 +1652,7 @@
       },
       "id": 22,
       "panels": [],
-      "title": "Switch and gateway ports",
+      "title": "Ports and link aggregation (supported devices only)",
       "type": "row"
     },
     {
@@ -1588,7 +1660,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Compact port tiles colored by negotiated speed; zero indicates a disconnected port. Requires port metrics.",
+      "description": "Scrollable port list colored by negotiated speed; Down indicates a disconnected port. Requires port metrics.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1611,8 +1683,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1648,11 +1724,18 @@
       },
       "id": 23,
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 32,
+        "minVizHeight": 24,
+        "minVizWidth": 8,
+        "namePlacement": "left",
         "orientation": "horizontal",
-        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -1660,9 +1743,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "text"
       },
       "targets": [
         {
@@ -1680,8 +1763,8 @@
           "refId": "A"
         }
       ],
-      "title": "Port map",
-      "type": "stat"
+      "title": "Port link speeds",
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -1732,8 +1815,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -1799,7 +1886,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current PoE draw for every port on the selected device.",
+      "description": "Current PoE draw for every port on the selected device. No data is expected on devices without PoE output.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1811,8 +1898,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -1875,7 +1966,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Compact link-aggregation tiles colored by negotiated aggregate speed.",
+      "description": "Configured link-aggregation groups colored by negotiated aggregate speed. No data is expected when the selected device is not a switch or the switch has no configured LAGs.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1898,8 +1989,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -1935,11 +2030,18 @@
       },
       "id": 26,
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
+        "displayMode": "basic",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 32,
+        "minVizHeight": 24,
+        "minVizWidth": 8,
+        "namePlacement": "left",
         "orientation": "horizontal",
-        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -1947,9 +2049,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "text"
       },
       "targets": [
         {
@@ -1967,15 +2069,15 @@
           "refId": "A"
         }
       ],
-      "title": "LAG map",
-      "type": "stat"
+      "title": "LAG link speeds",
+      "type": "bargauge"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Per-LAG traffic counters converted to bit/s with an adaptive rate window.",
+      "description": "Per-LAG traffic counters converted to bit/s with an adaptive rate window. No data is expected when the selected device is not a switch or the switch has no configured LAGs.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2019,8 +2121,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -2091,7 +2197,7 @@
       },
       "id": 28,
       "panels": [],
-      "title": "Gateway WAN",
+      "title": "Gateway WAN (gateway only)",
       "type": "row"
     },
     {
@@ -2128,8 +2234,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "green",
@@ -2218,8 +2328,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "green",
@@ -2291,8 +2405,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "orange",
@@ -2387,8 +2505,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -2503,8 +2625,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "#808080",
                 "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
               }
             ]
           },
@@ -2725,6 +2851,6 @@
   "timezone": "browser",
   "title": "Omada Device Details",
   "uid": "omada-device-details",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

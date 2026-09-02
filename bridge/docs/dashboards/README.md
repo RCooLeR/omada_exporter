@@ -22,7 +22,9 @@ filters.
 3. Select the Prometheus datasource and exporter job/instance.
 4. Choose one or more sites. The comprehensive dashboard can also filter by
    device MAC. The device-details dashboard is optimized for one selected
-   device and shows unsupported hardware-specific panels as no data.
+   device. Hardware-specific sections are labeled, and unsupported or
+   unconfigured capabilities remain neutral **No data** rather than being
+   synthesized as healthy or failed values.
 
 The comprehensive dashboard's **Device uptime** series and the simple
 dashboard's **Device CPU** series link directly to the matching device-details
