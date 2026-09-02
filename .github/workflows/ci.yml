@@ -43,6 +43,27 @@ jobs:
         run: go mod tidy && git diff --exit-code -- go.mod go.sum
         working-directory: bridge
 
+      - name: Verify generated Grafana dashboards are current
+        run: |
+          go generate ./docs/dashboards
+          git diff --exit-code -- docs/dashboards/dashboard.json docs/dashboards/simple-omada-dashboard.json
+        working-directory: bridge
+
+      - name: Lint Grafana dashboards
+        env:
+          DASHBOARD_LINTER_ARCHIVE_SHA256: 9a0eecb84ff22005dbd21c39ffd91534b407b511c45c21879df62ad0de33d79f
+          DASHBOARD_LINTER_VERSION: 0.3.0
+        run: |
+          archive="dashboard-linter_${DASHBOARD_LINTER_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/grafana/dashboard-linter/releases/download/v${DASHBOARD_LINTER_VERSION}/${archive}" \
+            --output "/tmp/${archive}"
+          echo "${DASHBOARD_LINTER_ARCHIVE_SHA256}  /tmp/${archive}" | sha256sum --check --strict
+          tar --extract --gzip --file "/tmp/${archive}" --directory /tmp dashboard-linter
+          /tmp/dashboard-linter lint --strict docs/dashboards/dashboard.json
+          /tmp/dashboard-linter lint --strict docs/dashboards/simple-omada-dashboard.json
+        working-directory: bridge
+
       - name: Run Go tests with the race detector
         run: go test -race -shuffle=on -count=1 ./...
         working-directory: bridge

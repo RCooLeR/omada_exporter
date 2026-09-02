@@ -34,7 +34,7 @@ func (isp *Isp) GetStatus() string {
 
 // GetGatewayStatus maps the stored gateway status code to an online or offline label.
 func (isp *Isp) GetGatewayStatus() string {
-	switch isp.Status {
+	switch isp.GatewayStatus {
 	case 1:
 		return "Online"
 	case 0:

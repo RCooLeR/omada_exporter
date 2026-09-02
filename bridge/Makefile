@@ -1,4 +1,4 @@
-.PHONY: build docker-build generate-metrics-table lint test test-race vet verify
+.PHONY: build docker-build generate-dashboards generate-metrics-table lint test test-race vet verify
 
 build:
 	go build -trimpath ./...
@@ -21,4 +21,7 @@ vet:
 verify: lint test vet build
 
 generate-metrics-table:
-	go run . --host dummy --client-id dummy --secret-id dummy --username dummy --password dummy mdocs > gen-metrics-table.md
+	go run . --host https://dummy.invalid --client-id dummy --secret-id dummy --username dummy --password dummy mdocs > gen-metrics-table.md
+
+generate-dashboards:
+	go generate ./docs/dashboards

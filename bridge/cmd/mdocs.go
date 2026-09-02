@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var descPattern = regexp.MustCompile(`^Desc\{fqName: "([^"]+)", help: "([^"]*)", constLabels: \{\}, variableLabels: [\{\[]([^}\]]*)[\}\]]\}$`)
+var descPattern = regexp.MustCompile(`^Desc\{fqName: "([^"]+)", help: "([^"]*)", (unit: "[^"]*", )?constLabels: \{\}, variableLabels: [\{\[]([^}\]]*)[\}\]]\}$`)
 
 // mdocs just spits out the metrics descriptions and exits
 func mdocs() {
@@ -39,11 +39,11 @@ func mdocs() {
 
 func parseDesc(desc string) (string, string, string) {
 	matches := descPattern.FindStringSubmatch(desc)
-	if len(matches) != 4 {
+	if len(matches) != 5 {
 		return desc, "", ""
 	}
 
-	labels := strings.TrimSpace(matches[3])
+	labels := strings.TrimSpace(matches[4])
 	if labels == "" {
 		labels = "-"
 	}

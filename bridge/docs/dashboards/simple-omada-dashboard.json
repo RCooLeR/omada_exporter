@@ -4,22 +4,30 @@
       {
         "builtIn": 1,
         "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
+          "type": "datasource",
+          "uid": "grafana"
         },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
+        "name": "Annotations \u0026 Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
+  "description": "Focused TP-Link Omada health and traffic dashboard for the current omada_exporter metrics.",
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 0,
+  "graphTooltip": 1,
+  "id": null,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -29,734 +37,48 @@
         "x": 0,
         "y": 0
       },
-      "id": 15,
+      "id": 1,
       "panels": [],
-      "title": "Omada",
+      "title": "Overview",
       "type": "row"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "ef95tr39us64gf"
+        "uid": "$datasource"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value #A"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "bool_yes_no"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value #B"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "ms"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value #C"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "binBps"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Link Bandwidth"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "Mbits"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ISP Bandwidth"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "Mbits"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 11,
-        "x": 0,
-        "y": 1
-      },
-      "id": 27,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "Port"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_wan_internet_state{}",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_wan_latency{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_isp_download_speed{} + omada_isp_upload_speed{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "expr": "omada_isp_status{}",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "D"
-        }
-      ],
-      "title": "",
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "ip",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time 1": true,
-              "Time 2": true,
-              "Time 3": true,
-              "Value #A": true,
-              "__name__ 1": true,
-              "__name__ 2": true,
-              "desc 1": true,
-              "device 1": true,
-              "device 2": true,
-              "device 3": true,
-              "device_mac 1": true,
-              "device_mac 2": true,
-              "device_mac 3": true,
-              "gateway_firmware_version 1": true,
-              "gateway_firmware_version 2": true,
-              "gateway_firmware_version 3": true,
-              "gateway_hw_version 1": true,
-              "gateway_hw_version 2": true,
-              "gateway_hw_version 3": true,
-              "gateway_ip 1": true,
-              "gateway_ip 2": true,
-              "gateway_ip 3": true,
-              "gateway_mac 1": true,
-              "gateway_mac 2": true,
-              "gateway_mac 3": true,
-              "gateway_model 1": true,
-              "gateway_model 2": true,
-              "gateway_model 3": true,
-              "gateway_name 1": true,
-              "gateway_name 2": true,
-              "gateway_name 3": true,
-              "gateway_show_model 1": true,
-              "gateway_show_model 2": true,
-              "gateway_show_model 3": true,
-              "gateway_site 1": true,
-              "gateway_site 2": true,
-              "gateway_site 3": true,
-              "gateway_site_id 1": true,
-              "gateway_site_id 2": true,
-              "gateway_site_id 3": true,
-              "gateway_status 1": true,
-              "gateway_status 2": true,
-              "gateway_status 3": true,
-              "gateway_type 1": true,
-              "gateway_type 2": true,
-              "gateway_type 3": true,
-              "gateway_uptime_seconds 1": true,
-              "gateway_uptime_seconds 2": true,
-              "gateway_version 1": true,
-              "gateway_version 2": true,
-              "gateway_version 3": true,
-              "gateway_version_upgrade 1": true,
-              "gateway_version_upgrade 2": true,
-              "instance 1": true,
-              "instance 2": true,
-              "instance 3": true,
-              "ip": false,
-              "ip 2": true,
-              "ip 3": true,
-              "job 1": true,
-              "job 2": true,
-              "job 3": true,
-              "load_balance": true,
-              "max_bandwidth": true,
-              "name 1": true,
-              "name 2": true,
-              "name 3": true,
-              "port 1": true,
-              "port 2": true,
-              "port 3": true,
-              "proto 1": true,
-              "proto 2": true,
-              "proto 3": true,
-              "site": true,
-              "site 1": true,
-              "site 2": true,
-              "site 3": true,
-              "site_id": true,
-              "site_id 1": true,
-              "site_id 2": true,
-              "site_id 3": true,
-              "type 1": true,
-              "type 2": true,
-              "type 3": true
-            },
-            "includeByName": {},
-            "indexByName": {
-              "Time 1": 0,
-              "Time 2": 20,
-              "Time 3": 50,
-              "Value #A": 42,
-              "Value #B": 48,
-              "Value #C": 49,
-              "__name__ 1": 1,
-              "__name__ 2": 21,
-              "desc 1": 2,
-              "desc 2": 22,
-              "download_speed_set": 45,
-              "gateway_firmware_version 1": 3,
-              "gateway_firmware_version 2": 23,
-              "gateway_hw_version 1": 4,
-              "gateway_hw_version 2": 24,
-              "gateway_ip 1": 5,
-              "gateway_ip 2": 25,
-              "gateway_mac 1": 6,
-              "gateway_mac 2": 26,
-              "gateway_mac 3": 51,
-              "gateway_model 1": 7,
-              "gateway_model 2": 27,
-              "gateway_name 1": 8,
-              "gateway_name 2": 28,
-              "gateway_name 3": 52,
-              "gateway_show_model 1": 9,
-              "gateway_show_model 2": 29,
-              "gateway_site 1": 10,
-              "gateway_site 2": 30,
-              "gateway_site_id 1": 11,
-              "gateway_site_id 2": 31,
-              "gateway_status 1": 12,
-              "gateway_status 2": 32,
-              "gateway_status 3": 53,
-              "gateway_type 1": 13,
-              "gateway_type 2": 33,
-              "gateway_uptime_seconds 1": 62,
-              "gateway_uptime_seconds 2": 63,
-              "gateway_version 1": 14,
-              "gateway_version 2": 34,
-              "gateway_version_upgrade 1": 60,
-              "gateway_version_upgrade 2": 61,
-              "instance 1": 15,
-              "instance 2": 35,
-              "instance 3": 54,
-              "ip": 43,
-              "job 1": 16,
-              "job 2": 36,
-              "job 3": 55,
-              "load_balance": 46,
-              "max_bandwidth": 44,
-              "name 1": 17,
-              "name 2": 37,
-              "name 3": 56,
-              "port 1": 41,
-              "port 2": 38,
-              "port 3": 57,
-              "proto 1": 18,
-              "proto 2": 39,
-              "site": 58,
-              "site_id": 59,
-              "status": 47,
-              "type 1": 19,
-              "type 2": 40
-            },
-            "renameByName": {
-              "Value #A": "Connected",
-              "Value #B": "Latency",
-              "Value #C": "Speed",
-              "__name__ 1": "",
-              "__name__ 2": "",
-              "desc": "ISP",
-              "download_speed_set": "ISP Bandwidth",
-              "gateway_ip 1": "",
-              "gateway_model 1": "Gateway",
-              "gateway_show_model 1": "",
-              "gateway_version 1": "",
-              "ip": "IP",
-              "ip 1": "IP",
-              "load_balance": "Load balance",
-              "max_bandwidth": "Link Bandwidth",
-              "port 1": "Port",
-              "status": "Status",
-              "type 3": ""
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "ef95tr39us64gf"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value #A"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "bool_yes_no"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value #B"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "m"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value #C"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "bytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Speed"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "binBps"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 13,
-        "x": 11,
-        "y": 1
-      },
-      "id": 29,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "Port"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_vpn_status{}",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_vpn_uptime{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_vpn_down_bytes{} + omada_vpn_up_bytes{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "(rate(omada_vpn_down_bytes[5m]) + rate(omada_vpn_up_bytes[5m]))",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "D"
-        }
-      ],
-      "title": "",
-      "transformations": [
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "name",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true,
-              "Time 3": true,
-              "Time 4": true,
-              "__name__": true,
-              "__name__ 1": true,
-              "__name__ 2": true,
-              "device 1": true,
-              "device 2": true,
-              "device 3": true,
-              "device_mac 1": true,
-              "device_mac 2": true,
-              "device_mac 3": true,
-              "instance": true,
-              "instance 1": true,
-              "instance 2": true,
-              "instance 3": true,
-              "instance 4": true,
-              "interface_name 1": true,
-              "interface_name 2": true,
-              "interface_name 3": true,
-              "ip 2": true,
-              "ip 3": true,
-              "job": true,
-              "job 1": true,
-              "job 2": true,
-              "job 3": true,
-              "job 4": true,
-              "local_ip 1": true,
-              "local_ip 2": true,
-              "local_ip 3": true,
-              "name 1": true,
-              "name 2": true,
-              "name 3": true,
-              "port 1": true,
-              "port 2": true,
-              "port 3": true,
-              "proto 1": true,
-              "proto 2": true,
-              "proto 3": true,
-              "purpose": true,
-              "remote_ip": false,
-              "remote_ip 2": true,
-              "remote_ip 3": true,
-              "remote_ip 4": true,
-              "site": true,
-              "site 1": true,
-              "site 2": true,
-              "site 3": true,
-              "site 4": true,
-              "site_id": true,
-              "site_id 1": true,
-              "site_id 2": true,
-              "site_id 3": true,
-              "site_id 4": true,
-              "type 1": true,
-              "type 2": true,
-              "type 3": true,
-              "vpn_id": true,
-              "vpn_mode 2": true,
-              "vpn_mode 3": true,
-              "vpn_mode 4": true,
-              "vpn_type": true,
-              "vpn_type 2": true,
-              "vpn_type 3": true,
-              "vpn_type 4": true
-            },
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Value #A": "Enabled",
-              "Value #B": "Uptime",
-              "Value #C": "Total",
-              "Value #D": "Speed",
-              "__name__ 1": "",
-              "__name__ 2": "",
-              "desc": "ISP",
-              "ip 1": "IP",
-              "remote_ip 1": "Remote IP",
-              "site 1": "",
-              "site_id 3": "",
-              "type 3": ""
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "ef95tr39us64gf"
-      },
+      "description": "Connected devices, including wireless-backhaul Connected variants.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": 0
+                "color": "red",
+                "value": null
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "green",
+                "value": 1
               }
             ]
           },
-          "unit": "watt"
+          "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 2,
+        "h": 4,
+        "w": 4,
         "x": 0,
-        "y": 6
+        "y": 1
       },
-      "id": 10,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "sum(sum by (switch_port)(omada_port_power_watts{}))",
-          "legendFormat": "Total PoE Used",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "ef95tr39us64gf"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 2,
-        "x": 2,
-        "y": 6
-      },
-      "id": 30,
+      "id": 2,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -774,53 +96,62 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
           "editorMode": "code",
-          "expr": "sum(omada_device_need_upgrade{})",
-          "legendFormat": "Firmware upgrades",
-          "range": true,
+          "exemplar": false,
+          "expr": "count(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_status=~\"^Connected.*$\"}) or vector(0)",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Online",
+          "range": false,
           "refId": "A"
         }
       ],
-      "title": "",
+      "title": "Devices online",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "ef95tr39us64gf"
+        "uid": "$datasource"
       },
+      "description": "Devices whose status does not start with Connected.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               },
               {
                 "color": "red",
-                "value": 80
+                "value": 1
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 3,
-        "w": 1,
+        "h": 4,
+        "w": 4,
         "x": 4,
-        "y": 6
+        "y": 1
       },
-      "id": 16,
+      "id": 3,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -838,57 +169,581 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "omada_site_alert_num{}",
+          "expr": "count(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_status!~\"^Connected.*$\"}) or vector(0)",
           "instant": true,
+          "interval": "",
+          "legendFormat": "Not online",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Devices not online",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current wired and wireless client total.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(omada_client_connected_total{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Clients",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Connected clients",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current alert count.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(omada_site_alert_num{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "instant": true,
+          "interval": "",
           "legendFormat": "Alerts",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "",
+      "title": "Site alerts",
       "type": "stat"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "ef95tr39us64gf"
+        "uid": "$datasource"
       },
+      "description": "Available device and controller firmware upgrades.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "thresholds"
           },
-          "fieldMinMax": false,
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
-                "value": 0
+                "value": null
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "orange",
+                "value": 1
               }
             ]
           },
-          "unit": "binBps"
+          "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 12,
-        "w": 6,
-        "x": 5,
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(sum(omada_device_need_upgrade{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)) + (sum(omada_controller_upgrade_available{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0))",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Upgrades",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Firmware upgrades",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Collectors whose latest scrape did not complete.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(omada_collector_last_scrape_completed{job=~\"$job\",instance=~\"$instance\"} == 0) or vector(0)",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Failed",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Collector failures",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 8,
+      "panels": [],
+      "title": "Traffic",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Aggregate client traffic using Grafana's adaptive Prometheus rate interval.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
         "y": 6
       },
-      "id": 13,
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Download",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Upload",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Client throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Omada WAN KB/s gauges converted to bit/s.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum by (site, device_name, device_mac, port, name) (omada_wan_rx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) * 8000",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "{{site}} · {{device_name}} · {{name}} RX",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum by (site, device_name, device_mac, port, name) (omada_wan_tx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) * 8000",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "{{site}} · {{device_name}} · {{name}} TX",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "WAN throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Ten busiest clients by combined upload and download rate.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "id": 11,
       "options": {
         "displayMode": "gradient",
         "legend": {
@@ -897,10 +752,10 @@
           "placement": "bottom",
           "showLegend": false
         },
-        "maxVizHeight": 50,
-        "minVizHeight": 10,
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
         "minVizWidth": 8,
-        "namePlacement": "left",
+        "namePlacement": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -913,392 +768,56 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "12.3.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10,\r\n  sum by(device_category, device_type,mac, ip,name) (\r\n    (rate(omada_client_traffic_up_bytes[3m]) + rate(omada_client_traffic_down_bytes[3m]))\r\n  )\r\n)",
+          "expr": "topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
           "instant": true,
-          "legendFormat": "{{ device_type }} - {{name}}",
+          "interval": "",
+          "legendFormat": "{{name}} · {{mac}}",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "Omada Clients",
+      "title": "Top clients",
       "type": "bargauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "ef95tr39us64gf"
+        "uid": "$datasource"
       },
+      "description": "Current count by Omada status, with wireless Connected variants shown separately.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "footer": {
-              "reducers": []
-            },
-            "inspect": false
-          },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
+                "value": null
               }
             ]
           },
-          "unit": "s"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Uptime"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "s"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "POE remain"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "watt"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 13,
-        "x": 11,
-        "y": 6
-      },
-      "id": 28,
-      "options": {
-        "cellHeight": "sm",
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "device"
-          }
-        ]
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_device_uptime_seconds{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_device_poe_remain_watts{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "ef95tr39us64gf"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "omada_controller_uptime_seconds{}",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "C"
-        }
-      ],
-      "title": "",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "joinByField",
-          "options": {
-            "byField": "mac",
-            "mode": "outer"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Time 1": true,
-              "Time 2": true,
-              "Value": false,
-              "Value #A": true,
-              "Value #C": true,
-              "__name__": true,
-              "__name__ 1": true,
-              "__name__ 2": true,
-              "adopted_ap_and_switch_num": true,
-              "adopted_ap_num": true,
-              "adopted_olt_num": true,
-              "adopted_osg_num": true,
-              "adopted_osw_num": true,
-              "ap_and_switch_capacity": true,
-              "ap_capacity": true,
-              "device 2": true,
-              "deviceType": true,
-              "device_type": true,
-              "device_type 2": true,
-              "firmware_version": true,
-              "firmware_version 1": true,
-              "firmware_version 2": true,
-              "hw_version": true,
-              "hw_version 1": true,
-              "hw_version 2": true,
-              "instance": true,
-              "instance 1": true,
-              "instance 2": true,
-              "ip": true,
-              "ip 1": true,
-              "ip 2": true,
-              "job": true,
-              "job 1": true,
-              "job 2": true,
-              "mac": true,
-              "macAddress": true,
-              "model 2": true,
-              "name 1": true,
-              "name 2": true,
-              "olt_capacity": true,
-              "osg_capacity": true,
-              "osw_capacity": true,
-              "poe_support": true,
-              "portMode": true,
-              "portProtocol": true,
-              "port_number": true,
-              "share_ap_and_switch_capacity": true,
-              "show_model": true,
-              "show_model 1": true,
-              "show_model 2": true,
-              "site": true,
-              "site 1": true,
-              "site 2": true,
-              "site_id": true,
-              "site_id 1": true,
-              "site_id 2": true,
-              "status 2": true,
-              "total_power": true,
-              "type": true,
-              "type 1": true,
-              "type 2": true,
-              "uptime_seconds": false,
-              "version": true,
-              "version 1": true,
-              "version 2": true,
-              "version_upgrade 2": true
-            },
-            "includeByName": {},
-            "indexByName": {
-              "Time": 11,
-              "Value #A": 7,
-              "Value #B": 4,
-              "Value #C": 34,
-              "__name__": 12,
-              "adopted_ap_and_switch_num": 23,
-              "adopted_ap_num": 24,
-              "adopted_olt_num": 25,
-              "adopted_osg_num": 26,
-              "adopted_osw_num": 27,
-              "ap_and_switch_capacity": 28,
-              "ap_capacity": 29,
-              "firmware_version": 13,
-              "hw_version": 14,
-              "instance": 15,
-              "ip": 16,
-              "job": 17,
-              "mac": 6,
-              "model": 1,
-              "name": 0,
-              "olt_capacity": 30,
-              "osg_capacity": 31,
-              "osw_capacity": 32,
-              "poe_support": 8,
-              "port_number": 9,
-              "share_ap_and_switch_capacity": 33,
-              "show_model": 18,
-              "site": 19,
-              "site_id": 20,
-              "status": 3,
-              "total_power": 10,
-              "type": 21,
-              "uptime_seconds": 5,
-              "version": 22,
-              "version_upgrade": 2
-            },
-            "renameByName": {
-              "Value": "Uptime",
-              "Value #A": "",
-              "Value #B": "POE remain",
-              "Value #C": "Uptime",
-              "device": "Device",
-              "mac": "",
-              "model": "Model",
-              "model 1": "Model",
-              "name 1": "Name",
-              "portID": "Port",
-              "portIP": "IP",
-              "portName": "ISP",
-              "show_model 1": "",
-              "site 1": "",
-              "status": "",
-              "status 1": "Status",
-              "total_power": "POE",
-              "uptime_seconds": "Uptime",
-              "version": "",
-              "version 1": "",
-              "version_upgrade": "Firmware",
-              "version_upgrade 1": "Version"
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "Model"
-              }
-            ]
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Firmware": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "Model": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "POE remain": {
-                "aggregations": [
-                  "max"
-                ],
-                "operation": "aggregate"
-              },
-              "Uptime": {
-                "aggregations": [
-                  "median"
-                ],
-                "operation": "aggregate"
-              },
-              "name": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "status": {
-                "aggregations": [],
-                "operation": "groupby"
-              }
-            }
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "Model": "",
-              "POE remain (max)": "POE remain",
-              "Uptime (median)": "Uptime",
-              "name": "Name",
-              "status": "Status"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "ef95tr39us64gf"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "continuous-GrYlRd"
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent"
+          "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
-        "w": 5,
-        "x": 0,
-        "y": 9
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
       },
       "id": 12,
       "options": {
@@ -1325,51 +844,666 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "12.3.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "    avg by (name, mac) (\r\n      avg_over_time(omada_device_cpu_percentage{}[3m])\r\n      )",
-          "format": "time_series",
+          "expr": "count by (device_status) (omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
           "instant": true,
-          "legendFormat": "{{name}}",
+          "interval": "",
+          "legendFormat": "{{device_status}}",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "Omada Device CPU",
+      "title": "Device states",
       "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 13,
+      "panels": [],
+      "title": "Health",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current CPU utilization by device.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 23
+      },
+      "id": 14,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (device_name, device_mac, device_model) (omada_device_cpu_percentage{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{device_name}} · {{device_model}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Device CPU",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current memory utilization by device.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 23
+      },
+      "id": 15,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (device_name, device_mac, device_model) (omada_device_mem_percentage{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{device_name}} · {{device_model}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Device memory",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current latency by WAN interface.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 23
+      },
+      "id": 16,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (device_name, device_mac, port, name) (omada_wan_latency{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{device_name}} · {{name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "WAN latency",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current PoE draw across all ports in the selected sites.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "watt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 31
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(omada_port_power_watts{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Draw",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "PoE draw",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Used storage divided by total controller storage.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 31
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "100 * sum(omada_controller_storage_used_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) / clamp_min(sum(omada_controller_storage_total_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}), 1)",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "Used",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Controller storage used",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "Current internet reachability for each WAN interface.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "Offline"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "Online"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 31
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (device_name, device_mac, port, name) (omada_wan_internet_state{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "instant": true,
+          "interval": "",
+          "legendFormat": "{{device_name}} · {{name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "WAN internet state",
+      "type": "stat"
     }
   ],
   "preload": false,
-  "refresh": "10s",
+  "refresh": "30s",
   "schemaVersion": 42,
-  "tags": [],
+  "tags": [
+    "omada",
+    "network",
+    "prometheus"
+  ],
   "templating": {
     "list": [
       {
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "label": "node",
-        "name": "node",
+        "current": {},
+        "includeAll": false,
+        "label": "Prometheus data source",
+        "multi": false,
+        "name": "datasource",
         "options": [],
-        "query": "",
+        "query": "prometheus",
         "refresh": 1,
         "regex": "",
+        "type": "datasource"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(omada_device_uptime_seconds, job)",
+        "includeAll": true,
+        "label": "Job",
+        "multi": true,
+        "name": "job",
+        "options": [],
+        "query": {
+          "label": "job",
+          "metric": "omada_device_uptime_seconds",
+          "qryType": 1,
+          "query": "label_values(omada_device_uptime_seconds, job)",
+          "refId": "PrometheusVariableQueryEditor-Job"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\"}, instance)",
+        "includeAll": true,
+        "label": "Instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "label": "instance",
+          "metric": "omada_device_uptime_seconds{job=~\"$job\"}",
+          "qryType": 1,
+          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\"}, instance)",
+          "refId": "PrometheusVariableQueryEditor-Instance"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}, site)",
+        "includeAll": true,
+        "label": "Site",
+        "multi": true,
+        "name": "Site",
+        "options": [],
+        "query": {
+          "label": "site",
+          "metric": "omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}",
+          "qryType": 1,
+          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}, site)",
+          "refId": "PrometheusVariableQueryEditor-Site"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-12h",
+    "from": "now-6h",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
   "timezone": "browser",
-  "title": "Simple omada dashboard",
+  "title": "Simple Omada dashboard",
   "uid": "ad5dtmf",
-  "version": 4
+  "version": 5,
+  "weekStart": ""
 }

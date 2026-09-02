@@ -1,0 +1,3 @@
+exclusions:
+  uneditable-dashboard:
+    reason: Imported copies are intentionally editable so users can customize them for their Omada deployment.
