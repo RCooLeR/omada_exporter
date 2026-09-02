@@ -577,7 +577,7 @@
           "exemplar": true,
           "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "Download",
           "range": true,
           "refId": "A"
@@ -591,7 +591,7 @@
           "exemplar": true,
           "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "Upload",
           "range": true,
           "refId": "B"
@@ -778,7 +778,7 @@
           "exemplar": false,
           "expr": "topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
           "instant": true,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · {{mac}}",
           "range": false,
           "refId": "A"
@@ -1504,6 +1504,6 @@
   "timezone": "browser",
   "title": "Simple Omada dashboard",
   "uid": "ad5dtmf",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }

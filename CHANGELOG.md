@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+### Fixed
+- Give Grafana rate queries a one-minute Min step so dashboards work when Omada is scraped every 60 seconds, show site-to-site peer session age when generic VPN uptime is unavailable, and stop presenting disabled DPI insights as real zero values.
+
 ## [2.4.1] - 2026-09-02
 
 ### Added

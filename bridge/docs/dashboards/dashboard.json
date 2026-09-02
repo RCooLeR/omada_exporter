@@ -1012,7 +1012,7 @@
           "exemplar": true,
           "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "Download",
           "range": true,
           "refId": "A"
@@ -1026,7 +1026,7 @@
           "exemplar": true,
           "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "Upload",
           "range": true,
           "refId": "B"
@@ -1102,7 +1102,7 @@
           "exemplar": false,
           "expr": "topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
           "instant": true,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · {{mac}}",
           "range": false,
           "refId": "A"
@@ -1199,7 +1199,7 @@
           "exemplar": true,
           "expr": "sum by (device_name, device_mac) (rate(omada_device_download{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{device_name}} download",
           "range": true,
           "refId": "A"
@@ -1213,7 +1213,7 @@
           "exemplar": true,
           "expr": "sum by (device_name, device_mac) (rate(omada_device_upload{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{device_name}} upload",
           "range": true,
           "refId": "B"
@@ -2510,7 +2510,7 @@
           "exemplar": true,
           "expr": "sum by (device_name, device_mac, port, name) (rate(omada_port_link_rx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{device_name}} · {{port}} RX",
           "range": true,
           "refId": "A"
@@ -2524,7 +2524,7 @@
           "exemplar": true,
           "expr": "sum by (device_name, device_mac, port, name) (rate(omada_port_link_tx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{device_name}} · {{port}} TX",
           "range": true,
           "refId": "B"
@@ -2621,7 +2621,7 @@
           "exemplar": true,
           "expr": "sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{device_name}} · LAG {{lag_id}} RX",
           "range": true,
           "refId": "A"
@@ -2635,7 +2635,7 @@
           "exemplar": true,
           "expr": "sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{device_name}} · LAG {{lag_id}} TX",
           "range": true,
           "refId": "B"
@@ -3886,7 +3886,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Current tunnel uptime in seconds.",
+      "description": "Current generic tunnel uptime, with the longest site-to-site peer session age inferred when generic tunnel stats are unavailable.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3946,10 +3946,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (site, name, interface_name) (omada_vpn_uptime{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, site, site_id, name, interface_name, vpn_type) (omada_vpn_uptime{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or (max by (job, instance, site, site_id, vpn_id, name, vpn_type) (clamp_min(time() - (omada_site_to_site_vpn_peer_login_timestamp{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"} \u003e 0), 0)) unless on (job, instance, site, site_id, name, vpn_type) max by (job, instance, site, site_id, name, vpn_type) (omada_vpn_uptime{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{name}}",
+          "legendFormat": "{{site}} · {{name}} · {{vpn_type}}",
           "range": false,
           "refId": "A"
         }
@@ -4113,7 +4113,7 @@
           "exemplar": true,
           "expr": "sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · down",
           "range": true,
           "refId": "A"
@@ -4127,7 +4127,7 @@
           "exemplar": true,
           "expr": "sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · up",
           "range": true,
           "refId": "B"
@@ -4224,7 +4224,7 @@
           "exemplar": true,
           "expr": "sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · down",
           "range": true,
           "refId": "A"
@@ -4238,7 +4238,7 @@
           "exemplar": true,
           "expr": "sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · up",
           "range": true,
           "refId": "B"
@@ -4335,7 +4335,7 @@
           "exemplar": true,
           "expr": "sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · {{peer_name}} down",
           "range": true,
           "refId": "A"
@@ -4349,7 +4349,7 @@
           "exemplar": true,
           "expr": "sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
-          "interval": "",
+          "interval": "1m",
           "legendFormat": "{{name}} · {{peer_name}} up",
           "range": true,
           "refId": "B"
@@ -4376,7 +4376,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Largest DPI traffic categories within the exporter's configured insight window.",
+      "description": "Largest DPI traffic categories within the exporter's configured insight window. Requires OMADA_TRACK_INSIGHT_METRICS=true.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4452,7 +4452,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Largest DPI-classified applications within the configured insight window.",
+      "description": "Largest DPI-classified applications within the configured insight window. Requires OMADA_TRACK_INSIGHT_METRICS=true and a non-zero application limit.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4528,7 +4528,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Total classified bytes for the current insight window.",
+      "description": "Total classified bytes for the current insight window. No data means insight metrics are disabled or unsupported.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4581,7 +4581,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_dpi_total_traffic_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "sum(omada_dpi_total_traffic_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
           "legendFormat": "Classified",
@@ -4597,7 +4597,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "Window used by the exporter when querying DPI insights.",
+      "description": "Window used by the exporter when querying DPI insights. No data means insight metrics are disabled or unsupported.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4650,7 +4650,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(omada_dpi_scrape_window_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "max(omada_dpi_scrape_window_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
           "legendFormat": "Window",
@@ -4826,6 +4826,6 @@
   "timezone": "browser",
   "title": "Omada Overview",
   "uid": "omada-overview",
-  "version": 9,
+  "version": 10,
   "weekStart": ""
 }

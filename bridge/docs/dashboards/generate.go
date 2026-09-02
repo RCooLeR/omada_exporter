@@ -18,14 +18,16 @@ const (
 	siteVariable     = "$" + "{Site:regex}"
 	deviceVariable   = "$" + "{Device:regex}"
 	rateInterval     = "$__rate_interval"
+	rateMinStep      = "1m"
 )
 
 type object = map[string]any
 
 type querySpec struct {
-	expr    string
-	legend  string
-	instant bool
+	expr     string
+	legend   string
+	interval string
+	instant  bool
 }
 
 type dashboardBuilder struct {
@@ -94,13 +96,13 @@ func fullDashboard() object {
 
 	b.row("Traffic", 9)
 	b.timeseries("Client throughput", "Aggregate client counter rate. Grafana's adaptive rate interval prevents gaps when the dashboard range changes.", 0, 10, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum(rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"])) * 8", "Download"),
-		rangeQuery("sum(rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8", "Upload"))
+		rateQuery("sum(rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"])) * 8", "Download"),
+		rateQuery("sum(rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8", "Upload"))
 	b.barGauge("Top clients by throughput", "Ten busiest clients by combined upload and download counter rate.", 12, 10, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
-		instant("topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
+		rateInstant("topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
 	b.timeseries("Device traffic", "Traffic counters grouped by current device labels.", 0, 18, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (device_name, device_mac) (rate(omada_device_download{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} download"),
-		rangeQuery("sum by (device_name, device_mac) (rate(omada_device_upload{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} upload"))
+		rateQuery("sum by (device_name, device_mac) (rate(omada_device_download{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} download"),
+		rateQuery("sum by (device_name, device_mac) (rate(omada_device_upload{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} upload"))
 	b.barGauge("Wireless client link rates", "Current negotiated Wi-Fi link rates; these are link capabilities rather than measured throughput.", 12, 18, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
 		instant("topk(10, max by (name, mac, ssid) (omada_client_rx_rate{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} RX"),
 		instant("topk(10, max by (name, mac, ssid) (omada_client_tx_rate{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} TX"))
@@ -139,11 +141,11 @@ func fullDashboard() object {
 	b.barGauge("PoE by port", "Current per-port PoE draw.", 16, 52, 8, 8, "watt", object{"min": 0}, nil, healthyThresholds(),
 		instant("max by (device_name, device_mac, port, name) (omada_port_power_watts{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
 	b.timeseries("Port throughput", "Per-port byte counters converted to bit/s with the adaptive rate interval.", 0, 60, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} RX"),
-		rangeQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} TX"))
+		rateQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} RX"),
+		rateQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} TX"))
 	b.timeseries("LAG throughput", "Link-aggregation byte counters converted to bit/s.", 12, 60, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} RX"),
-		rangeQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} TX"))
+		rateQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} RX"),
+		rateQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} TX"))
 	b.barGauge("LAG link state", "Current state of switch link-aggregation groups.", 0, 68, 8, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Disconnected", "Connected"), binaryThresholds(),
 		instant("max by (device_name, device_mac, lag_id, name) (omada_lag_link_status{"+device+"})", "{{device_name}} · LAG {{lag_id}} {{name}}"))
 	b.barGauge("LAG link speed", "Aggregate negotiated link speed for each LAG.", 8, 68, 8, 8, "Mbits", object{"min": 0}, nil, healthyThresholds(),
@@ -174,35 +176,38 @@ func fullDashboard() object {
 		instant("max by (gateway_name, gateway_mac, port, name) (omada_isp_upload_speed{"+site+"})", "{{gateway_name}} · {{name}} up"))
 
 	b.row("VPN", 97)
+	vpnUptime := "max by (job, instance, site, site_id, name, interface_name, vpn_type) (omada_vpn_uptime{" + site + "})" +
+		" or (max by (job, instance, site, site_id, vpn_id, name, vpn_type) (clamp_min(time() - (omada_site_to_site_vpn_peer_login_timestamp{" + site + "} > 0), 0))" +
+		" unless on (job, instance, site, site_id, name, vpn_type) max by (job, instance, site, site_id, name, vpn_type) (omada_vpn_uptime{" + site + "}))"
 	b.stat("VPN configuration state", "Enabled or disabled state for every configured VPN.", 0, 98, 6, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Disabled", "Enabled"), binaryThresholds(),
 		instant("max by (site, name, vpn_type) (omada_vpn_status{"+site+"})", "{{site}} · {{name}} {{vpn_type}}"))
 	b.stat("Site-to-site peer state", "Online state returned for peers that expose it.", 6, 98, 6, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
 		instant("max by (site, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_status{"+site+"})", "{{name}} · {{peer_name}}"))
-	b.barGauge("VPN uptime", "Current tunnel uptime in seconds.", 12, 98, 6, 8, "s", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (site, name, interface_name) (omada_vpn_uptime{"+site+"})", "{{site}} · {{name}}"))
+	b.barGauge("VPN uptime", "Current generic tunnel uptime, with the longest site-to-site peer session age inferred when generic tunnel stats are unavailable.", 12, 98, 6, 8, "s", object{"min": 0}, nil, healthyThresholds(),
+		instant(vpnUptime, "{{site}} · {{name}} · {{vpn_type}}"))
 	b.stat("Peer login time", "Most recent peer login timestamp, displayed relative to now.", 18, 98, 6, 8, "dateTimeFromNow", object{}, nil, healthyThresholds(),
 		instant("max by (site, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_login_timestamp{"+site+"} > 0) * 1000", "{{name}} · {{peer_name}}"))
 	b.timeseries("VPN throughput", "General VPN tunnel byte counters converted to bit/s.", 0, 106, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
-		rangeQuery("sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
+		rateQuery("sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
+		rateQuery("sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
 	b.timeseries("Site-to-site VPN throughput", "Aggregate site-to-site VPN byte counters converted to bit/s.", 12, 106, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
-		rangeQuery("sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
+		rateQuery("sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
+		rateQuery("sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
 	b.timeseries("Site-to-site peer throughput", "Per-peer site-to-site counters converted to bit/s.", 0, 114, 24, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} down"),
-		rangeQuery("sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} up"))
+		rateQuery("sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} down"),
+		rateQuery("sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} up"))
 
 	b.row("DPI insights", 122)
-	b.barGauge("Top DPI categories", "Largest DPI traffic categories within the exporter's configured insight window.", 0, 123, 12, 8, "bytes", object{"min": 0}, nil, healthyThresholds(),
+	b.barGauge("Top DPI categories", "Largest DPI traffic categories within the exporter's configured insight window. Requires OMADA_TRACK_INSIGHT_METRICS=true.", 0, 123, 12, 8, "bytes", object{"min": 0}, nil, healthyThresholds(),
 		instant("topk(10, sum by (site, family_id, family_name) (omada_dpi_category_traffic_bytes{"+site+"}))", "{{site}} · {{family_name}}"))
-	b.barGauge("Top DPI applications", "Largest DPI-classified applications within the configured insight window.", 12, 123, 12, 8, "bytes", object{"min": 0}, nil, healthyThresholds(),
+	b.barGauge("Top DPI applications", "Largest DPI-classified applications within the configured insight window. Requires OMADA_TRACK_INSIGHT_METRICS=true and a non-zero application limit.", 12, 123, 12, 8, "bytes", object{"min": 0}, nil, healthyThresholds(),
 		instant("topk(10, sum by (site, application_id, application_name) (omada_dpi_application_traffic_bytes{"+site+"}))", "{{site}} · {{application_name}}"))
-	b.stat("DPI-classified traffic", "Total classified bytes for the current insight window.", 0, 131, 12, 4, "bytes", object{"min": 0}, nil, healthyThresholds(),
-		instant("sum(omada_dpi_total_traffic_bytes{"+site+"}) or vector(0)", "Classified"))
-	b.stat("DPI insight window", "Window used by the exporter when querying DPI insights.", 12, 131, 12, 4, "s", object{"min": 0}, nil, healthyThresholds(),
-		instant("max(omada_dpi_scrape_window_seconds{"+site+"}) or vector(0)", "Window"))
+	b.stat("DPI-classified traffic", "Total classified bytes for the current insight window. No data means insight metrics are disabled or unsupported.", 0, 131, 12, 4, "bytes", object{"min": 0}, nil, healthyThresholds(),
+		instant("sum(omada_dpi_total_traffic_bytes{"+site+"})", "Classified"))
+	b.stat("DPI insight window", "Window used by the exporter when querying DPI insights. No data means insight metrics are disabled or unsupported.", 12, 131, 12, 4, "s", object{"min": 0}, nil, healthyThresholds(),
+		instant("max(omada_dpi_scrape_window_seconds{"+site+"})", "Window"))
 
-	return dashboard("Omada Overview", "omada-overview", 9,
+	return dashboard("Omada Overview", "omada-overview", 10,
 		"Comprehensive TP-Link Omada dashboard for the current omada_exporter metric and label contract.", b.panels, true)
 }
 
@@ -227,13 +232,13 @@ func simpleDashboard() object {
 
 	b.row("Traffic", 5)
 	b.timeseries("Client throughput", "Aggregate client traffic using Grafana's adaptive Prometheus rate interval.", 0, 6, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum(rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"])) * 8", "Download"),
-		rangeQuery("sum(rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8", "Upload"))
+		rateQuery("sum(rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"])) * 8", "Download"),
+		rateQuery("sum(rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8", "Upload"))
 	b.timeseries("WAN throughput", "Omada WAN KB/s gauges converted to bit/s.", 12, 6, 12, 8, "bps", object{"min": 0},
 		rangeQuery("sum by (site, device_name, device_mac, port, name) (omada_wan_rx_rate{"+site+"}) * 8000", "{{site}} · {{device_name}} · {{name}} RX"),
 		rangeQuery("sum by (site, device_name, device_mac, port, name) (omada_wan_tx_rate{"+site+"}) * 8000", "{{site}} · {{device_name}} · {{name}} TX"))
 	b.barGauge("Top clients", "Ten busiest clients by combined upload and download rate.", 0, 14, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
-		instant("topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
+		rateInstant("topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
 	b.barGauge("Device states", "Current count by Omada status, with wireless Connected variants shown separately.", 12, 14, 12, 8, "short", object{"min": 0}, nil, healthyThresholds(),
 		instant("count by (device_status) (omada_device_uptime_seconds{"+site+"})", "{{device_status}}"))
 
@@ -251,7 +256,7 @@ func simpleDashboard() object {
 	b.stat("WAN internet state", "Current internet reachability for each WAN interface.", 16, 31, 8, 4, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
 		instant("max by (device_name, device_mac, port, name) (omada_wan_internet_state{"+site+"})", "{{device_name}} · {{name}}"))
 
-	return dashboard("Simple Omada dashboard", "ad5dtmf", 5,
+	return dashboard("Simple Omada dashboard", "ad5dtmf", 6,
 		"Focused TP-Link Omada health and traffic dashboard for the current omada_exporter metrics.", b.panels, false)
 }
 
@@ -509,7 +514,7 @@ func targets(queries []querySpec) []any {
 			"exemplar":     !query.instant,
 			"expr":         query.expr,
 			"instant":      query.instant,
-			"interval":     "",
+			"interval":     query.interval,
 			"legendFormat": query.legend,
 			"range":        !query.instant,
 			"refId":        string(rune('A' + i)),
@@ -549,8 +554,16 @@ func rangeQuery(expr, legend string) querySpec {
 	return querySpec{expr: expr, legend: legend}
 }
 
+func rateQuery(expr, legend string) querySpec {
+	return querySpec{expr: expr, legend: legend, interval: rateMinStep}
+}
+
 func instant(expr, legend string) querySpec {
 	return querySpec{expr: expr, legend: legend, instant: true}
+}
+
+func rateInstant(expr, legend string) querySpec {
+	return querySpec{expr: expr, legend: legend, interval: rateMinStep, instant: true}
 }
 
 func binaryMappings(zero, one string) []any {

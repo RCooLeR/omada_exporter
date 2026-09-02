@@ -21,13 +21,21 @@ filters.
 
 The dashboards refresh every 30 seconds, matching the scrape interval in the
 [Prometheus setup example](../prometheus.md). Rate panels use
-`$__rate_interval`, so their sampling window adapts to the selected time range.
+`$__rate_interval` and set a one-minute query Min step. This keeps the rate
+window at four minutes or longer, so deployments that scrape Omada every 60
+seconds still provide enough samples even when the selected Grafana datasource
+retains its default 15-second scrape interval. Configure the datasource's
+scrape interval to the real value when it is longer than one minute.
 
 Some comprehensive panels intentionally show no data when their collector is
 disabled or unsupported by the controller. Per-client, per-port, and DPI panels
 depend on `OMADA_TRACK_CLIENT_METRICS`, `OMADA_TRACK_PORT_METRICS`, and
-`OMADA_TRACK_INSIGHT_METRICS`, respectively. Older controller firmware can also
-provide only part of the metric set; see
+`OMADA_TRACK_INSIGHT_METRICS`, respectively. Disabled or unsupported DPI
+collection is shown as no data rather than as a genuine zero-byte insight
+window. When generic VPN uptime is unavailable, the comprehensive dashboard
+shows the longest site-to-site peer session age inferred from peer login
+timestamps. Older controller firmware can also provide only part of the metric
+set; see
 [Controller Compatibility](../installation.md#controller-compatibility).
 
 ## Maintenance

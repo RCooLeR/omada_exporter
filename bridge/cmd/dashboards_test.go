@@ -13,7 +13,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const dashboardDatasourceUID = "$datasource"
+const (
+	dashboardDatasourceUID = "$datasource"
+	dashboardRateMinStep   = "1m"
+)
 
 var scrapeLabels = map[string]struct{}{"instance": {}, "job": {}}
 
@@ -75,6 +78,7 @@ type grafanaTarget struct {
 	Datasource   *grafanaDatasource
 	Expr         string
 	Instant      bool
+	Interval     string
 	LegendFormat string
 	Range        bool
 	RefID        string
@@ -273,6 +277,7 @@ func validateDashboardPanel(t *testing.T, panel *grafanaPanel, contract map[stri
 		t.Errorf("%s has no query targets", location)
 		return
 	}
+	validateDashboardPanelSemantics(t, panel, location)
 
 	referenceIDs := make(map[string]struct{}, len(panel.Targets))
 	for _, target := range panel.Targets {
@@ -293,8 +298,48 @@ func validateDashboardPanel(t *testing.T, panel *grafanaPanel, contract map[stri
 		if target.Instant == target.Range {
 			t.Errorf("%s must select exactly one of instant or range", targetLocation)
 		}
+		usesRate := strings.Contains(target.Expr, "rate(")
+		if usesRate && target.Interval != dashboardRateMinStep {
+			t.Errorf("%s rate query interval = %q, want Min step %q", targetLocation, target.Interval, dashboardRateMinStep)
+		}
+		if !usesRate && target.Interval != "" {
+			t.Errorf("%s non-rate query has unexpected Min step %q", targetLocation, target.Interval)
+		}
 		for _, metric := range validatePromQLContract(t, targetLocation, target.Expr, target.LegendFormat, contract) {
 			referenced[metric] = struct{}{}
+		}
+	}
+}
+
+func validateDashboardPanelSemantics(t *testing.T, panel *grafanaPanel, location string) {
+	t.Helper()
+
+	switch panel.Title {
+	case "DPI-classified traffic", "DPI insight window":
+		if len(panel.Targets) != 1 {
+			t.Errorf("%s has %d targets, want 1", location, len(panel.Targets))
+			return
+		}
+		if strings.Contains(panel.Targets[0].Expr, "vector(0)") {
+			t.Errorf("%s converts unavailable DPI metrics to a misleading zero", location)
+		}
+	case "VPN uptime":
+		if len(panel.Targets) != 1 {
+			t.Errorf("%s has %d targets, want 1", location, len(panel.Targets))
+			return
+		}
+		expression := panel.Targets[0].Expr
+		for _, fragment := range []string{
+			"omada_vpn_uptime",
+			"omada_site_to_site_vpn_peer_login_timestamp",
+			"clamp_min(time() - (",
+			"> 0",
+			"unless on (job, instance, site, site_id, name, vpn_type)",
+			"max by (job, instance, site, site_id, vpn_id, name, vpn_type)",
+		} {
+			if !strings.Contains(expression, fragment) {
+				t.Errorf("%s query does not contain required fallback fragment %q", location, fragment)
+			}
 		}
 	}
 }
