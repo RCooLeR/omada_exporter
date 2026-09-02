@@ -31,6 +31,7 @@ import type {
 import {
   cardHassChanged,
   getDashboardModel,
+  isDeviceConnected,
   normalizeMacKey,
   vpnModeLabel,
   vpnPeerLoginSeconds,
@@ -636,7 +637,7 @@ export class OmadaNetworkCard extends LitElement {
             const selected = this._selection?.kind === "device" && this._selection.key === device.key;
             const cpu = device.metrics.omada_device_cpu_percentage ?? 0;
             const mem = device.metrics.omada_device_mem_percentage ?? 0;
-            const isUp = device.status === "Connected";
+            const isUp = isDeviceConnected(device.status);
             const meta = this.getDeviceMeta(device);
             return html`
               <button

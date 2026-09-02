@@ -85,6 +85,10 @@ export function normalizeMacKey(mac: string): string {
   return compact.length === 12 ? compact : normalized;
 }
 
+export function isDeviceConnected(status: string): boolean {
+  return /^connected(?:\(|$)/i.test(status.trim());
+}
+
 function isDashboardEntity(entity: HassEntity): boolean {
   return getMetric(entity).startsWith("omada_") || isClientTrackerEntity(entity) || looksLikeClientEntity(entity);
 }
@@ -542,7 +546,7 @@ function comparePorts(left: PortRecord, right: PortRecord): number {
 function summaryFrom(devices: DeviceRecord[], clients: ClientRecord[], siteName: string): SiteSummary {
   const wiredClients = clients.filter((client) => !client.wireless).length;
   const wirelessClients = clients.filter((client) => client.wireless).length;
-  const devicesOnline = devices.filter((device) => device.status.toLowerCase() === "connected").length;
+  const devicesOnline = devices.filter((device) => isDeviceConnected(device.status)).length;
   const devicesOffline = devices.length - devicesOnline;
   const maxCpuDevice = devices.reduce<DeviceRecord | undefined>((max, device) => {
     if (!max) {
@@ -881,8 +885,8 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       return leftType - rightType;
     }
 
-    const leftOnline = left.status === "Connected" ? 0 : 1;
-    const rightOnline = right.status === "Connected" ? 0 : 1;
+    const leftOnline = isDeviceConnected(left.status) ? 0 : 1;
+    const rightOnline = isDeviceConnected(right.status) ? 0 : 1;
     if (leftOnline !== rightOnline) {
       return leftOnline - rightOnline;
     }

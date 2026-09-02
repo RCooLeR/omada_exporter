@@ -4,6 +4,7 @@ import {
   buildDashboardModel,
   cardHassChanged,
   getDashboardModel,
+  isDeviceConnected,
   normalizeMacKey,
   vpnModeLabel,
   vpnPeerLoginSeconds,
@@ -23,7 +24,7 @@ describe("buildDashboardModel", () => {
             device_mac: "aa:bb:cc:dd:ee:ff",
             device_name: "Gateway",
             device_type: "gateway",
-            device_status: "Connected",
+            device_status: "Connected(Wireless)",
             site: "Default"
           }
         },
@@ -438,6 +439,24 @@ describe("buildDashboardModel", () => {
     expect(getDashboardModel(hass, "Default")).toBe(getDashboardModel(hass, "Default"));
     expect(getDashboardModel(hass, "Default")).not.toBe(getDashboardModel(hass, "Other"));
   });
+});
+
+describe("isDeviceConnected", () => {
+  it.each([
+    "Connected",
+    "Connected(Wireless)",
+    "Connected(Migrating)",
+    "Connected(Wireless,Migrating)"
+  ])("recognizes %s as online", (status) => {
+    expect(isDeviceConnected(status)).toBe(true);
+  });
+
+  it.each(["Disconnected", "Provisioning", "Pending(Wireless)", "Connectedness", ""])(
+    "recognizes %s as offline",
+    (status) => {
+      expect(isDeviceConnected(status)).toBe(false);
+    }
+  );
 });
 
 describe("cardHassChanged", () => {
