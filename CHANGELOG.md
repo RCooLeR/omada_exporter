@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2.4.1] - 2026-09-02
+
 ### Added
 - Publish multi-platform `linux/amd64` and `linux/arm64` container images with SBOMs, build provenance, OCI annotations, and GitHub release attestations.
 - Add weekly Dependabot updates for Go, npm, Docker, and GitHub Actions dependencies, plus Go vulnerability and npm audit checks in CI.
@@ -17,6 +19,7 @@
 - Bound Omada response bodies, return structured HTTP/API failures, and apply cancellable MQTT connection handling with bounded writes and concurrent retained-message callbacks.
 - Manage ECharts through a Lit reactive controller, coalesce resize work, use dirty-rectangle and lazy rendering, and skip card updates caused only by unrelated Home Assistant entities.
 - Document partial metric availability on older Omada Controller releases and distinguish unsupported controller API paths from Grafana or Prometheus configuration errors.
+- Regenerate the bundled Grafana dashboards from source for the current metric and label contract, portable datasource selection, adaptive rate windows, and Grafana schema 42.
 
 ### Fixed
 - Encode Omada web and OpenAPI credentials with the JSON encoder so quotes, backslashes, and newlines cannot corrupt login requests.
@@ -25,6 +28,8 @@
 - Serialize web and OpenAPI authentication transitions, keep controller/site context snapshots synchronized during reauthentication, and prevent stale in-flight fetches from repopulating invalidated caches.
 - Make custom-card registration idempotent across Home Assistant resource reloads.
 - Recreate charts after a card reconnect, apply changed card configuration immediately, normalize MAC formats across topology joins, keep unnamed WAN/ISP rows distinct, and report missing Wi-Fi quality as unknown.
+- Treat APs reported as `Connected(Wireless)` as online in the Home Assistant device list.
+- Export gateway temperature as a gauge and derive gateway connectivity from the correct ISP response field.
 - Coalesce duplicate site-to-site VPN statistics returned by overlapping Omada API queries without dropping distinct tunnel or peer identities.
 
 ## [2.4.0] - 2026-08-05
