@@ -117,8 +117,45 @@ export interface SiteSummary {
   maxMemDevice: string;
 }
 
+export interface DpiCategoryRecord {
+  key: string;
+  siteKey: string;
+  site: string;
+  siteId: string;
+  familyId: string;
+  name: string;
+  bytes: number;
+}
+
+export interface DpiApplicationRecord extends DpiCategoryRecord {
+  applicationId: string;
+  categoryName: string;
+}
+
+export interface DpiSiteRecord {
+  key: string;
+  site: string;
+  siteId: string;
+  observedAt?: string;
+  totalBytes?: number;
+  windowSeconds?: number;
+  categories: DpiCategoryRecord[];
+  applications: DpiApplicationRecord[];
+}
+
+export interface DpiSummary {
+  available: boolean;
+  // Only defined when all available sites supply a valid total. Category and
+  // application rows are not summed: application exports can be capped.
+  totalBytes?: number;
+  sites: DpiSiteRecord[];
+  categories: DpiCategoryRecord[];
+  applications: DpiApplicationRecord[];
+}
+
 export interface DashboardModel {
   siteSummary: SiteSummary;
+  dpi: DpiSummary;
   devices: DeviceRecord[];
   clients: ClientRecord[];
   isps: LinkRow[];

@@ -101,6 +101,21 @@ vpn_id
 entity_id
 ```
 
+## DPI Insights
+
+The network card reads these optional MQTT metric sensors:
+
+```text
+omada_dpi_total_traffic_bytes
+omada_dpi_scrape_window_seconds
+omada_dpi_category_traffic_bytes
+omada_dpi_application_traffic_bytes
+```
+
+Rows use `site_id` (falling back to `site`), `family_id` / `family_name`, and `application_id` / `application_name`. The publisher's shared `attributes.last_updated` timestamp identifies a snapshot, so retained rows dropped from the latest export do not linger in the card. Home Assistant's own entity timestamp is not treated as a shared snapshot timestamp.
+
+The chip appears only when there is a valid non-negative traffic value, including zero. A query-window sensor alone is not evidence of traffic availability. No controller credentials or direct HTTP requests are required by the card.
+
 ## Required Bridge Behavior
 
 The default OmadaBridge MQTT publisher provides the attributes the cards expect. Avoid stripping JSON attributes from MQTT discovery configs. If Home Assistant entities exist but the card stays empty, inspect one entity in Developer Tools and confirm:
