@@ -11,6 +11,7 @@ import (
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
+	"github.com/RCooLeR/omada_exporter/internal/debugdump"
 	"github.com/RCooLeR/omada_exporter/internal/hamqtt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -62,6 +63,12 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	if conf == nil {
 		return fmt.Errorf("exporter configuration is nil")
 	}
+	if conf.DumpResponsesOnly && strings.TrimSpace(conf.DumpResponsesDir) == "" {
+		return fmt.Errorf("dump-responses-only requires dump-responses-dir")
+	}
+	if conf.DumpResponsesDir != "" && strings.TrimSpace(conf.DumpResponsesDir) == "" {
+		return fmt.Errorf("dump-responses-dir must not be blank")
+	}
 	missing := make([]string, 0, 3)
 	if conf.Host == "" {
 		missing = append(missing, "host")
@@ -92,6 +99,14 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	client, err := api.Configure(conf)
 	if err != nil {
 		return err
+	}
+	if conf.DumpResponsesDir != "" {
+		if err := debugdump.DumpResponses(ctx, client, conf.DumpResponsesDir); err != nil {
+			return err
+		}
+		if conf.DumpResponsesOnly {
+			return nil
+		}
 	}
 	mux := http.NewServeMux()
 	health := &healthState{}

@@ -9,6 +9,7 @@ OmadaBridge reads Omada Controller data, exposes Prometheus metrics on HTTP, and
 - [Collected data](./collected-data.md): what data is read from Omada and how it maps to monitoring outputs.
 - [Prometheus metrics](./prometheus.md): endpoints, scrape config, metric conventions, and metric reference.
 - [Home Assistant integration](./home-assistant.md): MQTT setup, topics, created devices, entity ids, sensor naming, payloads, and troubleshooting.
+- [API response diagnostics](./debugging.md): opt-in private response dumps for troubleshooting controller compatibility.
 - [Disclaimer](./disclaimer.md): unofficial project, trademarks, and operational responsibility.
 
 ## Assets
