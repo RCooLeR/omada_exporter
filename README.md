@@ -33,6 +33,18 @@ See [NOTICE](./NOTICE) for trademark and affiliation notice.
 - `ha-cards/` contains optional Lovelace cards.
 - `ha-cards/docs/` contains card installation and configuration docs.
 
+## Contributing
+
+`master` is the primary integration branch. Create changes on a short-lived branch
+and open pull requests against `master`. Before merging, require all three CI
+checks to pass: **Bridge**, **Home Assistant cards**, and **Container and release
+configuration**. These cover tests, dependency audits, generated dashboards,
+frontend builds, multi-platform container builds, and release configuration.
+
+See [bridge development](./bridge/README.md#local-development) and
+[card development](./ha-cards/README.md#development) for local checks. Release
+publishing is separate and runs only when a `v*` tag is pushed.
+
 ## License
 
 MIT License. See [LICENSE](./LICENSE).

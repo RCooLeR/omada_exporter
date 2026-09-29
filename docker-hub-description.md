@@ -2,7 +2,7 @@
 
 Unofficial TP-Link Omada Controller bridge for Prometheus metrics and Home Assistant MQTT Discovery.
 
-![Omada](https://raw.githubusercontent.com/RCooLeR/omada_exporter/main/bridge/docs/images/omada.png)
+![Omada](https://raw.githubusercontent.com/RCooLeR/omada_exporter/master/bridge/docs/images/omada.png)
 
 The container exposes Prometheus metrics on `/metrics` and can optionally publish the same Omada data to Home Assistant through MQTT Discovery. The image name remains `rcooler/omada_exporter` for compatibility.
 

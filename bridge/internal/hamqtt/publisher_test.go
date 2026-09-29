@@ -12,6 +12,7 @@ import (
 	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -352,6 +353,109 @@ func TestObjectIDDistinguishesRealSubresourcesAndDPIProperties(t *testing.T) {
 	applicationTwo := map[string]string{"site_id": "site-id", "family_id": "1", "application_id": "11"}
 	if objectID("omada_dpi_application_traffic_bytes", applicationOne) == objectID("omada_dpi_application_traffic_bytes", applicationTwo) {
 		t.Fatal("different DPI applications received the same object ID")
+	}
+}
+
+func TestPublishDPIHomeAssistantMetadataAndSnapshot(t *testing.T) {
+	cases := []struct {
+		metric      string
+		labels      map[string]string
+		value       float64
+		unit        string
+		deviceClass string
+	}{
+		{
+			metric: "omada_dpi_total_traffic_bytes",
+			labels: map[string]string{"site": "Default", "site_id": "site-id"},
+			value:  1024, unit: "B", deviceClass: "data_size",
+		},
+		{
+			metric: "omada_dpi_scrape_window_seconds",
+			labels: map[string]string{"site": "Default", "site_id": "site-id"},
+			value:  86400, unit: "s", deviceClass: "duration",
+		},
+		{
+			metric: "omada_dpi_category_traffic_bytes",
+			labels: map[string]string{"site": "Default", "site_id": "site-id", "family_id": "1", "family_name": "Streaming"},
+			value:  0, unit: "B", deviceClass: "data_size",
+		},
+		{
+			metric: "omada_dpi_application_traffic_bytes",
+			labels: map[string]string{"site": "Default", "site_id": "site-id", "family_id": "1", "family_name": "Streaming", "application_id": "10", "application_name": "Video"},
+			value:  256, unit: "B", deviceClass: "data_size",
+		},
+	}
+	collectors := make(map[string]prometheus.Collector, len(cases))
+	for _, tc := range cases {
+		gauge := prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: tc.metric, Help: "DPI test metric.", ConstLabels: tc.labels,
+		})
+		gauge.Set(tc.value)
+		collectors[tc.metric] = gauge
+	}
+	client := &api.Client{Config: &config.Config{
+		MQTTDiscoveryPrefix: "homeassistant",
+		MQTTTopicPrefix:     "omada_exporter",
+		MQTTRetain:          true,
+		MQTTExpireAfter:     360,
+		Site:                "Default",
+	}}
+	client.SetContextIDs("controller-id", "site-id")
+	publisher, err := NewPublisher(client, collectors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
+	publisher.mqtt = mqttClient
+	publisher.publishAll()
+
+	var snapshotTimestamp string
+	for _, tc := range cases {
+		t.Run(tc.metric, func(t *testing.T) {
+			id := objectID(tc.metric, tc.labels)
+			discoveryTopic := "homeassistant/sensor/omada_exporter/" + id + "/config"
+			stateTopic := "omada_exporter/entities/" + id + "/state"
+			var discovery, state map[string]any
+			if err := json.Unmarshal(mqttClient.messages[discoveryTopic], &discovery); err != nil {
+				t.Fatalf("decode DPI discovery: %v", err)
+			}
+			if err := json.Unmarshal(mqttClient.messages[stateTopic], &state); err != nil {
+				t.Fatalf("decode DPI state: %v", err)
+			}
+			for key, want := range map[string]any{
+				"state_topic":           stateTopic,
+				"json_attributes_topic": stateTopic,
+				"value_template":        "{{ value_json.value }}",
+				"unit_of_measurement":   tc.unit,
+				"device_class":          tc.deviceClass,
+				"state_class":           "measurement",
+				"expire_after":          float64(360),
+			} {
+				if got := discovery[key]; got != want {
+					t.Errorf("discovery[%q] = %#v, want %#v", key, got, want)
+				}
+			}
+			if state["metric"] != tc.metric || state["value"] != tc.value {
+				t.Errorf("state metric/value = %v/%v, want %s/%v", state["metric"], state["value"], tc.metric, tc.value)
+			}
+			for key, want := range tc.labels {
+				if got := state[key]; got != want {
+					t.Errorf("state label %q = %#v, want %q", key, got, want)
+				}
+			}
+			observedAt, ok := state["last_updated"].(string)
+			if !ok {
+				t.Fatal("DPI state is missing last_updated")
+			}
+			if _, err := time.Parse(time.RFC3339, observedAt); err != nil {
+				t.Fatalf("invalid snapshot timestamp %q: %v", observedAt, err)
+			}
+			if snapshotTimestamp == "" {
+				snapshotTimestamp = observedAt
+			} else if observedAt != snapshotTimestamp {
+				t.Errorf("DPI snapshot timestamp = %q, want shared timestamp %q", observedAt, snapshotTimestamp)
+			}
+		})
 	}
 }
 

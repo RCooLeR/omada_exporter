@@ -2,6 +2,10 @@ import type {
   ClientRecord,
   DashboardModel,
   DeviceRecord,
+  DpiApplicationRecord,
+  DpiCategoryRecord,
+  DpiSiteRecord,
+  DpiSummary,
   HassEntity,
   HomeAssistant,
   LinkRow,
@@ -582,6 +586,157 @@ function summaryFrom(devices: DeviceRecord[], clients: ClientRecord[], siteName:
   };
 }
 
+const dpiMetrics = new Set([
+  "omada_dpi_total_traffic_bytes",
+  "omada_dpi_scrape_window_seconds",
+  "omada_dpi_category_traffic_bytes",
+  "omada_dpi_application_traffic_bytes"
+]);
+
+function dpiValue(entity: HassEntity): number | undefined {
+  // Missing/unavailable data must not become an apparently healthy zero.
+  const state = entity.state.trim();
+  if (!state) {
+    return undefined;
+  }
+  const value = Number(state);
+  return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function dpiObservedAt(entity: HassEntity): number {
+  const observedAt = entityObservedAt(entity);
+  if (dpiValue(entity) !== undefined) {
+    return observedAt;
+  }
+  // HA can mark a retained sensor unavailable without replacing its MQTT
+  // attributes, including the source timestamp. Honour that newer state.
+  const stateChangedAt = Date.parse(entity.last_updated ?? "");
+  return Number.isFinite(stateChangedAt) ? Math.max(observedAt, stateChangedAt) : observedAt;
+}
+
+function compareDpiRows(left: DpiCategoryRecord, right: DpiCategoryRecord): number {
+  return right.bytes - left.bytes || left.name.localeCompare(right.name) || left.key.localeCompare(right.key);
+}
+
+function dpiSnapshotTimestamp(entity: HassEntity): number | undefined {
+  // MQTT assigns every metric in one Gather the same source timestamp. HA's
+  // individual state-change timestamps cannot identify a shared snapshot.
+  const parsed = Date.parse(attrString(entity, "last_updated"));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function buildDpiSummary(entities: HassEntity[]): DpiSummary {
+  const siteGroups = new Map<string, { latest: HassEntity; entities: Map<string, HassEntity> }>();
+  for (const entity of entities) {
+    const metric = getMetric(entity);
+    if (!dpiMetrics.has(metric)) {
+      continue;
+    }
+    const siteId = attrString(entity, "site_id").trim();
+    const site = attrString(entity, "site").trim();
+    const siteKey = JSON.stringify(siteId ? ["id", siteId] : ["name", site]);
+    const group = siteGroups.get(siteKey) ?? { latest: entity, entities: new Map<string, HassEntity>() };
+    if (dpiObservedAt(entity) >= dpiObservedAt(group.latest)) {
+      group.latest = entity;
+    }
+    const family = attrString(entity, "family_id").trim() || attrString(entity, "family_name").trim();
+    const application = attrString(entity, "application_id").trim() || attrString(entity, "application_name").trim();
+    const rowKey = JSON.stringify([
+      metric,
+      metric === "omada_dpi_category_traffic_bytes" || metric === "omada_dpi_application_traffic_bytes" ? family : "",
+      metric === "omada_dpi_application_traffic_bytes" ? application : ""
+    ]);
+    const previous = group.entities.get(rowKey);
+    if (!previous || dpiObservedAt(entity) >= dpiObservedAt(previous)) {
+      // Select before validating so a newer unavailable duplicate cannot
+      // resurrect an older retained metric with the same stable identity.
+      group.entities.set(rowKey, entity);
+    }
+    siteGroups.set(siteKey, group);
+  }
+
+  const sites: DpiSiteRecord[] = [];
+  for (const [key, group] of siteGroups) {
+    const snapshotTimes = Array.from(group.entities.values())
+      .filter((entity) => ["omada_dpi_total_traffic_bytes", "omada_dpi_scrape_window_seconds"].includes(getMetric(entity)))
+      .map(dpiSnapshotTimestamp)
+      .filter((timestamp): timestamp is number => timestamp !== undefined);
+    const snapshotAt = snapshotTimes.length > 0 ? Math.max(...snapshotTimes) : undefined;
+    const site: DpiSiteRecord = {
+      key,
+      site: attrString(group.latest, "site").trim() || "Unknown site",
+      siteId: attrString(group.latest, "site_id").trim(),
+      categories: [],
+      applications: []
+    };
+    if (snapshotAt !== undefined) {
+      site.observedAt = new Date(snapshotAt).toISOString();
+    }
+    for (const [rowKey, entity] of group.entities) {
+      const entitySnapshotAt = dpiSnapshotTimestamp(entity);
+      if (snapshotAt !== undefined && entitySnapshotAt !== undefined && entitySnapshotAt < snapshotAt) {
+        // Disappearing/capped DPI rows can remain retained in HA. Do not show
+        // a previous query window's applications as part of the current one.
+        continue;
+      }
+      const value = dpiValue(entity);
+      if (value === undefined) {
+        continue;
+      }
+      const metric = getMetric(entity);
+      if (metric === "omada_dpi_total_traffic_bytes") {
+        site.totalBytes = value;
+        continue;
+      }
+      if (metric === "omada_dpi_scrape_window_seconds") {
+        site.windowSeconds = value;
+        continue;
+      }
+      const category: DpiCategoryRecord = {
+        key: JSON.stringify([key, rowKey]),
+        siteKey: key,
+        site: site.site,
+        siteId: site.siteId,
+        familyId: attrString(entity, "family_id").trim(),
+        name: attrString(entity, "family_name").trim() || "Unknown category",
+        bytes: value
+      };
+      if (metric === "omada_dpi_category_traffic_bytes") {
+        site.categories.push(category);
+      } else {
+        const application: DpiApplicationRecord = {
+          ...category,
+          applicationId: attrString(entity, "application_id").trim(),
+          categoryName: category.name,
+          name: attrString(entity, "application_name").trim() || "Unknown application"
+        };
+        site.applications.push(application);
+      }
+    }
+    site.categories.sort(compareDpiRows);
+    site.applications.sort(compareDpiRows);
+    // A scrape-window entity alone proves collection is configured, not that
+    // usable traffic data exists. An explicit zero traffic value is valid.
+    if (site.totalBytes !== undefined || site.categories.length > 0 || site.applications.length > 0) {
+      sites.push(site);
+    }
+  }
+  sites.sort((left, right) => left.site.localeCompare(right.site) || left.key.localeCompare(right.key));
+  const summary: DpiSummary = {
+    available: sites.length > 0,
+    sites,
+    categories: sites.flatMap((site) => site.categories).sort(compareDpiRows),
+    applications: sites.flatMap((site) => site.applications).sort(compareDpiRows)
+  };
+  if (sites.length > 0 && sites.every((site) => site.totalBytes !== undefined)) {
+    const totalBytes = sites.reduce((sum, site) => sum + (site.totalBytes ?? 0), 0);
+    if (Number.isFinite(totalBytes)) {
+      summary.totalBytes = totalBytes;
+    }
+  }
+  return summary;
+}
+
 export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): DashboardModel {
   // Home Assistant exposes every MQTT entity as a flat dictionary. The card is
   // easier to render if we first group those entities back into domain objects:
@@ -602,6 +757,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   const portByDeviceMacAndPort = new Map<string, PortRecord>();
   const infrastructureEntityByMac = new Map<string, HassEntity>();
   const clientTrackerByMac = new Map<string, HassEntity>();
+  const dpiEntities: HassEntity[] = [];
 
   for (const entity of Object.values(hass.states)) {
     if (!matchSite(entity, siteFilter)) {
@@ -655,6 +811,11 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     const value = toNumber(entity.state);
+
+    if (metric.startsWith("omada_dpi_")) {
+      dpiEntities.push(entity);
+      continue;
+    }
 
     if (metric.startsWith("omada_device_")) {
       const device = ensureDevice(devices, entity);
@@ -925,6 +1086,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
   return {
     siteSummary: summaryFrom(deviceList, clientList, siteName),
+    dpi: buildDpiSummary(dpiEntities),
     devices: deviceList,
     clients: clientList,
     isps: ispList,

@@ -9,6 +9,7 @@ import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import logoDark from "./assets/logo-dark.svg?raw";
 import logoLight from "./assets/logo-light.svg?raw";
 import { inspectionAriaLabel } from "./accessibility";
+import { dpiStyles, renderDpiDetail } from "./dpi-detail";
 import { ChartController, deviceResourceSummarySignature } from "./chart-controller";
 import {
   formatBytes,
@@ -41,7 +42,7 @@ import {
 } from "./model";
 import { registerCustomCard } from "./register-card";
 
-type Selection = { kind: "device"; key: string } | { kind: "client"; key: string };
+type Selection = { kind: "device"; key: string } | { kind: "client"; key: string } | { kind: "dpi"; key: "dpi" };
 type DeviceMeta = {
   pendingUpdate: boolean;
   updateTarget: string;
@@ -87,11 +88,12 @@ export class OmadaNetworkCard extends LitElement {
     _config: { state: true },
     _model: { state: true },
     _selection: { state: true },
+    _dpiCategoryFilters: { state: true },
     _clientFilter: { state: true },
     _deviceFilter: { state: true }
   };
 
-  static override styles = css`
+  static override styles = [css`
     :host {
       display: block;
       --bg: linear-gradient(135deg, #08131d, #0b1d2f 42%, #10253a);
@@ -151,6 +153,7 @@ export class OmadaNetworkCard extends LitElement {
     }
     .table-card { grid-template-rows: auto minmax(0, 1fr); align-content: start; align-items: start; height: 100%; align-self: stretch; padding: 0.75rem 0.75rem 0; }
     .chips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.65rem; }
+    .chips.has-dpi { grid-template-columns: repeat(7, minmax(0, 1fr)); }
     .chip, .detail-stat, .card-row, .detail-card, .chart-card {
       border-radius: 18px;
       border: 1px solid rgba(255, 255, 255, 0.05);
@@ -178,6 +181,9 @@ export class OmadaNetworkCard extends LitElement {
       font-size: 1rem;
       flex: 0 0 auto;
     }
+    button.chip { appearance: none; color: inherit; font: inherit; text-align: left; width: 100%; cursor: pointer; }
+    button.chip:hover, button.chip.active { border-color: var(--accent); background: rgba(84, 209, 255, 0.2); }
+    button.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .table { overflow: auto; min-width: 0; min-height: 0; align-self: stretch; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.05); }
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th, td { padding: 0.7rem 0.75rem; text-align: left; white-space: nowrap; }
@@ -255,7 +261,7 @@ export class OmadaNetworkCard extends LitElement {
     .path-main .detail-stat-value { font-size: 0.96rem; line-height: 1.25; }
     .empty { display: grid; place-items: center; color: var(--muted); min-height: 18rem; text-align: center; padding: 2rem; }
     @media (max-width: 1400px) {
-      .chips { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .chips, .chips.has-dpi { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .detail-stats-wired { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .path-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -264,12 +270,14 @@ export class OmadaNetworkCard extends LitElement {
       .frame { height: auto; aspect-ratio: auto; min-height: auto; }
       .header, .content, .link-grid, .detail-hero, .chart-stack, .detail-bottom { grid-template-columns: 1fr; }
     }
-  `;
+    @media (max-width: 600px) { .chips, .chips.has-dpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  `, dpiStyles];
 
   public hass?: HomeAssistant;
   private _config?: LovelaceCardConfig;
   private _model?: DashboardModel;
   private _selection: Selection | undefined;
+  private _dpiCategoryFilters: ReadonlyMap<string, string> = new Map();
   private _clientFilter: "all" | "wireless" | "wired" = "all";
   private _deviceFilter: "all" | "controller" | "gateway" | "switch" | "ap" = "all";
   private _filteredClients: ClientRecord[] = [];
@@ -315,6 +323,9 @@ export class OmadaNetworkCard extends LitElement {
 
     if (modelChanged && this._model) {
       const model = this._model;
+      this._dpiCategoryFilters = new Map([...this._dpiCategoryFilters].filter(([siteKey, categoryKey]) =>
+        model.dpi.sites.some((site) => site.key === siteKey && site.categories.some((row) => row.key === categoryKey))
+      ));
       this._pendingUpdateCount = model.devices.reduce(
         (count, device) => count + (this.getDeviceMeta(device).pendingUpdate ? 1 : 0),
         0
@@ -322,7 +333,7 @@ export class OmadaNetworkCard extends LitElement {
       if (!this._selection || !this.selectionExists(this._selection)) {
         const device = model.devices[0];
         const client = this._filteredClients[0];
-        this._selection = device ? { kind: "device", key: device.key } : client ? { kind: "client", key: client.key } : undefined;
+        this._selection = device ? { kind: "device", key: device.key } : client ? { kind: "client", key: client.key } : model.dpi.available ? { kind: "dpi", key: "dpi" } : undefined;
       }
     }
 
@@ -366,7 +377,7 @@ export class OmadaNetworkCard extends LitElement {
               <div class="brand-logo">${unsafeSVG(this.logoSvg)}</div>
             </div>
             <div class="panel header-right">
-              <div class="chips">${this.renderSummaryChips()}</div>
+              <div class="chips ${this._model.dpi.available ? "has-dpi" : ""}">${this.renderSummaryChips()}</div>
               <div class="link-grid">
                 <div class="panel table-card">${this.renderIspBlock()}</div>
                 <div class="panel table-card">${this.renderVpnBlock()}</div>
@@ -375,7 +386,7 @@ export class OmadaNetworkCard extends LitElement {
           </section>
           <section class="content">
             <div class="panel list-panel">${this.renderDeviceList()}</div>
-            <div class="panel detail-panel">${this.renderDetail()}</div>
+            <div id="inspection-detail" class="panel detail-panel">${this.renderDetail()}</div>
             <div class="panel list-panel">${this.renderClientList()}</div>
           </section>
         </div>
@@ -470,6 +481,9 @@ export class OmadaNetworkCard extends LitElement {
     if (!this._model) {
       return false;
     }
+    if (selection.kind === "dpi") {
+      return this._model.dpi.available;
+    }
     return selection.kind === "device"
       ? this._model.deviceByKey.has(selection.key)
       : this._model.clientByKey.has(selection.key);
@@ -483,10 +497,20 @@ export class OmadaNetworkCard extends LitElement {
     this._selection = { kind: "client", key };
   }
 
+  private selectDpiCategory(siteKey: string, categoryKey: string | undefined): void {
+    const filters = new Map(this._dpiCategoryFilters);
+    if (categoryKey === undefined) {
+      filters.delete(siteKey);
+    } else {
+      filters.set(siteKey, categoryKey);
+    }
+    this._dpiCategoryFilters = filters;
+  }
+
   private renderSummaryChips() {
     const summary = this._model!.siteSummary;
     const totalClients = summary.wiredClients + summary.wirelessClients;
-    return [
+    const chips = [
       { label: "Clients", value: String(totalClients), sub: `${summary.wirelessClients} wireless` },
       { label: "Devices", value: String(this._model!.devices.length), sub: `${summary.devicesOnline} online` },
       { label: "Updates", value: String(this._pendingUpdateCount), sub: "Devices pending" },
@@ -504,6 +528,15 @@ export class OmadaNetworkCard extends LitElement {
         </div>
       `
     );
+    const dpi = this._model!.dpi;
+    return html`${chips}${dpi.available ? html`
+      <button type="button" class="chip ${this._selection?.kind === "dpi" ? "active" : ""}"
+        aria-label="Show DPI traffic insights" aria-controls="inspection-detail" aria-pressed=${this._selection?.kind === "dpi"}
+        @click=${() => { this._selection = { kind: "dpi", key: "dpi" }; }}>
+        <span class="chip-copy"><span class="chip-label">DPI</span><span class="chip-sub">${dpi.categories.length} categories</span></span>
+        <span class="chip-value">${dpi.applications.length} apps</span>
+      </button>
+    ` : nothing}`;
   }
 
   private renderIspBlock() {
@@ -760,6 +793,9 @@ export class OmadaNetworkCard extends LitElement {
   private renderDetail() {
     if (!this._model || !this._selection) {
       return html`<div class="empty">Select a device or client to inspect it.</div>`;
+    }
+    if (this._selection.kind === "dpi") {
+      return renderDpiDetail(this._model.dpi, this._dpiCategoryFilters, (siteKey, categoryKey) => this.selectDpiCategory(siteKey, categoryKey));
     }
     if (this._selection.kind === "device") {
       return this._selectedDevice ? this.renderDeviceDetail(this._selectedDevice) : html`<div class="empty">Device not found.</div>`;
