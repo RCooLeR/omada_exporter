@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -50,9 +51,7 @@ func TestControlActionsUseVerifiedWebRoutesForBothControllerKinds(t *testing.T) 
 						_, _ = io.WriteString(w, `{"errorCode":0,"result":[{"mac":"aa:bb:cc:dd:ee:ff","type":"ap","status":15,"name":"Mesh AP"}]}`)
 					case "/cid/api/v2/sites/site-id/clients":
 						reads.Add(1)
-						if req.URL.Query().Get("filters.active") != "true" {
-							t.Error("missing active filter")
-						}
+						controlClientRequestPage(t, req)
 						_, _ = io.WriteString(w, `{"errorCode":0,"result":{"totalRows":1,"data":[{"mac":"AA-BB-CC-DD-EE-FF","wireless":true,"active":true,"authStatus":0}]}}`)
 					case "/cid/api/v2/sites/site-id/cmd/devices/AA-BB-CC-DD-EE-FF/reboot", "/cid/api/v2/sites/site-id/cmd/clients/AA-BB-CC-DD-EE-FF/reconnect":
 						posts.Add(1)
@@ -153,14 +152,14 @@ func TestControlTargetsPaginationAndMetadata(t *testing.T) {
 			_, _ = io.WriteString(w, `{"errorCode":0,"result":[{"mac":"112233445566","type":"gateway","status":14,"name":"Fusion","model":"ER706W"}]}`)
 			return
 		}
-		if req.URL.Query().Get("page") == "1" {
-			_, _ = io.WriteString(w, `{"errorCode":0,"result":{"totalRows":101,"data":[{"mac":"aabbccddeeff","name":"Phone","wireless":true,"active":true,"authStatus":3}]}}`)
+		if controlClientRequestPage(t, req) == 1 {
+			_, _ = io.WriteString(w, `{"errorCode":0,"result":{"currentPage":1,"currentSize":1,"totalRows":2,"data":[{"mac":"aabbccddeeff","name":"Phone","wireless":true,"active":true,"authStatus":3}]}}`)
 			return
 		}
-		if req.URL.Query().Get("page") != "2" {
-			t.Errorf("unexpected page %s", req.URL.Query().Get("page"))
+		if req.URL.Query().Get("currentPage") != "2" {
+			t.Errorf("unexpected page %s", req.URL.Query().Get("currentPage"))
 		}
-		_, _ = io.WriteString(w, `{"errorCode":0,"result":{"totalRows":101,"data":[{"mac":"aabbccddee00","name":"Tablet","wireless":true,"active":true,"authStatus":2}]}}`)
+		_, _ = io.WriteString(w, `{"errorCode":0,"result":{"currentPage":2,"currentSize":1,"totalRows":2,"data":[{"mac":"aabbccddee00","name":"Tablet","wireless":true,"active":true,"authStatus":2}]}}`)
 	})
 	targets, err := client.ControlTargets(t.Context())
 	if err != nil {
@@ -176,6 +175,197 @@ func TestControlTargetsPaginationAndMetadata(t *testing.T) {
 		if target.SiteID != "site-id" {
 			t.Errorf("wrong scope: %+v", target)
 		}
+	}
+}
+
+// The Web API ignores the Open API's page/pageSize parameters and defaults to
+// ten rows. Assert the actual Web API contract so mocks cannot mask that bug.
+func controlClientRequestPage(t *testing.T, req *http.Request) int {
+	t.Helper()
+	query := req.URL.Query()
+	if req.Method != http.MethodGet {
+		t.Errorf("client inventory method = %s, want GET", req.Method)
+	}
+	if len(query) != 3 || len(query["currentPage"]) != 1 || len(query["currentPageSize"]) != 1 || len(query["filters.active"]) != 1 || query.Get("currentPageSize") != "100" || query.Get("filters.active") != "true" {
+		t.Errorf("incorrect Web API client pagination query: %s", req.URL.RawQuery)
+	}
+	page, err := strconv.Atoi(query.Get("currentPage"))
+	if err != nil || page < 1 {
+		t.Errorf("invalid currentPage: %q", query.Get("currentPage"))
+		return 1
+	}
+	return page
+}
+
+func controlClientRows(count int) []map[string]any {
+	rows := make([]map[string]any, count)
+	for i := range rows {
+		rows[i] = map[string]any{
+			"mac":  fmt.Sprintf("AA-BB-CC-00-%02X-%02X", i/256, i%256),
+			"name": fmt.Sprintf("Client %d", i), "model": "Phone", "siteId": "site-id",
+			"wireless": true, "active": true, "blocked": false, "authStatus": 0,
+		}
+	}
+	return rows
+}
+
+func writeControlClientPage(t *testing.T, w http.ResponseWriter, page, totalRows int, rows []map[string]any) {
+	t.Helper()
+	if err := json.NewEncoder(w).Encode(map[string]any{
+		"errorCode": 0,
+		"result":    map[string]any{"currentPage": page, "currentSize": len(rows), "totalRows": totalRows, "data": rows},
+	}); err != nil {
+		t.Errorf("write client inventory: %v", err)
+	}
+}
+
+func TestControlTargetsReadCompleteClientInventoryForBothControllerKinds(t *testing.T) {
+	for _, kind := range []string{config.SystemTypeStandard, config.SystemTypeFusion} {
+		for _, tc := range []struct {
+			name             string
+			total, pageSize  int
+			onlyLastEligible bool
+		}{
+			{name: "more-than-default-ten", total: 25, pageSize: 100},
+			{name: "multiple-requested-pages", total: 125, pageSize: 100},
+			{name: "server-clamps-page-size", total: 25, pageSize: 10},
+			{name: "count-raw-rows-before-eligibility-filter", total: 25, pageSize: 10, onlyLastEligible: true},
+		} {
+			t.Run(kind+"/"+tc.name, func(t *testing.T) {
+				rows := controlClientRows(tc.total)
+				if tc.onlyLastEligible {
+					for _, row := range rows[:len(rows)-1] {
+						row["wireless"] = false
+					}
+				}
+				var reads atomic.Int32
+				client := newControlsTestClient(t, kind, func(w http.ResponseWriter, req *http.Request) {
+					switch req.URL.Path {
+					case "/cid/api/v2/sites/site-id/devices":
+						_, _ = io.WriteString(w, `{"errorCode":0,"result":[]}`)
+					case "/cid/api/v2/sites/site-id/clients":
+						page := controlClientRequestPage(t, req)
+						if want := int(reads.Add(1)); page != want {
+							t.Errorf("requested page = %d, want %d", page, want)
+						}
+						start := min((page-1)*tc.pageSize, len(rows))
+						end := min(start+tc.pageSize, len(rows))
+						writeControlClientPage(t, w, page, len(rows), rows[start:end])
+					default:
+						t.Errorf("unexpected endpoint: %s", req.URL)
+						http.Error(w, "unexpected", http.StatusInternalServerError)
+					}
+				})
+				targets, err := client.ControlTargets(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantTargets := tc.total
+				if tc.onlyLastEligible {
+					wantTargets = 1
+				}
+				if len(targets) != wantTargets {
+					t.Fatalf("targets = %d, want %d", len(targets), wantTargets)
+				}
+				for i, target := range targets {
+					row := rows[i]
+					if tc.onlyLastEligible {
+						row = rows[len(rows)-1]
+					}
+					if target.MAC != row["mac"] || target.Name != row["name"] || target.Model != "Phone" || target.DeviceType != "client" || target.SiteID != "site-id" || target.Action != ControlActionReconnectWiFiClient {
+						t.Errorf("target %d = %+v, want metadata from %+v", i, target, row)
+					}
+				}
+				if want := int32((tc.total + tc.pageSize - 1) / tc.pageSize); reads.Load() != want {
+					t.Errorf("client page reads = %d, want %d", reads.Load(), want)
+				}
+			})
+		}
+	}
+}
+
+func TestReconnectValidatesLaterClientPagesFreshForBothControllerKinds(t *testing.T) {
+	for _, kind := range []string{config.SystemTypeStandard, config.SystemTypeFusion} {
+		t.Run(kind, func(t *testing.T) {
+			rows := controlClientRows(25)
+			mac := rows[24]["mac"].(string)
+			var reads, posts atomic.Int32
+			var blocked atomic.Bool
+			client := newControlsTestClient(t, kind, func(w http.ResponseWriter, req *http.Request) {
+				switch req.URL.Path {
+				case "/cid/api/v2/sites/site-id/clients":
+					page := controlClientRequestPage(t, req)
+					reads.Add(1)
+					start := min((page-1)*10, len(rows))
+					end := min(start+10, len(rows))
+					rows[24]["blocked"] = blocked.Load()
+					writeControlClientPage(t, w, page, len(rows), rows[start:end])
+				case "/cid/api/v2/sites/site-id/cmd/clients/" + mac + "/reconnect":
+					posts.Add(1)
+					if req.Method != http.MethodPost {
+						t.Errorf("reconnect method = %s, want POST", req.Method)
+					}
+					body, _ := io.ReadAll(req.Body)
+					if len(body) != 0 {
+						t.Errorf("reconnect body = %s, want empty", body)
+					}
+					_, _ = io.WriteString(w, `{"errorCode":0,"result":{}}`)
+				default:
+					t.Errorf("unexpected endpoint: %s", req.URL)
+					http.Error(w, "unexpected", http.StatusInternalServerError)
+				}
+			})
+			if err := client.ReconnectWiFiClient(t.Context(), "site-id", mac); err != nil {
+				t.Fatalf("eligible client on third page: %v", err)
+			}
+			blocked.Store(true)
+			if err := client.ReconnectWiFiClient(t.Context(), "site-id", mac); err == nil {
+				t.Fatal("newly blocked client accepted from stale inventory")
+			}
+			if reads.Load() != 6 || posts.Load() != 1 {
+				t.Fatalf("reads = %d, posts = %d; want all three pages revalidated and only one command", reads.Load(), posts.Load())
+			}
+		})
+	}
+}
+
+func TestReconnectFailsClosedOnIncompleteOrMismatchedPagination(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		secondCurrentPage int
+		emptySecondPage   bool
+	}{
+		{name: "empty-before-total", secondCurrentPage: 2, emptySecondPage: true},
+		{name: "wrong-current-page", secondCurrentPage: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rows := controlClientRows(25)
+			var reads, posts atomic.Int32
+			client := newControlsTestClient(t, config.SystemTypeStandard, func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == http.MethodPost {
+					posts.Add(1)
+					_, _ = io.WriteString(w, `{"errorCode":0,"result":{}}`)
+					return
+				}
+				page := controlClientRequestPage(t, req)
+				reads.Add(1)
+				if page == 1 {
+					writeControlClientPage(t, w, page, 25, rows[:10])
+					return
+				}
+				remaining := rows[10:]
+				if tc.emptySecondPage {
+					remaining = nil
+				}
+				writeControlClientPage(t, w, tc.secondCurrentPage, 25, remaining)
+			})
+			if err := client.ReconnectWiFiClient(t.Context(), "site-id", rows[0]["mac"].(string)); err == nil {
+				t.Fatal("incomplete inventory allowed a command for an earlier-page target")
+			}
+			if reads.Load() != 2 || posts.Load() != 0 {
+				t.Fatalf("reads = %d, posts = %d; want two reads and no command", reads.Load(), posts.Load())
+			}
+		})
 	}
 }
 

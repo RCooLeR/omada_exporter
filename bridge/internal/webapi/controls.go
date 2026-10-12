@@ -158,11 +158,13 @@ func controlDevices(session *api.WebControlSession) ([]ControlTarget, error) {
 func controlClients(session *api.WebControlSession) ([]ControlTarget, error) {
 	var targets []ControlTarget
 	seen := map[string]bool{}
+	rowsRead := 0
 	for page := 1; page <= controlMaxClientPages; page++ {
 		var response struct {
 			Result struct {
-				TotalRows int `json:"totalRows"`
-				Data      []struct {
+				TotalRows   int `json:"totalRows"`
+				CurrentPage int `json:"currentPage"`
+				Data        []struct {
 					MAC        string `json:"mac"`
 					Name       string `json:"name"`
 					Model      string `json:"model"`
@@ -174,10 +176,21 @@ func controlClients(session *api.WebControlSession) ([]ControlTarget, error) {
 				} `json:"data"`
 			} `json:"result"`
 		}
-		endpoint := fmt.Sprintf("/clients?page=%d&pageSize=%d&filters.active=true", page, controlClientPageSize)
+		// The Web API uses different pagination keys than the OpenAPI. Unknown
+		// keys silently return its default first page of only ten clients.
+		endpoint := fmt.Sprintf("/clients?currentPage=%d&currentPageSize=%d&filters.active=true", page, controlClientPageSize)
 		if err := session.ReadJSON(endpoint, &response); err != nil {
 			return nil, err
 		}
+		if response.Result.CurrentPage != 0 && response.Result.CurrentPage != page {
+			return nil, fmt.Errorf("control client inventory returned unexpected page")
+		}
+		if len(response.Result.Data) == 0 && rowsRead < response.Result.TotalRows {
+			return nil, fmt.Errorf("control client inventory ended before all rows were read")
+		}
+		// Count all returned rows, including ineligible clients. Controllers may
+		// cap the requested page size, so page*controlClientPageSize is unsafe.
+		rowsRead += len(response.Result.Data)
 		for _, client := range response.Result.Data {
 			if !client.Wireless || !client.Active || client.Blocked || client.AuthStatus == nil || *client.AuthStatus < 0 || *client.AuthStatus > 3 {
 				continue
@@ -195,7 +208,7 @@ func controlClients(session *api.WebControlSession) ([]ControlTarget, error) {
 			seen[mac] = true
 			targets = append(targets, ControlTarget{session.SiteID, mac, client.Name, "client", client.Model, ControlActionReconnectWiFiClient})
 		}
-		if len(response.Result.Data) == 0 || response.Result.TotalRows <= page*controlClientPageSize {
+		if len(response.Result.Data) == 0 || response.Result.TotalRows <= rowsRead {
 			return targets, nil
 		}
 	}
