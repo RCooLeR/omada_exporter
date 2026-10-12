@@ -95,6 +95,147 @@ describe("buildDashboardModel", () => {
     expect(model.siteSummary.wirelessClients).toBe(1);
   });
 
+  it("keeps new network-quality sensors from changing existing WAN and device views", () => {
+    const gatewayLabels = {
+      device_mac: "aa:bb:cc:dd:ee:ff",
+      device_name: "Gateway",
+      device_type: "gateway",
+      site: "Default",
+      site_id: "site-1"
+    };
+    const apLabels = {
+      device_mac: "11:22:33:44:55:66",
+      device_name: "Access point",
+      device_type: "ap",
+      site: "Default",
+      site_id: "site-1"
+    };
+    const hass: HomeAssistant = {
+      states: {
+        "sensor.gateway_cpu": {
+          entity_id: "sensor.gateway_cpu",
+          state: "42",
+          attributes: {
+            ...gatewayLabels,
+            metric: "omada_device_cpu_percentage",
+            device_status: "Connected"
+          }
+        },
+        "sensor.ap_cpu": {
+          entity_id: "sensor.ap_cpu",
+          state: "12",
+          last_updated: "2026-09-29T10:00:00Z",
+          attributes: {
+            ...apLabels,
+            metric: "omada_device_cpu_percentage",
+            device_status: "Connected",
+            device_model: "EAP772",
+            device_version_upgrade: "1.2.3",
+            device_poe_support: "yes"
+          }
+        },
+        "sensor.wan_latency": {
+          entity_id: "sensor.wan_latency",
+          state: "23",
+          attributes: {
+            ...gatewayLabels,
+            metric: "omada_wan_latency",
+            name: "WAN 1",
+            port: "1"
+          }
+        }
+      }
+    };
+    const baseline = buildDashboardModel(hass, "Default");
+    const qualitySamples: Record<string, number> = {
+      omada_gateway_wan_quality_latency_average_seconds: 0.02,
+      omada_gateway_wan_quality_jitter_average_seconds: 0.003,
+      omada_gateway_wan_quality_packet_loss_average_percentage: 0.1,
+      omada_gateway_wan_quality_mos_average: 4.5,
+      omada_gateway_wan_quality_window_seconds: 86400
+    };
+    for (const [metric, value] of Object.entries(qualitySamples)) {
+      const entityId = `sensor.${metric}`;
+      hass.states[entityId] = {
+        entity_id: entityId,
+        state: String(value),
+        attributes: { ...gatewayLabels, metric }
+      };
+    }
+    for (const [band, value] of [["2.4", 17], ["5", 8], ["6", 0]] as const) {
+      const entityId = `sensor.ap_interference_${band.replace(".", "_")}`;
+      hass.states[entityId] = {
+        entity_id: entityId,
+        state: String(value),
+        last_updated: "2026-09-29T10:01:00Z",
+        attributes: {
+          ...apLabels,
+          metric: "omada_ap_interference_percentage",
+          radio_band: band
+        }
+      };
+    }
+    for (const metric of [
+      "omada_ap_uplink_packets_total",
+      "omada_ap_uplink_dropped_packets_total",
+      "omada_ap_uplink_error_packets_total"
+    ]) {
+      for (const direction of ["up", "down"]) {
+        const entityId = `sensor.${metric}_${direction}`;
+        hass.states[entityId] = {
+          entity_id: entityId,
+          state: "100",
+          last_updated: "2026-09-29T10:01:00Z",
+          attributes: { ...apLabels, metric, direction }
+        };
+      }
+    }
+    for (const metric of ["omada_network_quality_scrape_success", "omada_network_quality_available"]) {
+      const entityId = `sensor.${metric}`;
+      hass.states[entityId] = {
+        entity_id: entityId,
+        state: "1",
+        attributes: { ...gatewayLabels, metric, source: "wan" }
+      };
+    }
+    hass.states["sensor.network_quality_inventory"] = {
+      entity_id: "sensor.network_quality_inventory",
+      state: "1",
+      attributes: {
+        ...gatewayLabels,
+        device_mac: "",
+        device_name: "",
+        device_type: "",
+        metric: "omada_network_quality_scrape_success",
+        source: "inventory"
+      }
+    };
+
+    const model = buildDashboardModel(hass, "Default");
+
+    // Quality samples only enrich the explicit detail model. Gateway-wide
+    // averages are not WAN interfaces; sparse AP labels cannot erase metadata.
+    expect(model.devices.map(({ quality: _quality, ...device }) => device)).toEqual(baseline.devices);
+    expect(model.wans).toEqual(baseline.wans);
+    expect(model.siteSummary).toEqual(baseline.siteSummary);
+    expect(model.devices).toHaveLength(2);
+    const ap = model.deviceByMac.get(normalizeMacKey(apLabels.device_mac));
+    expect(ap?.attrs.device_version_upgrade).toBe("1.2.3");
+    expect(ap?.attrs.device_poe_support).toBe("yes");
+    expect(ap?.radios).toHaveLength(0);
+    expect(ap?.quality).toEqual({
+      interference: [{ band: "2.4", percentage: 17 }, { band: "5", percentage: 8 }, { band: "6", percentage: 0 }],
+      uplink: { status: "available", up: { packets: 100, dropped: 100, errors: 100 }, down: { packets: 100, dropped: 100, errors: 100 } }
+    });
+    expect(model.deviceByMac.get(normalizeMacKey(gatewayLabels.device_mac))?.quality?.wan).toEqual({
+      status: "available", latencySeconds: 0.02, jitterSeconds: 0.003, packetLossPercentage: 0.1, mos: 4.5, windowSeconds: 86400
+    });
+    expect(model.wans).toHaveLength(1);
+    expect(model.wanByName.get("WAN 1")?.metrics.omada_wan_latency).toBe(23);
+    expect(model.wanByPort.get("1")).toBe(model.wans[0]);
+    expect(model.wanByPort.has("undefined")).toBe(false);
+  });
+
   it("groups site-to-site VPN metrics and exposes WireGuard IP details", () => {
     const hass: HomeAssistant = {
       states: {

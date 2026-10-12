@@ -64,6 +64,8 @@ services:
       OMADA_INSECURE: "true"
       LOG_LEVEL: "info"
       OMADA_TRACK_INSIGHT_METRICS: "false"
+      OMADA_TRACK_NETWORK_QUALITY_METRICS: "false"
+      OMADA_NETWORK_QUALITY_WINDOW_SECONDS: "86400"
       OMADA_INSIGHT_WINDOW_SECONDS: "86400"
       OMADA_INSIGHT_APPLICATION_LIMIT: "50"
 
@@ -87,6 +89,67 @@ Start it:
 docker compose up -d
 docker compose logs -f omada_exporter
 ```
+
+## Multiple Bridges With Shared Monitoring
+
+Keep the current installation's `OMADA_BRIDGE_ID` unset. The empty default
+preserves its existing MQTT topics, Home Assistant identifiers and unlabelled
+Prometheus history. Give every additional bridge a unique, stable
+`OMADA_BRIDGE_ID` (CLI: `--bridge-id`). IDs must be 1–64 lowercase letters,
+digits or hyphens, starting and ending with a letter or digit; for example,
+`slobidska44`. Treat an ID as immutable once deployed: changing it creates new
+Home Assistant identities and Prometheus series, not a rename of old data.
+
+A non-empty ID scopes MQTT client/state/discovery/availability identities and
+retained-message cleanup to that bridge. It is also published as the
+`bridge_id` attribute in Home Assistant and a label on all exported metrics.
+Different topic prefixes alone are not a substitute for separate bridge IDs.
+
+Example additional Fusion service, alongside the unchanged existing service:
+
+```yaml
+services:
+  omada-appt:
+    image: rcooler/omada_exporter:latest
+    environment:
+      OMADA_BRIDGE_ID: "slobidska44"
+      OMADA_HOST: "https://10.20.0.1:443"
+      OMADA_USER: "service-user"
+      OMADA_PASS: "change-me"
+      OMADA_SYSTEM_TYPE: "fusion"
+      OMADA_OPENAPI_AUTH: "web_session"
+      OMADA_CLIENT_ID: ""
+      OMADA_SECRET_ID: ""
+      OMADA_SITE: "Slobidska 44_28"
+      OMADA_PORT: "9040"
+      OMADA_INSECURE: "true"
+      OMADA_MQTT_ENABLED: "true"
+      OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"
+      OMADA_MQTT_USER: "mqtt-user"
+      OMADA_MQTT_PASS: "mqtt-password"
+    restart: unless-stopped
+```
+
+Replace the credential placeholders and join the networks required to reach
+the controller, MQTT broker and Prometheus. With a local source deployment,
+use the updated build context instead of the published image. Put the ID in
+this service's `environment` or a dedicated environment file: **do not add
+`OMADA_BRIDGE_ID` to a shared `env_file` inherited by the existing service**.
+Fusion `web_session` does not require OpenAPI app credentials; do not inherit
+the other controller's client ID/secret.
+
+For a binary deployment, add `--bridge-id slobidska44` to the Fusion command
+and use `--host https://10.20.0.1:443 --system-type fusion
+--openapi-auth web_session --site "Slobidska 44_28" --port 9040`.
+
+Update the Home Assistant JavaScript bundle and add separate apartment cards
+with `bridge_id: slobidska44`; leave existing card YAML unchanged. Both cards
+default to legacy entities only when `bridge_id` is omitted. See
+[card configuration](../../ha-cards/docs/cards.md#multiple-bridges-in-one-home-assistant).
+Add a separate [Prometheus scrape target](./prometheus.md#multiple-bridges)
+and reimport the updated sample Grafana dashboards before viewing both sources.
+The sample dashboards select one scrape job and bridge endpoint, including
+the old source without a `bridge_id` label.
 
 ## Docker Run
 
@@ -172,6 +235,7 @@ The Docker image health check calls `/healthz`.
 
 | Variable | Default | Required | Purpose |
 | --- | --- | --- | --- |
+| `OMADA_BRIDGE_ID` | empty | no | Immutable unique namespace for an additional bridge (`--bridge-id`). Empty preserves legacy identities. Non-empty: 1–64 lowercase letters/digits/hyphens, beginning and ending with a letter or digit. |
 | `OMADA_HOST` | empty | yes | Controller URL including protocol. |
 | `OMADA_USER` | empty | yes | Omada service user. |
 | `OMADA_PASS` | empty | yes | Omada service user password. |
@@ -194,6 +258,8 @@ The Docker image health check calls `/healthz`.
 | `OMADA_TRACK_PORT_METRICS` | `true` | Export per-port metrics. |
 | `OMADA_TRACK_CLIENT_METRICS` | `true` | Export per-client metrics. |
 | `OMADA_TRACK_INSIGHT_METRICS` | `false` | Export optional DPI insight metrics from Omada Web API. |
+| `OMADA_TRACK_NETWORK_QUALITY_METRICS` | `false` | Export optional AP wired-uplink counters and gateway WAN quality averages; requires supported OpenAPI responses. |
+| `OMADA_NETWORK_QUALITY_WINDOW_SECONDS` | `86400` | Positive rolling-window duration for gateway WAN quality averages. |
 | `OMADA_INSIGHT_WINDOW_SECONDS` | `86400` | Query window for DPI insight metrics. |
 | `OMADA_INSIGHT_APPLICATION_LIMIT` | `50` | Maximum DPI application metric series to export. Set `0` to disable application metrics. |
 | `OMADA_DISABLE_GO_COLLECTOR` | `true` | Disable default Go runtime metrics. |

@@ -1,3 +1,11 @@
 exclusions:
+  template-job-rule:
+    reason: Multi-bridge isolation requires a single scrape job with no All option; TestGrafanaDashboardsMatchExporterContract enforces the stricter source contract.
+  template-instance-rule:
+    reason: Multi-bridge isolation requires a single exporter endpoint with no All option; TestGrafanaDashboardsMatchExporterContract enforces the stricter source contract.
+  target-job-rule:
+    reason: The linter accepts only literal $job, while these single-select sources use explicit ${job:regex} escaping; Go contract tests require the matcher on every selector.
+  target-instance-rule:
+    reason: The linter accepts only literal $instance, while these single-select sources use explicit ${instance:regex} escaping; Go contract tests require the matcher on every selector.
   uneditable-dashboard:
     reason: Imported copies are intentionally editable so users can customize them for their Omada deployment.

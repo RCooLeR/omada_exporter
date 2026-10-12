@@ -1,6 +1,7 @@
 import type {
   ClientRecord,
   DashboardModel,
+  DashboardScope,
   DeviceRecord,
   DpiApplicationRecord,
   DpiCategoryRecord,
@@ -14,6 +15,7 @@ import type {
   SiteSummary
 } from "./ha-types";
 import { toNumber } from "./format";
+import { attachNetworkQuality, isNetworkQualityMetric } from "./network-quality-model";
 
 const dashboardModelCache = new WeakMap<HomeAssistant["states"], Map<string, DashboardModel>>();
 const recordUpdatedAt = new WeakMap<object, number>();
@@ -97,19 +99,19 @@ function isDashboardEntity(entity: HassEntity): boolean {
   return getMetric(entity).startsWith("omada_") || isClientTrackerEntity(entity) || looksLikeClientEntity(entity);
 }
 
-function dashboardStatesChanged(current: HomeAssistant["states"], previous: HomeAssistant["states"]): boolean {
+function dashboardStatesChanged(current: HomeAssistant["states"], previous: HomeAssistant["states"], scope: DashboardScope): boolean {
   if (Object.is(current, previous)) {
     return false;
   }
 
   for (const [entityId, entity] of Object.entries(current)) {
-    if (isDashboardEntity(entity) && previous[entityId] !== entity) {
+    if (matchesScope(entity, scope) && isDashboardEntity(entity) && previous[entityId] !== entity) {
       return true;
     }
   }
 
   for (const [entityId, entity] of Object.entries(previous)) {
-    if (isDashboardEntity(entity) && current[entityId] !== entity) {
+    if (matchesScope(entity, scope) && isDashboardEntity(entity) && current[entityId] !== entity) {
       return true;
     }
   }
@@ -122,7 +124,7 @@ function dashboardStatesChanged(current: HomeAssistant["states"], previous: Home
  * Entity state objects are immutable in Home Assistant, so identity changes are
  * sufficient to skip full dashboard rebuilds caused by unrelated integrations.
  */
-export function cardHassChanged(current: HomeAssistant | undefined, previous: HomeAssistant | undefined): boolean {
+export function cardHassChanged(current: HomeAssistant | undefined, previous: HomeAssistant | undefined, scope: DashboardScope = {}): boolean {
   if (Object.is(current, previous)) {
     return false;
   }
@@ -133,7 +135,7 @@ export function cardHassChanged(current: HomeAssistant | undefined, previous: Ho
     return true;
   }
 
-  return dashboardStatesChanged(current.states, previous.states);
+  return dashboardStatesChanged(current.states, previous.states, scope);
 }
 
 function isActiveClientTracker(entity: HassEntity): boolean {
@@ -270,22 +272,73 @@ export function vpnPeerLoginSeconds(row: LinkRow): number {
   return row.metrics.omada_site_to_site_vpn_peer_login_timestamp ?? 0;
 }
 
-function matchSite(entity: HassEntity, siteFilter?: string): boolean {
-  if (!siteFilter) {
-    return true;
-  }
+function normalizeScope(scope: string | DashboardScope | undefined): DashboardScope {
+  return typeof scope === "string" ? { site: scope } : scope ?? {};
+}
 
-  const entitySite = attrString(entity, "site");
-  if (!entitySite) {
-    return true;
-  }
+function matchesScope(entity: HassEntity, scope: DashboardScope): boolean {
+  const bridge = scope.bridge_id?.trim() ?? "";
+  if (attrString(entity, "bridge_id").trim() !== bridge) return false;
+  if (scope.site_id && attrString(entity, "site_id") !== scope.site_id) return false;
+  if (!scope.site) return true;
+  const site = attrString(entity, "site");
+  // Preserve old site-less tracker support only for the legacy bridge. A
+  // named bridge never borrows another integration's unscoped entities.
+  return site === scope.site || (!bridge && !scope.site_id && !site);
+}
 
-  return entitySite === siteFilter;
+export function scopedRecordKey(attrs: Record<string, unknown>, key: string): string {
+  const bridge = String(attrs.bridge_id ?? "").trim();
+  const siteId = String(attrs.site_id ?? "").trim();
+  const site = String(attrs.site ?? "").trim();
+  // Tag ID/name separately: a literal site name such as "id:123" must not
+  // collide with a controller-issued site ID of "123".
+  return bridge || siteId || site ? JSON.stringify([bridge, siteId ? ["id", siteId] : ["name", site], key]) : key;
+}
+
+function scopedEntityKey(entity: HassEntity, key: string): string {
+  return scopedRecordKey(entity.attributes, key);
+}
+
+function linkOwner(attrs: Record<string, unknown>): string {
+  return normalizeMacKey(String(attrs.device_mac || attrs.gateway_mac || ""));
+}
+
+function scopedLinkKey(entity: HassEntity, key: string): string {
+  const owner = linkOwner(entity.attributes);
+  return scopedEntityKey(entity, owner ? JSON.stringify([owner, key]) : key);
+}
+
+/** Unqualified aliases are safe only when exactly one row owns the key. */
+function uniqueIndex<T>(rows: T[], key: (row: T) => string): Map<string, T> {
+  const result = new Map<string, T>();
+  const duplicates = new Set<string>();
+  for (const row of rows) {
+    const value = key(row);
+    if (!value || duplicates.has(value)) continue;
+    if (result.has(value)) {
+      result.delete(value);
+      duplicates.add(value);
+    } else result.set(value, row);
+  }
+  return result;
+}
+
+/** Match ISP rows to their own gateway/site, never a global WAN 1 alias. */
+export function findWanForRow(model: DashboardModel, row: LinkRow): LinkRow | undefined {
+  const candidates = model.wans.filter((wan) =>
+    scopedRecordKey(wan.attrs, "") === scopedRecordKey(row.attrs, "") &&
+    linkOwner(wan.attrs) === linkOwner(row.attrs));
+  const byName = candidates.filter((wan) => wan.name === row.name);
+  const port = String(row.attrs.port ?? "");
+  const byPort = port ? candidates.filter((wan) => String(wan.attrs.port ?? "") === port) : [];
+  if (byName.length === 1 && (!port || String(byName[0]!.attrs.port ?? "") === port)) return byName[0];
+  return byPort.length === 1 ? byPort[0] : undefined;
 }
 
 function ensureDevice(map: Map<string, DeviceRecord>, entity: HassEntity): DeviceRecord {
   const deviceMac = attrString(entity, "device_mac");
-  const key = normalizeMacKey(deviceMac) || attrString(entity, "device_name") || entity.entity_id;
+  const key = scopedEntityKey(entity, normalizeMacKey(deviceMac) || attrString(entity, "device_name") || entity.entity_id);
   let existing = map.get(key);
 
   if (!existing) {
@@ -328,7 +381,7 @@ function ensureControllerDevice(
   includeEntityAttributes = true
 ): DeviceRecord {
   const mac = firstString(entity, "device_mac", "mac");
-  const key = normalizeMacKey(mac) || firstString(entity, "device_name", "name") || entity.entity_id;
+  const key = scopedEntityKey(entity, normalizeMacKey(mac) || firstString(entity, "device_name", "name") || entity.entity_id);
   let existing = map.get(key);
 
   if (!existing) {
@@ -375,7 +428,7 @@ function ensureControllerDevice(
 function ensurePort(map: Map<string, PortRecord>, entity: HassEntity): PortRecord {
   const deviceMac = attrString(entity, "device_mac");
   const port = attrString(entity, "port");
-  const key = `${normalizeMacKey(deviceMac)}:${port}`;
+  const key = scopedEntityKey(entity, `${normalizeMacKey(deviceMac)}:${port}`);
   let existing = map.get(key);
 
   if (!existing) {
@@ -409,7 +462,7 @@ function ensurePort(map: Map<string, PortRecord>, entity: HassEntity): PortRecor
 
 function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity): ClientRecord {
   const mac = attrString(entity, "mac");
-  const key = normalizeMacKey(mac) || attrString(entity, "name") || entity.entity_id;
+  const key = scopedEntityKey(entity, normalizeMacKey(mac) || attrString(entity, "name") || entity.entity_id);
   let existing = map.get(key);
 
   if (!existing) {
@@ -477,7 +530,7 @@ function ensureClient(map: Map<string, ClientRecord>, entity: HassEntity): Clien
 }
 
 function ensureLinkRow(map: Map<string, LinkRow>, entity: HassEntity, fallbackKeys: string[]): LinkRow {
-  const key = fallbackKeys.find(Boolean) ?? entity.entity_id;
+  const key = scopedLinkKey(entity, fallbackKeys.find(Boolean) ?? entity.entity_id);
   let existing = map.get(key);
 
   if (!existing) {
@@ -503,7 +556,7 @@ function joinKeyParts(...parts: string[]): string {
 }
 
 function ensureVpnParentRow(map: Map<string, LinkRow>, entity: HassEntity): LinkRow {
-  const key = vpnRowKey(entity);
+  const key = scopedLinkKey(entity, vpnRowKey(entity));
   let existing = map.get(key);
 
   if (!existing) {
@@ -517,7 +570,10 @@ function ensureVpnParentRow(map: Map<string, LinkRow>, entity: HassEntity): Link
         vpn_type: attrString(entity, "vpn_type"),
         site_vpn_type: attrString(entity, "site_vpn_type"),
         site: attrString(entity, "site"),
-        site_id: attrString(entity, "site_id")
+        site_id: attrString(entity, "site_id"),
+        bridge_id: attrString(entity, "bridge_id"),
+        device_mac: attrString(entity, "device_mac"),
+        gateway_mac: attrString(entity, "gateway_mac")
       },
       metrics: {}
     };
@@ -737,7 +793,8 @@ function buildDpiSummary(entities: HassEntity[]): DpiSummary {
   return summary;
 }
 
-export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): DashboardModel {
+export function buildDashboardModel(hass: HomeAssistant, filter?: string | DashboardScope): DashboardModel {
+  const scope = normalizeScope(filter);
   // Home Assistant exposes every MQTT entity as a flat dictionary. The card is
   // easier to render if we first group those entities back into domain objects:
   // devices, ports, clients, WAN rows, VPN rows, and ISP rows.
@@ -753,18 +810,18 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   const vpns = new Map<string, LinkRow>();
   const vpnPeers = new Map<string, LinkRow>();
   const wans = new Map<string, LinkRow>();
-  const deviceByMac = new Map<string, DeviceRecord>();
   const portByDeviceMacAndPort = new Map<string, PortRecord>();
   const infrastructureEntityByMac = new Map<string, HassEntity>();
   const clientTrackerByMac = new Map<string, HassEntity>();
   const dpiEntities: HassEntity[] = [];
+  const qualityEntities: HassEntity[] = [];
 
   for (const entity of Object.values(hass.states)) {
-    if (!matchSite(entity, siteFilter)) {
+    if (!matchesScope(entity, scope)) {
       continue;
     }
     if (isClientTrackerEntity(entity)) {
-      const mac = normalizeMacKey(attrString(entity, "mac"));
+      const mac = scopedEntityKey(entity, normalizeMacKey(attrString(entity, "mac")));
       const previous = clientTrackerByMac.get(mac);
       if (!previous || entityObservedAt(entity) >= entityObservedAt(previous)) {
         clientTrackerByMac.set(mac, entity);
@@ -774,7 +831,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     const metric = getMetric(entity);
     const deviceMac = attrString(entity, "device_mac");
     if (deviceMac && (metric.startsWith("omada_device_") || metric.startsWith("omada_controller_"))) {
-      const key = normalizeMacKey(deviceMac);
+      const key = scopedEntityKey(entity, normalizeMacKey(deviceMac));
       const previous = infrastructureEntityByMac.get(key);
       if (!previous || entityObservedAt(entity) >= entityObservedAt(previous)) {
         infrastructureEntityByMac.set(key, entity);
@@ -783,12 +840,12 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   }
 
   for (const entity of Object.values(hass.states)) {
-    if (!matchSite(entity, siteFilter)) {
+    if (!matchesScope(entity, scope)) {
       continue;
     }
 
     if (isClientTrackerEntity(entity)) {
-      const mac = normalizeMacKey(attrString(entity, "mac"));
+      const mac = scopedEntityKey(entity, normalizeMacKey(attrString(entity, "mac")));
       // The latest tracker state is the source of truth for dashboard
       // presence. Retained metric sensors can outlive the network session and
       // must not recreate clients that are away or unavailable.
@@ -802,7 +859,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     const metric = getMetric(entity);
     if (!metric) {
-      const mac = normalizeMacKey(attrString(entity, "mac"));
+      const mac = scopedEntityKey(entity, normalizeMacKey(attrString(entity, "mac")));
       const activeTracker = clientTrackerByMac.get(mac);
       if (looksLikeClientEntity(entity) && activeTracker && isActiveClientTracker(activeTracker)) {
         ensureClient(clients, entity);
@@ -812,6 +869,11 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     const value = toNumber(entity.state);
 
+    if (isNetworkQualityMetric(metric)) {
+      qualityEntities.push(entity);
+      continue;
+    }
+
     if (metric.startsWith("omada_dpi_")) {
       dpiEntities.push(entity);
       continue;
@@ -819,25 +881,19 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     if (metric.startsWith("omada_device_")) {
       const device = ensureDevice(devices, entity);
-      if (device.mac) {
-        deviceByMac.set(normalizeMacKey(device.mac), device);
-      }
       setLatestMetric(device, metric, value, entity);
       continue;
     }
 
     if (metric.startsWith("omada_controller_")) {
       const device = ensureControllerDevice(devices, entity);
-      if (device.mac) {
-        deviceByMac.set(normalizeMacKey(device.mac), device);
-      }
       setLatestMetric(device, metric, value, entity);
       continue;
     }
 
     if (metric.startsWith("omada_port_")) {
       const port = ensurePort(ports, entity);
-      portByDeviceMacAndPort.set(`${normalizeMacKey(port.deviceMac)}:${port.port}`, port);
+      portByDeviceMacAndPort.set(port.key, port);
       setLatestMetric(port, metric, value, entity);
       continue;
     }
@@ -845,7 +901,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     if (metric.startsWith("omada_radio_") || metric.startsWith("omada_ap_radio_")) {
       const deviceMac = attrString(entity, "device_mac");
       const band = attrString(entity, "band") || attrString(entity, "radio_name") || metric;
-      const key = `${normalizeMacKey(deviceMac)}:${band}`;
+      const key = scopedEntityKey(entity, `${normalizeMacKey(deviceMac)}:${band}`);
       let radio = radios.get(key);
 
       if (!radio) {
@@ -867,7 +923,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     if (metric.startsWith("omada_lag_")) {
       const deviceMac = attrString(entity, "device_mac");
       const lagId = attrString(entity, "lag_id");
-      const key = `${normalizeMacKey(deviceMac)}:${lagId}`;
+      const key = scopedEntityKey(entity, `${normalizeMacKey(deviceMac)}:${lagId}`);
       const observedAt = entityObservedAt(entity);
       const existing =
         lags.get(key) ?? { attrs: {}, metrics: {}, updatedAt: -1, metricUpdatedAt: new Map<string, number>() };
@@ -884,19 +940,17 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (metric.startsWith("omada_client_")) {
-      const mac = normalizeMacKey(attrString(entity, "mac"));
-      if (!mac || metric === "omada_client_connected_total") {
+      const rawMac = normalizeMacKey(attrString(entity, "mac"));
+      if (!rawMac || metric === "omada_client_connected_total") {
         continue;
       }
+      const mac = scopedEntityKey(entity, rawMac);
       const infrastructureEntity = infrastructureEntityByMac.get(mac);
       if (infrastructureEntity) {
         const infrastructureMetric = getMetric(infrastructureEntity);
         const device = infrastructureMetric.startsWith("omada_controller_")
           ? ensureControllerDevice(devices, infrastructureEntity)
           : ensureDevice(devices, infrastructureEntity);
-        if (device.mac) {
-          deviceByMac.set(normalizeMacKey(device.mac), device);
-        }
         setLatestMetric(device, metric, value, entity);
         continue;
       }
@@ -905,9 +959,6 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
       // the controller device row instead of showing a fake client.
       if (isControllerEntity(entity)) {
         const controller = ensureControllerDevice(devices, entity, false);
-        if (controller.mac) {
-          deviceByMac.set(normalizeMacKey(controller.mac), controller);
-        }
         setLatestMetric(controller, metric, value, entity);
         continue;
       }
@@ -980,8 +1031,10 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
   }
 
+  attachNetworkQuality(devices.values(), qualityEntities);
+
   for (const port of ports.values()) {
-    const device = deviceByMac.get(normalizeMacKey(port.deviceMac));
+    const device = devices.get(scopedRecordKey(port.attrs, normalizeMacKey(port.deviceMac)));
     if (device) {
       device.ports.push(port);
     }
@@ -992,7 +1045,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   }
 
   for (const radio of radios.values()) {
-    const device = deviceByMac.get(normalizeMacKey(radio.deviceMac));
+    const device = devices.get(scopedRecordKey(radio.attrs, normalizeMacKey(radio.deviceMac)));
     if (device) {
       device.radios.push(radio);
     }
@@ -1005,7 +1058,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     const lagId = client.attachmentLagId;
     const lagDeviceMac = client.switchMac || client.gatewayMac;
     if (lagId && lagId !== "0" && lagDeviceMac) {
-      const lag = lags.get(`${normalizeMacKey(lagDeviceMac)}:${lagId}`);
+      const lag = lags.get(scopedRecordKey(client.attrs, `${normalizeMacKey(lagDeviceMac)}:${lagId}`));
       if (lag) {
         client.attachmentLagPorts = String(lag.attrs.lag_ports ?? "").trim();
         const linkSpeed = lag.metrics.omada_lag_link_speed_mbps ?? Number(lag.attrs.link_speed ?? 0);
@@ -1018,7 +1071,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     }
 
     if (client.switchMac && client.attachmentPort) {
-      const port = portByDeviceMacAndPort.get(`${normalizeMacKey(client.switchMac)}:${client.attachmentPort}`);
+      const port = portByDeviceMacAndPort.get(scopedRecordKey(client.attrs, `${normalizeMacKey(client.switchMac)}:${client.attachmentPort}`));
       if (port) {
         port.clients.push(client);
       }
@@ -1026,7 +1079,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
 
     const attachmentMac = client.apMac || client.switchMac || client.gatewayMac;
     if (attachmentMac) {
-      const device = deviceByMac.get(normalizeMacKey(attachmentMac));
+      const device = devices.get(scopedRecordKey(client.attrs, normalizeMacKey(attachmentMac)));
       if (device) {
         device.clients.push(client);
       }
@@ -1066,7 +1119,7 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   });
 
   const siteName =
-    siteFilter ||
+    scope.site ||
     deviceList[0]?.site ||
     clientList[0]?.site ||
     Array.from(isps.values())[0]?.attrs.site?.toString() ||
@@ -1084,6 +1137,13 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
   });
   const wanList = Array.from(wans.values()).sort((left, right) => left.name.localeCompare(right.name));
 
+  // Retain legacy convenience lookups only where the MAC/port is unambiguous.
+  // All internal joins and UI consumers use the scoped keys above.
+  const deviceByMac = uniqueIndex(deviceList, (device) => normalizeMacKey(device.mac));
+  for (const [key, port] of uniqueIndex(Array.from(ports.values()), (port) => `${normalizeMacKey(port.deviceMac)}:${port.port}`)) {
+    portByDeviceMacAndPort.set(key, port);
+  }
+
   return {
     siteSummary: summaryFrom(deviceList, clientList, siteName),
     dpi: buildDpiSummary(dpiEntities),
@@ -1097,13 +1157,14 @@ export function buildDashboardModel(hass: HomeAssistant, siteFilter?: string): D
     deviceByMac,
     portByDeviceMacAndPort,
     clientByKey: new Map(clientList.map((client) => [client.key, client])),
-    wanByName: new Map(wanList.map((wan) => [wan.name, wan])),
-    wanByPort: new Map(wanList.map((wan) => [String(wan.attrs.port), wan]))
+    wanByName: uniqueIndex(wanList, (wan) => wan.name),
+    wanByPort: uniqueIndex(wanList, (wan) => String(wan.attrs.port ?? ""))
   };
 }
 
-export function getDashboardModel(hass: HomeAssistant, siteFilter?: string): DashboardModel {
-  const cacheKey = siteFilter ?? "";
+export function getDashboardModel(hass: HomeAssistant, filter?: string | DashboardScope): DashboardModel {
+  const scope = normalizeScope(filter);
+  const cacheKey = JSON.stringify([scope.bridge_id?.trim() ?? "", scope.site ?? "", scope.site_id ?? ""]);
   let cacheBySite = dashboardModelCache.get(hass.states);
   if (!cacheBySite) {
     cacheBySite = new Map<string, DashboardModel>();
@@ -1115,7 +1176,7 @@ export function getDashboardModel(hass: HomeAssistant, siteFilter?: string): Das
     return cached;
   }
 
-  const model = buildDashboardModel(hass, siteFilter);
+  const model = buildDashboardModel(hass, scope);
   cacheBySite.set(cacheKey, model);
   return model;
 }

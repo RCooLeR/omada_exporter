@@ -5,10 +5,15 @@ export interface HomeAssistant {
   };
 }
 
-export interface LovelaceCardConfig {
+export interface DashboardScope {
+  bridge_id?: string;
+  site?: string;
+  site_id?: string;
+}
+
+export interface LovelaceCardConfig extends DashboardScope {
   type: string;
   title?: string;
-  site?: string;
   logo_mode?: "light" | "dark" | "auto";
   device_limit?: number;
   client_limit?: number;
@@ -26,6 +31,29 @@ export interface MetricRecord {
   [metricName: string]: number;
 }
 
+export interface UplinkPacketCounts {
+  packets?: number;
+  dropped?: number;
+  errors?: number;
+}
+
+export interface DeviceQuality {
+  interference: { band: string; percentage: number }[];
+  uplink?: {
+    status: "available" | "unavailable" | "error" | "wireless" | "offline";
+    up: UplinkPacketCounts;
+    down: UplinkPacketCounts;
+  };
+  wan?: {
+    status: "available" | "unavailable" | "error" | "offline";
+    latencySeconds?: number;
+    jitterSeconds?: number;
+    packetLossPercentage?: number;
+    mos?: number;
+    windowSeconds?: number;
+  };
+}
+
 export interface DeviceRecord {
   key: string;
   name: string;
@@ -41,6 +69,7 @@ export interface DeviceRecord {
   ports: PortRecord[];
   radios: RadioRecord[];
   clients: ClientRecord[];
+  quality?: DeviceQuality;
 }
 
 export interface PortRecord {

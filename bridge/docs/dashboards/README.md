@@ -2,8 +2,10 @@
 
 These dashboards target the current `omada_exporter` Prometheus metric and label
 contract. All use Grafana's portable Classic dashboard model (`schemaVersion`
-42) and selectable Prometheus datasource, scrape job, instance, and site
-filters.
+42) and selectable Prometheus datasource, scrape job, bridge endpoint, and site
+filters. Job and endpoint select exactly one source, so identically named
+devices, clients, WANs, and VPNs from another controller are never included in
+the same totals by default.
 
 - [`dashboard.json`](./dashboard.json) is the comprehensive dashboard. It adds a
   device filter and covers exporter health, clients, device and radio health,
@@ -19,7 +21,8 @@ filters.
 
 1. In Grafana, choose **Dashboards → New → Import**.
 2. Upload one of the JSON files.
-3. Select the Prometheus datasource and exporter job/instance.
+3. Select the Prometheus datasource, one exporter job, and one bridge endpoint
+   (Prometheus `instance`). Source filters have no **All** option.
 4. Choose one or more sites. The comprehensive dashboard can also filter by
    device MAC. The device-details dashboard is optimized for one selected
    device. Hardware-specific sections are labeled, and unsupported or
@@ -29,6 +32,32 @@ filters.
 The comprehensive dashboard's **Device uptime** series and the simple
 dashboard's **Device CPU** series link directly to the matching device-details
 view while preserving the datasource, filters, and time range.
+
+## Multiple bridges and legacy history
+
+Keep the existing bridge and its scrape configuration unchanged. New bridges
+can set a stable `OMADA_BRIDGE_ID`, for example `slobidska44`, and use a separate
+scrape target such as `omada-appt:9040`. The existing bridge's unlabelled data
+and historical samples remain visible: dashboards intentionally do not require
+a non-empty `bridge_id`. Entity aggregations and VPN joins retain `job`,
+`instance`, `bridge_id`, and site identity. Legends identify the selected
+job/endpoint, and device drill-downs preserve those source filters.
+
+Every exporter must have a unique `(job, instance)` pair in Prometheus. This is
+normally automatic for different targets. If multiple bridges are scraped
+through different reverse-proxy paths on the **same host and port**, use
+separate jobs or set a unique `instance` target label for each. A distinct
+`bridge_id` alone is not a substitute for that source selection contract.
+Do not relabel the existing target just to add the apartment; that would split
+its time-series history. Avoid adding a duplicate scrape of the same exporter.
+
+Select the apartment's job/endpoint to view only its data, or open two dashboard
+tabs to compare controllers. Site/device **All** still means all sites/devices
+within the selected bridge, never every bridge. On import, source variables
+have no saved wildcard selection; Grafana resolves a single available source.
+
+Reimport the generated dashboards after upgrading; existing imported copies
+keep their previous queries and multi-source **All** options until updated.
 
 The dashboards refresh every 30 seconds, matching the scrape interval in the
 [Prometheus setup example](../prometheus.md). Rate panels use
@@ -61,5 +90,15 @@ go generate ./docs/dashboards
 `go test ./...` validates panel metadata, datasource portability, variables,
 metric names, selector and legend labels, and adaptive Prometheus rate windows
 against the descriptors emitted by the current collectors. CI also runs
-Grafana's pinned `dashboard-linter`; [`.lint`](./.lint) documents the one
-intentional exception that imported dashboards remain editable.
+Grafana's pinned `dashboard-linter`; [`.lint`](./.lint) documents intentional
+exceptions: imported dashboards remain editable, and our stricter single-source
+selection/escaped matchers replace the linter's multi-select job/instance
+conventions. Go contract tests enforce those source rules on every selector.
+
+With Prometheus `promtool` installed (or `PROMTOOL_BIN` pointing to its binary),
+run `go test ./cmd -run TestGrafana -v` from `bridge` to also evaluate the generated
+queries against two synthetic bridges with identical site/device/client/VPN
+identities. This checks unlabelled legacy data, apartment-only totals, source
+grouping, VPN fallback isolation, and literal endpoint matching. Without
+`promtool`, only that integration test is skipped; the dashboard contract and
+source-isolation structure checks still run.

@@ -10,6 +10,7 @@ import logoDark from "./assets/logo-dark.svg?raw";
 import logoLight from "./assets/logo-light.svg?raw";
 import { inspectionAriaLabel } from "./accessibility";
 import { dpiStyles, renderDpiDetail } from "./dpi-detail";
+import { networkQualityStyles, renderNetworkQualityDetail } from "./network-quality-detail";
 import { ChartController, deviceResourceSummarySignature } from "./chart-controller";
 import {
   formatBytes,
@@ -31,9 +32,11 @@ import type {
 } from "./ha-types";
 import {
   cardHassChanged,
+  findWanForRow,
   getDashboardModel,
   isDeviceConnected,
   normalizeMacKey,
+  scopedRecordKey,
   vpnModeLabel,
   vpnPeerLoginSeconds,
   vpnRemoteLabel,
@@ -84,7 +87,7 @@ function chartAria(description: string) {
 
 export class OmadaNetworkCard extends LitElement {
   static override properties = {
-    hass: { attribute: false, hasChanged: cardHassChanged },
+    hass: { attribute: false, noAccessor: true },
     _config: { state: true },
     _model: { state: true },
     _selection: { state: true },
@@ -271,9 +274,15 @@ export class OmadaNetworkCard extends LitElement {
       .header, .content, .link-grid, .detail-hero, .chart-stack, .detail-bottom { grid-template-columns: 1fr; }
     }
     @media (max-width: 600px) { .chips, .chips.has-dpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  `, dpiStyles];
+  `, dpiStyles, networkQualityStyles];
 
-  public hass?: HomeAssistant;
+  private _hass: HomeAssistant | undefined;
+  public get hass(): HomeAssistant | undefined { return this._hass; }
+  public set hass(value: HomeAssistant | undefined) {
+    const previous = this._hass;
+    this._hass = value;
+    if (cardHassChanged(value, previous, this._config)) this.requestUpdate("hass", previous);
+  }
   private _config?: LovelaceCardConfig;
   private _model?: DashboardModel;
   private _selection: Selection | undefined;
@@ -309,7 +318,7 @@ export class OmadaNetworkCard extends LitElement {
     let modelChanged = false;
     const configChanged = changed.has("_config");
     if ((changed.has("hass") || configChanged) && this.hass) {
-      this._model = getDashboardModel(this.hass, this._config?.site);
+      this._model = getDashboardModel(this.hass, this._config);
       modelChanged = true;
     }
 
@@ -817,8 +826,9 @@ export class OmadaNetworkCard extends LitElement {
     const pendingUpdate = meta.pendingUpdate;
     const updateTarget = meta.updateTarget;
     const poeBudget = meta.poeBudget;
+    const qualityDetail = renderNetworkQualityDetail(device);
     return html`
-      <div class="detail-shell">
+      <div class="detail-shell ${qualityDetail === nothing ? "" : "has-quality"}">
         <div class="detail-hero">
           <div class="detail-card">
             <div class="detail-title">
@@ -853,6 +863,7 @@ export class OmadaNetworkCard extends LitElement {
             </div>
           </div>
         </div>
+        ${qualityDetail}
         <div class="chart-stack">
           <div class="chart-card"><div class="section-title">Health Profile</div><div class="chart" data-chart="detail-primary"></div></div>
           <div class="chart-card"><div class="section-title">${this.deviceSecondaryTitle(device)}</div><div class="chart" data-chart="detail-secondary"></div></div>
@@ -1184,7 +1195,7 @@ export class OmadaNetworkCard extends LitElement {
       return undefined;
     }
 
-    return this._model.portByDeviceMacAndPort.get(`${normalizeMacKey(deviceMac)}:${client.attachmentPort}`);
+    return this._model.portByDeviceMacAndPort.get(scopedRecordKey(client.attrs, `${normalizeMacKey(deviceMac)}:${client.attachmentPort}`));
   }
 
   private clientLiveRate(client: ClientRecord): number {
@@ -1228,7 +1239,7 @@ export class OmadaNetworkCard extends LitElement {
       return undefined;
     }
 
-    return this._model.wanByName.get(row.name) ?? this._model.wanByPort.get(String(row.attrs.port));
+    return findWanForRow(this._model, row);
   }
 
   private ispDisplayName(row: LinkRow, wan?: LinkRow): string {

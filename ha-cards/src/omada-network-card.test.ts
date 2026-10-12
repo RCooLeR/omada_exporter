@@ -114,6 +114,26 @@ function invokeBoundClick(template: TemplateResult | undefined): void {
 }
 
 describe("Omada network card DPI selection", () => {
+  it("keeps gateway quality inside device details without adding a summary chip", () => {
+    const hass = homeAssistant(undefined);
+    for (const [metric, state] of [
+      ["omada_gateway_wan_quality_latency_average_seconds", "0.012"],
+      ["omada_gateway_wan_quality_window_seconds", "86400"],
+      ["omada_network_quality_available", "1"]
+    ]) {
+      const sample = entity(`sensor.${metric}`, state!, {
+        metric, device_mac: "aa:bb:cc:dd:ee:ff", device_type: "gateway", source: "wan"
+      });
+      hass.states[sample.entity_id] = sample;
+    }
+    const fixture = setup(hass);
+    const detail = fixture.harness.renderDetail();
+    expect(markup(detail)).toContain("WAN Quality");
+    expect(boundValues(detail)).toContain("has-quality");
+    expect(boundValues(detail)).toContain("12 ms");
+    expect(markup(fixture.harness.renderSummaryChips())).not.toContain("WAN Quality");
+  });
+
   it.each([undefined, "unknown", "unavailable"])("hides the chip when DPI data is %s", (state) => {
     const fixture = setup(homeAssistant(state));
     expect(markup(fixture.harness.renderSummaryChips())).not.toContain("Show DPI traffic insights");

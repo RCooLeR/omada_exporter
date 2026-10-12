@@ -15,7 +15,7 @@ type Wan struct {
 	//Fields
 	RxRate  float64 `json:"rxRate"`
 	TxRate  float64 `json:"txRate"`
-	Latency int8    `json:"latency"`
+	Latency float64 `json:"latency"`
 }
 
 // GetLinkSpeed converts the encoded WAN link speed to Mbps and returns 0 when

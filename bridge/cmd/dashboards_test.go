@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -19,12 +21,15 @@ const (
 	dashboardNoDataColor   = "#808080"
 )
 
-var scrapeLabels = map[string]struct{}{"instance": {}, "job": {}}
+// bridge_id is optional on the exporter registry; the legacy registry has no
+// such label. Aggregation may retain it without excluding unlabelled history.
+var scrapeLabels = map[string]struct{}{"instance": {}, "job": {}, "bridge_id": {}}
 
 var (
 	metricNamePattern           = regexp.MustCompile("\\bomada_[a-zA-Z0-9_]+\\b")
 	matcherPattern              = regexp.MustCompile("(^|,)\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=~|!~|!=|=)")
 	groupByPattern              = regexp.MustCompile("\\b(sum|avg|max|min|count)\\s+by\\s*\\(([^)]*)\\)")
+	vectorMatchPattern          = regexp.MustCompile(`\bon\s*\(([^)]*)\)`)
 	legendPattern               = regexp.MustCompile("\\{\\{\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\}\\}")
 	fixedRangePattern           = regexp.MustCompile("\\[[0-9]+[smhdwy]\\]")
 	exactVariableMatcherPattern = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*"\$(?:\{[^}]+\}|[a-zA-Z_][a-zA-Z0-9_]*)"`)
@@ -51,6 +56,7 @@ type grafanaDatasource struct {
 
 type grafanaVariable struct {
 	AllValue   string
+	Current    map[string]any
 	Datasource *grafanaDatasource
 	IncludeAll bool
 	Multi      bool
@@ -163,7 +169,8 @@ func TestGrafanaDashboardsMatchExporterContract(t *testing.T) {
 			switch filepath.Base(path) {
 			case "dashboard.json":
 				if !strings.Contains(string(data), "/d/omada-device-details/omada-device-details?") ||
-					!strings.Contains(string(data), "var-Device=${__field.labels.device_mac}") {
+					!strings.Contains(string(data), "var-Device=${__field.labels.device_mac}") ||
+					!strings.Contains(string(data), "${job:queryparam}") || !strings.Contains(string(data), "${instance:queryparam}") {
 					t.Error("full dashboard does not link device uptime series to the device details dashboard")
 				}
 				required := []string{
@@ -204,12 +211,141 @@ func TestGrafanaDashboardsMatchExporterContract(t *testing.T) {
 				}
 			case "simple-omada-dashboard.json":
 				if !strings.Contains(string(data), "/d/omada-device-details/omada-device-details?") ||
-					!strings.Contains(string(data), "var-Device=${__field.labels.device_mac}") {
+					!strings.Contains(string(data), "var-Device=${__field.labels.device_mac}") ||
+					!strings.Contains(string(data), "${job:queryparam}") || !strings.Contains(string(data), "${instance:queryparam}") {
 					t.Error("simple dashboard does not link device CPU series to the device details dashboard")
 				}
 			}
 		})
 	}
+}
+
+// Exercise the generated queries in the real PromQL engine when promtool is
+// available. Keep this optional for go-only contributors; the static contract
+// above always checks every generated panel's isolation rules.
+func TestGrafanaDashboardsKeepBridgeSourcesSeparate(t *testing.T) {
+	tool := os.Getenv("PROMTOOL_BIN")
+	if tool == "" {
+		var err error
+		tool, err = exec.LookPath("promtool")
+		if err != nil {
+			t.Skip("set PROMTOOL_BIN or install promtool to run two-bridge PromQL integration tests")
+		}
+	}
+	data, err := os.ReadFile(filepath.Join("..", "docs", "dashboards", "dashboard.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dashboard grafanaDashboard
+	if err := json.Unmarshal(data, &dashboard); err != nil {
+		t.Fatal(err)
+	}
+	query := func(title, job, instance string) string {
+		t.Helper()
+		for _, panel := range dashboard.Panels {
+			if panel.Title == title {
+				// Grafana regex interpolation escapes the value, followed by
+				// PromQL string escaping. In particular, a dot is not a wildcard.
+				escape := func(value string) string {
+					quoted := strconv.Quote(regexp.QuoteMeta(value))
+					return quoted[1 : len(quoted)-1]
+				}
+				return strings.NewReplacer(
+					"${job:regex}", escape(job), "${instance:regex}", escape(instance),
+					"${Site:regex}", ".*", "${Device:regex}", ".*",
+					"$__rate_interval", "4m", "$__range", "5m",
+				).Replace(panel.Targets[0].Expr)
+			}
+		}
+		t.Fatalf("missing panel %q", title)
+		return ""
+	}
+
+	type sample struct {
+		Labels string  `json:"labels"`
+		Value  float64 `json:"value"`
+	}
+	type expressionTest struct {
+		Expr       string   `json:"expr"`
+		EvalTime   string   `json:"eval_time"`
+		ExpSamples []sample `json:"exp_samples"`
+	}
+	type inputSeries struct {
+		Series string `json:"series"`
+		Values string `json:"values"`
+	}
+	// These sites, names, client/device MACs and VPN IDs intentionally collide.
+	// One controller is the unlabelled legacy source, the other is the apartment.
+	legacy := `job="omada",instance="omada-bridge:9040",site="Default",site_id="same-site"`
+	apartment := `job="omada",instance="omada-appt:9040",bridge_id="slobidska44",site="Default",site_id="same-site"`
+	device := `device_name="Gateway",device_mac="00:11:22:33:44:55"`
+	wan := device + `,port="1",name="WAN 1"`
+	client := `name="Phone",mac="66:77:88:99:AA:BB"`
+	vpn := `name="site-vpn",vpn_type="WireGuard"`
+	inputs := []inputSeries{
+		{`omada_wan_latency{` + legacy + `,` + wan + `}`, "10+0x5"},
+		{`omada_wan_latency{` + apartment + `,` + wan + `}`, "90+0x5"},
+		{`omada_client_traffic_down_bytes{` + legacy + `,` + client + `}`, "0+600x5"},
+		{`omada_client_traffic_up_bytes{` + legacy + `,` + client + `}`, "0+600x5"},
+		{`omada_client_traffic_down_bytes{` + apartment + `,` + client + `}`, "0+1200x5"},
+		{`omada_client_traffic_up_bytes{` + apartment + `,` + client + `}`, "0+1200x5"},
+		{`omada_vpn_uptime{` + legacy + `,` + vpn + `,interface_name="wg0"}`, "60+0x5"},
+		{`omada_site_to_site_vpn_peer_login_timestamp{` + apartment + `,` + vpn + `,vpn_id="same-vpn",peer_id="same-peer"}`, "120+0x5"},
+		// Regex metacharacters in instance values must not match another target.
+		{`omada_wan_latency{job="omada",instance="10.20.0.1:9040",bridge_id="ip-target",site="Default",site_id="same-site",` + wan + `}`, "30+0x5"},
+		{`omada_wan_latency{job="omada",instance="10x20x0x1:9040",bridge_id="lookalike",site="Default",site_id="same-site",` + wan + `}`, "999+0x5"},
+		// A separate scrape job may have the same instance name.
+		{`omada_wan_latency{job="different-job",instance="omada-bridge:9040",site="Default",site_id="same-site",` + wan + `}`, "888+0x5"},
+	}
+	tests := []expressionTest{
+		{query("WAN latency", "omada", "omada-bridge:9040"), "5m", []sample{{`{` + legacy + `,` + wan + `}`, 10}}},
+		{query("WAN latency", "omada", "omada-appt:9040"), "5m", []sample{{`{` + apartment + `,` + wan + `}`, 90}}},
+		{query("Top clients by throughput", "omada", "omada-bridge:9040"), "5m", []sample{{`{` + legacy + `,` + client + `}`, 160}}},
+		{query("Top clients by throughput", "omada", "omada-appt:9040"), "5m", []sample{{`{` + apartment + `,` + client + `}`, 320}}},
+		{query("VPN uptime", "omada", "omada-bridge:9040"), "5m", []sample{{`{` + legacy + `,` + vpn + `,interface_name="wg0"}`, 60}}},
+		{query("VPN uptime", "omada", "omada-appt:9040"), "5m", []sample{{`{` + apartment + `,` + vpn + `,vpn_id="same-vpn"}`, 180}}},
+		{query("WAN latency", "omada", "10.20.0.1:9040"), "5m", []sample{{`{job="omada",instance="10.20.0.1:9040",bridge_id="ip-target",site="Default",site_id="same-site",` + wan + `}`, 30}}},
+		{query("WAN latency", "", ""), "5m", []sample{}},
+		{query("Client throughput", "omada", "omada-bridge:9040"), "5m", []sample{{`{}`, 80}}},
+		{query("Client throughput", "omada", "omada-appt:9040"), "5m", []sample{{`{}`, 160}}},
+	}
+	// Defense in depth: even if someone manually broadens a URL variable, the
+	// entity groups and fallback join must not merge identities across sources.
+	bothSources := func(title string) string {
+		return strings.ReplaceAll(query(title, "omada", "omada-bridge:9040"),
+			`instance=~"omada-bridge:9040"`, `instance=~"omada-(bridge|appt):9040"`)
+	}
+	tests = append(tests,
+		expressionTest{bothSources("WAN latency"), "5m", []sample{
+			{`{` + legacy + `,` + wan + `}`, 10}, {`{` + apartment + `,` + wan + `}`, 90},
+		}},
+		expressionTest{bothSources("VPN uptime"), "5m", []sample{
+			{`{` + legacy + `,` + vpn + `,interface_name="wg0"}`, 60},
+			{`{` + apartment + `,` + vpn + `,vpn_id="same-vpn"}`, 180},
+		}},
+	)
+	fixture := map[string]any{
+		"evaluation_interval": "1m",
+		"fuzzy_compare":       true,
+		"tests": []any{map[string]any{
+			"name":     "legacy and apartment share identities, not data",
+			"interval": "1m", "input_series": inputs, "promql_expr_test": tests,
+		}},
+	}
+	encoded, err := json.MarshalIndent(fixture, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "bridge-isolation.yaml")
+	// JSON is valid YAML and avoids adding a YAML module just for this fixture.
+	if err := os.WriteFile(path, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.Command(tool, "test", "rules", path).CombinedOutput()
+	if err != nil {
+		t.Fatalf("promtool query regression: %v\n%s", err, output)
+	}
+	t.Logf("%s", output)
 }
 
 func validateDashboardVariables(t *testing.T, variables []grafanaVariable, contract map[string]map[string]struct{}) {
@@ -241,15 +377,17 @@ func validateDashboardVariables(t *testing.T, variables []grafanaVariable, contr
 			validateSingleDeviceVariable(t, variable, contract)
 			continue
 		}
-		if !variable.Multi || !variable.IncludeAll {
-			t.Errorf("variable %s must support multi-select and Include All", variable.Name)
-		}
-		wantAllValue := ".*"
 		if variable.Name == "job" || variable.Name == "instance" {
-			wantAllValue = ".+"
-		}
-		if variable.AllValue != wantAllValue {
-			t.Errorf("variable %s allValue = %q, want %q", variable.Name, variable.AllValue, wantAllValue)
+			if variable.Multi || variable.IncludeAll || variable.AllValue != "" || len(variable.Current) != 0 {
+				t.Errorf("source variable %s must select one endpoint, with no All or preselected wildcard", variable.Name)
+			}
+		} else {
+			if !variable.Multi || !variable.IncludeAll {
+				t.Errorf("variable %s must support multi-select and Include All", variable.Name)
+			}
+			if variable.AllValue != ".*" {
+				t.Errorf("variable %s allValue = %q, want .*", variable.Name, variable.AllValue)
+			}
 		}
 		if variable.Refresh != 2 {
 			t.Errorf("variable %s refresh = %d, want On Time Range Change (2)", variable.Name, variable.Refresh)
@@ -268,6 +406,12 @@ func validateDashboardVariables(t *testing.T, variables []grafanaVariable, contr
 		if query.Metric == "" || query.Label == "" || query.Query == "" {
 			t.Errorf("variable %s has incomplete Label values query", variable.Name)
 			continue
+		}
+		if variable.Name != "job" && !strings.Contains(query.Metric, `job=~"${job:regex}"`) {
+			t.Errorf("variable %s is not limited to the selected job", variable.Name)
+		}
+		if variable.Name != "job" && variable.Name != "instance" && !strings.Contains(query.Metric, `instance=~"${instance:regex}"`) {
+			t.Errorf("variable %s is not limited to the selected bridge endpoint", variable.Name)
 		}
 		if query.QryType != 1 {
 			t.Errorf("variable %s qryType = %d, want Label values (1)", variable.Name, query.QryType)
@@ -372,6 +516,9 @@ func validateDashboardPanel(t *testing.T, panel *grafanaPanel, contract map[stri
 			continue
 		}
 		validateDashboardQueryScope(t, targetLocation, target.Expr, contract)
+		if !strings.HasPrefix(target.LegendFormat, "${job} / ${instance} · ") {
+			t.Errorf("%s legend does not identify the selected bridge endpoint", targetLocation)
+		}
 		if target.Instant == target.Range {
 			t.Errorf("%s must select exactly one of instant or range", targetLocation)
 		}
@@ -424,8 +571,8 @@ func validateDashboardPanelSemantics(t *testing.T, panel *grafanaPanel, location
 			"omada_site_to_site_vpn_peer_login_timestamp",
 			"clamp_min(time() - (",
 			"> 0",
-			"unless on (job, instance, site, site_id, name, vpn_type)",
-			"max by (job, instance, site, site_id, vpn_id, name, vpn_type)",
+			"unless on (job, instance, bridge_id, site, site_id, name, vpn_type)",
+			"max by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type)",
 		} {
 			if !strings.Contains(expression, fragment) {
 				t.Errorf("%s query does not contain required fallback fragment %q", location, fragment)
@@ -579,11 +726,28 @@ func validatePromQLContract(t *testing.T, location, expression, legend string, c
 
 func validateDashboardQueryScope(t *testing.T, location, expression string, contract map[string]map[string]struct{}) {
 	t.Helper()
+	for _, match := range groupByPattern.FindAllStringSubmatch(expression, -1) {
+		for _, source := range []string{"job", "instance", "bridge_id", "site", "site_id"} {
+			if !slices.Contains(commaSeparated(match[2]), source) {
+				t.Errorf("%s aggregation drops source identity %s", location, source)
+			}
+		}
+	}
+	for _, match := range vectorMatchPattern.FindAllStringSubmatch(expression, -1) {
+		for _, source := range []string{"job", "instance", "bridge_id", "site", "site_id"} {
+			if !slices.Contains(commaSeparated(match[1]), source) {
+				t.Errorf("%s vector match crosses source identity %s", location, source)
+			}
+		}
+	}
 	for _, selector := range prometheusSelectors(expression) {
-		for _, matcher := range []string{`job=~"$job"`, `instance=~"$instance"`} {
+		for _, matcher := range []string{`job=~"${job:regex}"`, `instance=~"${instance:regex}"`} {
 			if !strings.Contains(selector.matchers, matcher) {
 				t.Errorf("%s selector for %s is missing %s", location, selector.metric, matcher)
 			}
+		}
+		if strings.Contains(selector.matchers, "bridge_id") {
+			t.Errorf("%s requires bridge_id and can exclude legacy history", location)
 		}
 		if labels, ok := contract[selector.metric]; ok {
 			if _, hasSite := labels["site"]; hasSite && !strings.Contains(selector.matchers, `site=~"${Site:regex}"`) {

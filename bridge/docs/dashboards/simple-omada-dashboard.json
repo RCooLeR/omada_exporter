@@ -21,7 +21,7 @@
       }
     ]
   },
-  "description": "Focused TP-Link Omada health and traffic dashboard for the current omada_exporter metrics.",
+  "description": "Focused TP-Link Omada health and traffic dashboard for the current omada_exporter metrics. Select exactly one scrape job and bridge endpoint; legacy unlabelled series remain supported.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -108,10 +108,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_status=~\"^Connected.*$\"}) or vector(0)",
+          "expr": "count(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_status=~\"^Connected.*$\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Online",
+          "legendFormat": "${job} / ${instance} · Online",
           "range": false,
           "refId": "A"
         }
@@ -185,10 +185,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_status!~\"^Connected.*$\"}) or vector(0)",
+          "expr": "count(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_status!~\"^Connected.*$\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Not online",
+          "legendFormat": "${job} / ${instance} · Not online",
           "range": false,
           "refId": "A"
         }
@@ -258,10 +258,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_client_connected_total{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "sum(omada_client_connected_total{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Clients",
+          "legendFormat": "${job} / ${instance} · Clients",
           "range": false,
           "refId": "A"
         }
@@ -335,10 +335,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_site_alert_num{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "sum(omada_site_alert_num{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Alerts",
+          "legendFormat": "${job} / ${instance} · Alerts",
           "range": false,
           "refId": "A"
         }
@@ -412,10 +412,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(sum(omada_device_need_upgrade{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)) + (sum(omada_controller_upgrade_available{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0))",
+          "expr": "(sum(omada_device_need_upgrade{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)) + (sum(omada_controller_upgrade_available{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0))",
           "instant": true,
           "interval": "",
-          "legendFormat": "Upgrades",
+          "legendFormat": "${job} / ${instance} · Upgrades",
           "range": false,
           "refId": "A"
         }
@@ -489,10 +489,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_collector_last_scrape_completed{job=~\"$job\",instance=~\"$instance\"} == 0) or vector(0)",
+          "expr": "sum(omada_collector_last_scrape_completed{job=~\"${job:regex}\",instance=~\"${instance:regex}\"} == 0) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Failed",
+          "legendFormat": "${job} / ${instance} · Failed",
           "range": false,
           "refId": "A"
         }
@@ -603,10 +603,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "Download",
+          "legendFormat": "${job} / ${instance} · Download",
           "range": true,
           "refId": "A"
         },
@@ -617,10 +617,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "Upload",
+          "legendFormat": "${job} / ${instance} · Upload",
           "range": true,
           "refId": "B"
         }
@@ -718,10 +718,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, device_name, device_mac, port, name) (omada_wan_rx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) * 8000",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_rx_rate{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) * 8000",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{site}} · {{device_name}} · {{name}} RX",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{device_name}} · {{name}} RX",
           "range": true,
           "refId": "A"
         },
@@ -732,10 +732,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, device_name, device_mac, port, name) (omada_wan_tx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) * 8000",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_tx_rate{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) * 8000",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{site}} · {{device_name}} · {{name}} TX",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{device_name}} · {{name}} TX",
           "range": true,
           "refId": "B"
         }
@@ -812,10 +812,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
+          "expr": "topk(10, sum by (job, instance, bridge_id, site, site_id, name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
           "instant": true,
           "interval": "1m",
-          "legendFormat": "{{name}} · {{mac}}",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{mac}}",
           "range": false,
           "refId": "A"
         }
@@ -892,10 +892,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count by (device_status) (omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "count by (job, instance, bridge_id, site, site_id, device_status) (omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_status}}",
+          "legendFormat": "${job} / ${instance} · {{device_status}}",
           "range": false,
           "refId": "A"
         }
@@ -1001,10 +1001,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, device_model) (omada_device_cpu_percentage{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_cpu_percentage{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_model}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{device_model}}",
           "range": false,
           "refId": "A"
         }
@@ -1090,10 +1090,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, device_model) (omada_device_mem_percentage{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_mem_percentage{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_model}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{device_model}}",
           "range": false,
           "refId": "A"
         }
@@ -1178,10 +1178,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name) (omada_wan_latency{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_latency{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -1251,10 +1251,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_port_power_watts{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "sum(omada_port_power_watts{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Draw",
+          "legendFormat": "${job} / ${instance} · Draw",
           "range": false,
           "refId": "A"
         }
@@ -1333,10 +1333,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "100 * sum(omada_controller_storage_used_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) / clamp_min(sum(omada_controller_storage_total_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}), 1)",
+          "expr": "100 * sum(omada_controller_storage_used_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) / clamp_min(sum(omada_controller_storage_total_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}), 1)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Used",
+          "legendFormat": "${job} / ${instance} · Used",
           "range": false,
           "refId": "A"
         }
@@ -1427,10 +1427,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name) (omada_wan_internet_state{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_internet_state{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -1462,19 +1462,16 @@
         "type": "datasource"
       },
       {
-        "allValue": ".+",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "$datasource"
         },
         "definition": "label_values(omada_device_uptime_seconds, job)",
-        "includeAll": true,
-        "label": "Job",
-        "multi": true,
+        "description": "Select one scrape job. Sources are never combined automatically.",
+        "includeAll": false,
+        "label": "Scrape job",
+        "multi": false,
         "name": "job",
         "options": [],
         "query": {
@@ -1490,26 +1487,23 @@
         "type": "query"
       },
       {
-        "allValue": ".+",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\"}, instance)",
-        "includeAll": true,
-        "label": "Instance",
-        "multi": true,
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\"}, instance)",
+        "description": "Select one unique exporter endpoint. Legacy series without bridge_id remain supported.",
+        "includeAll": false,
+        "label": "Bridge endpoint",
+        "multi": false,
         "name": "instance",
         "options": [],
         "query": {
           "label": "instance",
-          "metric": "omada_device_uptime_seconds{job=~\"$job\"}",
+          "metric": "omada_device_uptime_seconds{job=~\"${job:regex}\"}",
           "qryType": 1,
-          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\"}, instance)",
+          "query": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\"}, instance)",
           "refId": "PrometheusVariableQueryEditor-Instance"
         },
         "refresh": 2,
@@ -1527,7 +1521,7 @@
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}, site)",
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}, site)",
         "includeAll": true,
         "label": "Site",
         "multi": true,
@@ -1535,9 +1529,9 @@
         "options": [],
         "query": {
           "label": "site",
-          "metric": "omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}",
+          "metric": "omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}",
           "qryType": 1,
-          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}, site)",
+          "query": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}, site)",
           "refId": "PrometheusVariableQueryEditor-Site"
         },
         "refresh": 2,
@@ -1575,6 +1569,6 @@
   "timezone": "browser",
   "title": "Simple Omada dashboard",
   "uid": "ad5dtmf",
-  "version": 8,
+  "version": 9,
   "weekStart": ""
 }

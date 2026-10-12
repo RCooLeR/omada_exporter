@@ -63,6 +63,9 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	if conf == nil {
 		return fmt.Errorf("exporter configuration is nil")
 	}
+	if err := config.ValidateBridgeID(conf.BridgeID); err != nil {
+		return err
+	}
 	if conf.DumpResponsesOnly && strings.TrimSpace(conf.DumpResponsesDir) == "" {
 		return fmt.Errorf("dump-responses-only requires dump-responses-dir")
 	}
@@ -110,14 +113,15 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	}
 	mux := http.NewServeMux()
 	health := &healthState{}
-	registry, err := newExporterRegistry(conf.GoCollectorDisabled, conf.ProcessCollectorDisabled)
+	registry, err := newExporterRegistry(conf.GoCollectorDisabled, conf.ProcessCollectorDisabled, conf.BridgeID)
 	if err != nil {
 		return err
 	}
 
 	collectors := initCollectors(client)
+	registerer := bridgeRegisterer(registry, conf.BridgeID)
 	collectorHealth := newCollectorHealth()
-	if err := registry.Register(collectorHealth); err != nil {
+	if err := registerer.Register(collectorHealth); err != nil {
 		return fmt.Errorf("register collector health metrics: %w", err)
 	}
 
@@ -125,15 +129,16 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	for name, c := range collectors {
 		instrumented := newInstrumentedCollector(name, c, collectorHealth)
 		collectors[name] = instrumented
-		if err := registry.Register(instrumented); err != nil {
+		if err := registerer.Register(instrumented); err != nil {
 			return fmt.Errorf("register %s collector: %w", name, err)
 		}
 
 		collectorRegistry := prometheus.NewRegistry()
-		if err := collectorRegistry.Register(instrumented); err != nil {
+		collectorRegisterer := bridgeRegisterer(collectorRegistry, conf.BridgeID)
+		if err := collectorRegisterer.Register(instrumented); err != nil {
 			return fmt.Errorf("register %s collector endpoint: %w", name, err)
 		}
-		mux.Handle(fmt.Sprintf("/metrics/%s", name), newMetricsHandler(collectorRegistry, collectorRegistry))
+		mux.Handle(fmt.Sprintf("/metrics/%s", name), newMetricsHandler(collectorRegistry, collectorRegisterer))
 	}
 
 	var publisherDone <-chan struct{}
@@ -158,6 +163,9 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 		insightsLink = `<p>
 				<a href="/metrics/insights">Insights Metrics</a>
 			</p>`
+	}
+	if conf.TrackNetworkQualityMetrics {
+		insightsLink += `<p><a href="/metrics/network-quality">Network Quality Metrics</a></p>`
 	}
 
 	mux.HandleFunc("/healthz", health.livez)
@@ -205,8 +213,8 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
     </html>`, insightsLink)))
 	})
 
-	metricsHandler := newMetricsHandler(registry, registry)
-	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(registry, metricsHandler))
+	metricsHandler := newMetricsHandler(registry, registerer)
+	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(registerer, metricsHandler))
 	health.ready.Store(true)
 
 	server := newExporterHTTPServer(fmt.Sprintf(":%s", conf.Port), mux)
@@ -238,19 +246,32 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	}
 }
 
-func newExporterRegistry(goCollectorDisabled, processCollectorDisabled bool) (*prometheus.Registry, error) {
+func newExporterRegistry(goCollectorDisabled, processCollectorDisabled bool, bridgeID string) (*prometheus.Registry, error) {
+	if err := config.ValidateBridgeID(bridgeID); err != nil {
+		return nil, err
+	}
 	registry := prometheus.NewRegistry()
+	registerer := bridgeRegisterer(registry, bridgeID)
 	if !goCollectorDisabled {
-		if err := registry.Register(collectors.NewGoCollector()); err != nil {
+		if err := registerer.Register(collectors.NewGoCollector()); err != nil {
 			return nil, fmt.Errorf("register Go collector: %w", err)
 		}
 	}
 	if !processCollectorDisabled {
-		if err := registry.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})); err != nil {
+		if err := registerer.Register(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{})); err != nil {
 			return nil, fmt.Errorf("register process collector: %w", err)
 		}
 	}
 	return registry, nil
+}
+
+// bridgeRegisterer isolates all exported metric families, including collector
+// health and HTTP instrumentation, while leaving legacy label sets unchanged.
+func bridgeRegisterer(registerer prometheus.Registerer, bridgeID string) prometheus.Registerer {
+	if bridgeID == "" {
+		return registerer
+	}
+	return prometheus.WrapRegistererWith(prometheus.Labels{"bridge_id": bridgeID}, registerer)
 }
 
 func newMetricsHandler(gatherer prometheus.Gatherer, registerer prometheus.Registerer) http.Handler {

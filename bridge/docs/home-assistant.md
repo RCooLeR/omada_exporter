@@ -33,6 +33,56 @@ If the broker does not require authentication, omit `OMADA_MQTT_USER` and `OMADA
 
 If the MQTT broker is unavailable when OmadaBridge starts, the exporter still starts and Prometheus endpoints remain available. MQTT publishing retries in the background until the broker is reachable.
 
+## Multiple bridges on one MQTT broker and Home Assistant
+
+Leave `OMADA_BRIDGE_ID` unset on an existing installation to retain its MQTT
+topics, discovery identifiers, Home Assistant entities, history and automations.
+Give every additional bridge a permanent, unique ID, for example:
+
+```yaml
+environment:
+  OMADA_BRIDGE_ID: "slobidska44"
+  OMADA_MQTT_ENABLED: "true"
+  OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"
+```
+
+The ID is added automatically; do not also append it to the configured MQTT
+prefix/client ID. With the default MQTT settings the effective values are:
+
+| Resource | Existing bridge (no ID) | Apartment (`slobidska44`) |
+| --- | --- | --- |
+| MQTT client ID | `omada_exporter` | `omada_exporter_slobidska44` |
+| State prefix | `omada_exporter` | `omada_exporter_slobidska44` |
+| Availability | `omada_exporter/status` | `omada_exporter_slobidska44/status` |
+| Discovery node | `omada_exporter` | `omada_exporter_slobidska44` |
+| Discovery root | `homeassistant` | `homeassistant` |
+| JSON `bridge_id` attribute | absent | `slobidska44` |
+
+Custom state prefixes and MQTT client IDs are also suffixed with `_<bridge_id>`.
+For example, `my/omada` becomes `my/omada_slobidska44`, not
+`my/omada/slobidska44`. The discovery root stays unchanged so Home Assistant
+can discover every bridge. Keep effective prefixes/client IDs unique; do not
+manually configure one installation to use another's effective namespace.
+
+Metric entities include the bridge ID in their identity. Named bridges also
+scope Home Assistant device identifiers and client trackers by bridge and site,
+so the same phone, MAC address, VPN name or controller-provided site ID can
+exist independently at both locations. Presence means “connected at this
+bridge's site”: a phone may correctly be `home` at one location and `not_home`
+at the other. A disconnect/restart affects only that bridge's availability.
+
+State/derived metric payloads and online, configured-offline and recovered
+trackers all carry `bridge_id`. Retained startup recovery and duplicate cleanup
+are limited to the bridge's own topic namespace and identity; a named bridge
+does not adopt or delete the legacy bridge's retained entities.
+
+Do not rename an ID once deployed unless you intend to create a separate set
+of entities. Setting an ID on the existing bridge is not an automatic migration
+and does not remove its previous retained records. The default card selection
+without `bridge_id` is the legacy installation; set `bridge_id: slobidska44` in
+each apartment card. See [Home Assistant cards](../../ha-cards/README.md) for
+the card configuration.
+
 ## MQTT Topics
 
 Default prefixes:
