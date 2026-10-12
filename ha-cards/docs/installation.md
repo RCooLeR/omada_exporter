@@ -4,7 +4,7 @@ The cards are built with Vite and Lit. Build them locally, copy the output to Ho
 
 ## Build
 
-Use Node.js 22.12 or newer (Node.js 24 LTS is recommended) and npm 11. From `ha-cards/`:
+Use Node.js 22.22.2+, 24.15.0+, or 26+ (Node.js 24 LTS is recommended) and npm 12.2.0. From `ha-cards/`:
 
 ```bash
 npm ci
