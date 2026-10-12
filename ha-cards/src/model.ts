@@ -144,11 +144,6 @@ function isActiveClientTracker(entity: HassEntity): boolean {
   return isClientTrackerEntity(entity) && entity.state.trim().toLowerCase() === "home";
 }
 
-function isControllerEntity(entity: HassEntity): boolean {
-  const deviceType = firstString(entity, "device_type", "device_model", "device_show_model").toLowerCase();
-  return deviceType.includes("controller") || getMetric(entity).startsWith("omada_controller_");
-}
-
 function looksLikeClientEntity(entity: HassEntity): boolean {
   if (attrString(entity, "mac") === "") {
     return false;
@@ -956,14 +951,9 @@ export function buildDashboardModel(hass: HomeAssistant, filter?: string | Dashb
         setLatestMetric(device, metric, value, entity);
         continue;
       }
-      // Older exports can make controller client-like metrics look similar to
-      // real client metrics. If the labels say "controller", keep the data on
-      // the controller device row instead of showing a fake client.
-      if (isControllerEntity(entity)) {
-        const controller = ensureControllerDevice(devices, entity, false);
-        setLatestMetric(controller, metric, value, entity);
-        continue;
-      }
+      // Client classifications are descriptive, not infrastructure identity.
+      // Only the scoped MAC lookup above can identify a real controller;
+      // retained client metrics must still pass the active-tracker check.
       const activeTracker = clientTrackerByMac.get(mac);
       if (!activeTracker || !isActiveClientTracker(activeTracker)) {
         continue;
