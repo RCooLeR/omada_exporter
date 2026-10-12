@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+### Fixed
+- Stop promoting historical clients classified as "Omada Controller" into connected controller rows in Home Assistant; identify infrastructure by scoped device metrics and require active client presence for other client data.
+
 ## [2.4.2] - 2026-10-12
 
 ### Added
