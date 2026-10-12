@@ -12,13 +12,23 @@ Metric entities must include:
 attributes.metric = omada_...
 ```
 
-The optional card `site` setting filters by:
+Before grouping, both cards select exactly one source using the optional
+`bridge_id` card setting and `attributes.bridge_id`. Omitted/empty `bridge_id`
+means **legacy entities only** (missing or empty attribute), not all bridges.
+For example, `bridge_id: slobidska44` selects only apartment entities and never
+uses legacy trackers, availability, DPI, or quality data as a fallback.
+
+The optional card `site` setting filters the selected bridge by:
 
 ```text
 attributes.site
 ```
 
-If an entity has no `site` attribute, it is still allowed through the filter so site-level or incomplete entities can remain visible.
+Only legacy cards allow an entity without `site` through this name filter,
+preserving compatibility with older payloads. An optional `site_id` setting
+matches `attributes.site_id` exactly and excludes missing IDs. Caches and update
+detection use all three scope fields, so updates to another bridge do not
+rebuild this card's model.
 
 ## Device Records
 
@@ -39,13 +49,13 @@ device_status, device_ip, device_version, site
 Ports are attached to devices by:
 
 ```text
-device_mac + port
+bridge_id + site_id (or site) + device_mac + port
 ```
 
 Radio rows are attached by:
 
 ```text
-device_mac + band/radio labels
+bridge_id + site_id (or site) + device_mac + band/radio labels
 ```
 
 ## Client Records
@@ -54,7 +64,9 @@ Client rows require a `device_tracker` entity with a `mac` attribute whose
 current state is exactly `home`. Metric entities starting with
 `omada_client_` enrich those active rows with traffic, signal, and attachment
 data. Retained metric entities never create a client by themselves, so clients
-that are `not_home`, unavailable, or missing a tracker are not shown.
+that are `not_home`, unavailable, or missing a tracker are not shown. Tracker
+presence is matched within the selected bridge and site: an apartment's newer
+`not_home` state cannot suppress a phone currently `home` on the legacy bridge.
 
 Important attributes:
 
@@ -67,7 +79,7 @@ ssid, vlan_id, wifi_mode, site
 
 Wired client path data references port and LAG metrics when `switch_mac` or
 `gateway_mac` plus `port` or `lag_id` match an existing
-parent port/LAG record. The card copies only attachment display values such as
+parent port/LAG record in the same bridge and site. The card copies only attachment display values such as
 link speed and LAG member ports; switch-owned LAG attributes and metrics remain
 on the switch.
 
@@ -85,7 +97,10 @@ WAN rows use:
 omada_wan_
 ```
 
-The card attempts to match WAN rows to ISP rows by WAN name or port, then uses WAN details such as latency, link speed, and RX/TX rate in the ISP table.
+The card matches WAN rows to ISP rows by WAN name or port **within the same
+bridge, site, and owning gateway** (`device_mac`/`gateway_mac`). Ambiguous or
+unscoped matches are not borrowed from another gateway. WAN details such as
+latency, link speed, and RX/TX rate then enrich the ISP table.
 
 VPN rows use:
 
@@ -93,7 +108,7 @@ VPN rows use:
 omada_vpn_
 ```
 
-The row key prefers:
+Within the bridge, site and owning device, the row key prefers:
 
 ```text
 name + vpn_mode + vpn_type
@@ -116,12 +131,34 @@ Rows use `site_id` (falling back to `site`), `family_id` / `family_name`, and `a
 
 The chip appears only when there is a valid non-negative traffic value, including zero. A query-window sensor alone is not evidence of traffic availability. No controller credentials or direct HTTP requests are required by the card.
 
+## Device Network Quality
+
+The network card attaches optional quality data to existing devices by normalized MAC and site, without creating extra devices, radios or WAN rows:
+
+```text
+omada_ap_interference_percentage                          (radio_band)
+omada_ap_uplink_packets_total                            (direction)
+omada_ap_uplink_dropped_packets_total                    (direction)
+omada_ap_uplink_error_packets_total                      (direction)
+omada_gateway_wan_quality_latency_average_seconds
+omada_gateway_wan_quality_jitter_average_seconds
+omada_gateway_wan_quality_packet_loss_average_percentage
+omada_gateway_wan_quality_mos_average
+omada_gateway_wan_quality_window_seconds
+omada_network_quality_available                         (source)
+omada_network_quality_scrape_success                    (source)
+```
+
+`radio_band` distinguishes `2.4`, `5`, `5-2` and `6`; `direction` distinguishes `up` and `down`. Source availability and the publisher's snapshot timestamps prevent old retained counters from appearing as current after a failed or unsupported query. Offline devices suppress previous quality values. Wireless-backhaul APs can show radio interference, but not wired-uplink counters. Quality sensors never replace the device's richer metadata.
+
 ## Required Bridge Behavior
 
 The default OmadaBridge MQTT publisher provides the attributes the cards expect. Avoid stripping JSON attributes from MQTT discovery configs. If Home Assistant entities exist but the card stays empty, inspect one entity in Developer Tools and confirm:
 
-- it has `attributes.metric`
+- metric sensors have `attributes.metric` (trackers instead have `attributes.mac`)
+- its `attributes.bridge_id` exactly matches the card setting; omit the setting for legacy entities
 - it has a matching `attributes.site` or the card `site` option is removed
+- its `attributes.site_id` matches when the card specifies `site_id`
 - client entities have `attributes.mac`
 - device entities have `attributes.device_mac`
 

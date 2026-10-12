@@ -19,6 +19,7 @@ The root `/metrics` endpoint contains every enabled collector. Per-collector end
 ```
 
 When optional DPI insight metrics are enabled, `/metrics/insights` is also registered.
+When optional network-quality metrics are enabled, `/metrics/network-quality` is also registered. See [network quality](./network-quality.md) for availability, units, and example queries.
 
 ## Protocol And Scrape Controls
 
@@ -46,6 +47,61 @@ scrape_configs:
 
 Use the hostname or IP address reachable from Prometheus. If Prometheus runs outside Docker, the target may be `HOST_IP:9202`.
 
+## Multiple Bridges
+
+Leave the existing scrape job, target labels and unlabelled history unchanged.
+Configure the additional bridge with `OMADA_BRIDGE_ID=slobidska44` (or
+`--bridge-id slobidska44`). Every metric it exports includes
+`bridge_id="slobidska44"`, including collector health metrics. A bridge with an
+empty/unset ID does not add the label, preserving the legacy label set.
+
+Add a distinct scrape job for the apartment; this example assumes Prometheus
+can resolve the `omada-appt` service on the same Docker network:
+
+```yaml
+scrape_configs:
+  # Keep the existing bridge job here unchanged.
+  - job_name: omada-appt
+    scrape_interval: 30s
+    scrape_timeout: 30s
+    static_configs:
+      - targets: ["omada-appt:9040"]
+```
+
+No static `bridge_id` target label is needed: the exporter already provides
+it. Keep each exporter at a unique `(job, instance)` pair. If a reverse proxy
+serves both exporters on the same host/port under different paths, use
+separate jobs or unique `instance` labels; do not scrape the same exporter
+twice under different identities.
+
+For custom queries spanning sources, preserve `job`, `instance`, `bridge_id`,
+`site` and `site_id` in aggregation and matching, together with the relevant
+device/client/WAN identity. For example, connected clients by source/site:
+
+```promql
+sum by (job, instance, bridge_id, site, site_id) (
+  omada_client_connected_total
+)
+```
+
+Alternatively, filter one source explicitly before calculating a total:
+
+```promql
+sum(omada_client_connected_total{job="omada-appt",instance="omada-appt:9040",bridge_id="slobidska44"})
+```
+
+Do not aggregate solely by a device name, MAC or site name across controllers:
+these values can legitimately be identical. For the old source, filter its
+existing `job`/`instance`; `bridge_id=""` also matches an absent label, but is
+not enough to distinguish multiple legacy exporters on its own.
+
+Reimport the [updated sample Grafana dashboards](./dashboards/README.md).
+Their **Scrape job** and **Bridge endpoint** selectors choose one source and
+have no **All** option. Site/device **All** stays within that source. The old
+unlabelled source remains selectable without relabelling historical samples;
+select `omada-appt` and `omada-appt:9040` for the apartment. Aggregations and
+device drill-downs retain source identity.
+
 ## Collector Controls
 
 | Variable | Default | Effect |
@@ -53,6 +109,8 @@ Use the hostname or IP address reachable from Prometheus. If Prometheus runs out
 | `OMADA_TRACK_PORT_METRICS` | `true` | Disable to suppress per-port metrics. |
 | `OMADA_TRACK_CLIENT_METRICS` | `true` | Disable to suppress per-client metrics while keeping `omada_client_connected_total`. |
 | `OMADA_TRACK_INSIGHT_METRICS` | `false` | Enable optional DPI insight metrics from Omada Web API. |
+| `OMADA_TRACK_NETWORK_QUALITY_METRICS` | `false` | Enable AP wired-uplink packet counters and gateway WAN quality from OpenAPI. |
+| `OMADA_NETWORK_QUALITY_WINDOW_SECONDS` | `86400` | Rolling window for gateway WAN quality averages, not AP packet counters. |
 | `OMADA_INSIGHT_WINDOW_SECONDS` | `86400` | Query window for DPI insight metrics. |
 | `OMADA_INSIGHT_APPLICATION_LIMIT` | `50` | Maximum DPI application series to export. Set `0` to disable application metrics. |
 | `OMADA_INCLUDE_PORT_ACTIVITY_LABEL` | `true` | Disable to reduce label churn from Omada port activity text. |
@@ -109,6 +167,17 @@ OmadaBridge wraps each Omada collector with a small layer of scrape-health metri
 | `omada_device_5g2_rx_util` | 5 GHz-2 RX utilization. | AP radio labels, device labels, site, site_id |
 | `omada_device_6g_tx_util` | 6 GHz TX utilization. | AP radio labels, device labels, site, site_id |
 | `omada_device_6g_rx_util` | 6 GHz RX utilization. | AP radio labels, device labels, site, site_id |
+| `omada_ap_interference_percentage` | Current radio interference, 0–100%; absent/invalid/offline readings omitted. No extra API calls. | device_mac, device_name, device_type, site, site_id, radio_band |
+| `omada_ap_uplink_packets_total` | Controller-reported cumulative wired-uplink packets; may reset. Optional network-quality collector. | device_mac, device_name, device_type, site, site_id, direction |
+| `omada_ap_uplink_dropped_packets_total` | Controller-reported cumulative wired-uplink dropped packets; may reset. | Same as AP uplink packets |
+| `omada_ap_uplink_error_packets_total` | Controller-reported cumulative wired-uplink error packets; may reset. | Same as AP uplink packets |
+| `omada_gateway_wan_quality_latency_average_seconds` | Gateway-wide rolling-window average WAN latency, converted from milliseconds. | device_mac, device_name, device_type, site, site_id |
+| `omada_gateway_wan_quality_jitter_average_seconds` | Gateway-wide rolling-window average WAN jitter, converted from milliseconds. | Same as WAN quality latency |
+| `omada_gateway_wan_quality_packet_loss_average_percentage` | Gateway-wide rolling-window average WAN loss percentage. | Same as WAN quality latency |
+| `omada_gateway_wan_quality_mos_average` | Gateway-wide rolling-window mean opinion score. | Same as WAN quality latency |
+| `omada_gateway_wan_quality_window_seconds` | Window used for available WAN quality measurements. | Same as WAN quality latency |
+| `omada_network_quality_scrape_success` | Success of each attempted inventory/AP uplink/WAN quality query; successful empty responses are not proof of available measurements. | device_mac, device_name, device_type, site, site_id, source |
+| `omada_network_quality_available` | At least one valid measurement is available for a device/source; zero for offline, wireless AP uplinks, empty, unsupported or failed queries. | Same as network quality scrape success |
 | `omada_port_link_status` | Port link status. | device labels, port, max_speed, name, type, operation, link_status, link_speed, poe, port_activity_label |
 | `omada_port_power_watts` | Current PoE usage for a port. | device labels, port labels |
 | `omada_port_link_speed_mbps` | Port link speed in Mbit/s. | device labels, port labels |
@@ -186,10 +255,10 @@ and Wi-Fi-mode labels.
 
 ## Query Examples
 
-Connected clients:
+Connected clients (preserving bridge and site identity):
 
 ```promql
-sum(omada_client_connected_total)
+sum by (job, instance, bridge_id, site, site_id) (omada_client_connected_total)
 ```
 
 Offline Omada devices:
@@ -201,7 +270,7 @@ omada_device_uptime_seconds unless omada_device_uptime_seconds > 0
 Ports with active links:
 
 ```promql
-sum by (device_name) (omada_port_link_status == 1)
+sum by (job, instance, bridge_id, site, site_id, device_mac, device_name) (omada_port_link_status == 1)
 ```
 
 Devices needing firmware updates:

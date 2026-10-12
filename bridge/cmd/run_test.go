@@ -55,7 +55,7 @@ func TestNewExporterHTTPServerAppliesLimits(t *testing.T) {
 
 func TestNewExporterRegistryIsIndependentAndConfigurable(t *testing.T) {
 	for range 2 {
-		registry, err := newExporterRegistry(false, false)
+		registry, err := newExporterRegistry(false, false, "")
 		if err != nil {
 			t.Fatalf("newExporterRegistry() error = %v", err)
 		}
@@ -71,7 +71,7 @@ func TestNewExporterRegistryIsIndependentAndConfigurable(t *testing.T) {
 		}
 	}
 
-	disabled, err := newExporterRegistry(true, true)
+	disabled, err := newExporterRegistry(true, true, "")
 	if err != nil {
 		t.Fatalf("newExporterRegistry(disabled) error = %v", err)
 	}

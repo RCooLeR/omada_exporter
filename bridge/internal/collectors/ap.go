@@ -3,6 +3,7 @@ package collector
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
@@ -10,6 +11,19 @@ import (
 
 // collectAccessPoint emits metrics for the access point.
 func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *model.AccessPoint, siteID string) error {
+	if strings.HasPrefix(ap.GetStatus(), "Connected") {
+		for _, band := range []struct {
+			name  string
+			radio *model.Radio
+		}{
+			{"2.4", ap.Wp2GHz}, {"5", ap.Wp5GHz}, {"5-2", ap.Wp5GHz_2}, {"6", ap.Wp6GHz},
+		} {
+			if band.radio != nil && validQualityValue(band.radio.InterUtilization, 100) {
+				ch <- prometheus.MustNewConstMetric(c.omadaRadioInterference, prometheus.GaugeValue,
+					*band.radio.InterUtilization, ap.GetMac(), ap.GetName(), ap.GetType(), c.webClient.Config.Site, siteID, band.name)
+			}
+		}
+	}
 	deviceLabels := []string{
 		ap.GetMac(),
 		ap.GetType(),

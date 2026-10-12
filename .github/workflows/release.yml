@@ -46,6 +46,38 @@ jobs:
           go-version-file: bridge/go.mod
           cache-dependency-path: bridge/go.sum
 
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ha-cards/package-lock.json
+
+      - name: Set up pinned npm
+        run: |
+          npm install --global "$(node -p 'require("./ha-cards/package.json").packageManager')"
+          npm --version
+
+      - name: Validate and build Home Assistant release bundle
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run typecheck
+          npm test
+          npm run build
+          test -s dist/omada-network-card.js
+        working-directory: ha-cards
+
+      - name: Validate Grafana release dashboards
+        run: |
+          go generate ./docs/dashboards
+          git diff --exit-code -- docs/dashboards/*.json
+          go test ./cmd -run '^TestGrafanaDashboards' -count=1
+          for dashboard in dashboard.json omada-device-details.json simple-omada-dashboard.json; do
+            test -s "docs/dashboards/${dashboard}"
+          done
+        working-directory: bridge
+
       - name: Smoke test release image
         run: |
           smoke_dir="${RUNNER_TEMP}/omada-exporter-smoke/linux/amd64"
@@ -56,12 +88,14 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
-          version: v2.18.0
+          version: v2.18.3
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -13,8 +13,8 @@ import (
 
 const (
 	datasourceUID    = "$datasource"
-	jobVariable      = "$job"
-	instanceVariable = "$instance"
+	jobVariable      = "${job:regex}"
+	instanceVariable = "${instance:regex}"
 	siteVariable     = "$" + "{Site:regex}"
 	deviceVariable   = "$" + "{Device:regex}"
 	rateInterval     = "$__rate_interval"
@@ -95,123 +95,123 @@ func fullDashboard() object {
 	b.stat("Slowest collector", "Current duration of the slowest collector scrape.", 16, 5, 4, 4, "s", object{"min": 0}, nil, durationThresholds(),
 		instant("max(omada_collector_last_scrape_duration_seconds{"+target+"}) or vector(0)", "Duration"))
 	b.stat("Site-to-site peers", "Total configured peers across site-to-site VPN tunnels.", 20, 5, 4, 4, "short", object{"min": 0}, nil, healthyThresholds(),
-		instant("sum(max by (site, vpn_id, tunnel_id, name) (omada_site_to_site_vpn_total_peers{"+site+"})) or vector(0)", "Peers"))
+		instant("sum(max by (job, instance, bridge_id, site, site_id, vpn_id, tunnel_id, name) (omada_site_to_site_vpn_total_peers{"+site+"})) or vector(0)", "Peers"))
 
 	b.row("Traffic", 9)
 	b.timeseries("Client throughput", "Aggregate client counter rate. Grafana's adaptive rate interval prevents gaps when the dashboard range changes.", 0, 10, 12, 8, "bps", object{"min": 0},
 		rateQuery("sum(rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"])) * 8", "Download"),
 		rateQuery("sum(rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8", "Upload"))
 	b.barGauge("Top clients by throughput", "Ten busiest clients by combined upload and download counter rate.", 12, 10, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
-		rateInstant("topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
+		rateInstant("topk(10, sum by (job, instance, bridge_id, site, site_id, name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
 	b.timeseries("Device traffic", "Traffic counters grouped by current device labels.", 0, 18, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (device_name, device_mac) (rate(omada_device_download{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} download"),
-		rateQuery("sum by (device_name, device_mac) (rate(omada_device_upload{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} upload"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac) (rate(omada_device_download{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} download"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac) (rate(omada_device_upload{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} upload"))
 	b.barGauge("Wireless client link rates", "Current negotiated Wi-Fi link rates; these are link capabilities rather than measured throughput.", 12, 18, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
-		instant("topk(10, max by (name, mac, ssid) (omada_client_rx_rate{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} RX"),
-		instant("topk(10, max by (name, mac, ssid) (omada_client_tx_rate{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} TX"))
+		instant("topk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_rx_rate{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} RX"),
+		instant("topk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_tx_rate{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} TX"))
 
 	b.row("Device and Wi-Fi health", 26)
 	b.timeseries("Device CPU", "CPU utilization grouped by stable device identity.", 0, 27, 8, 8, "percent", object{"min": 0, "max": 100},
-		rangeQuery("max by (site, device_name, device_mac, device_model) (omada_device_cpu_percentage{"+device+"})", "{{device_name}} · {{device_model}}"))
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_cpu_percentage{"+device+"})", "{{device_name}} · {{device_model}}"))
 	b.timeseries("Device memory", "Memory utilization grouped by stable device identity.", 8, 27, 8, 8, "percent", object{"min": 0, "max": 100},
-		rangeQuery("max by (site, device_name, device_mac, device_model) (omada_device_mem_percentage{"+device+"})", "{{device_name}} · {{device_model}}"))
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_mem_percentage{"+device+"})", "{{device_name}} · {{device_model}}"))
 	b.timeseries("Device temperature", "Temperature reported by supported gateways and switches.", 16, 27, 8, 8, "celsius", object{},
-		rangeQuery("max by (site, device_name, device_mac, device_model) (omada_device_temp{"+device+"})", "{{device_name}} · {{device_model}}"))
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_temp{"+device+"})", "{{device_name}} · {{device_model}}"))
 	b.barGauge("Device states", "Current count for every Omada device state. Wireless-backhaul Connected variants remain visible here and count as online above.", 0, 35, 8, 8, "short", object{"min": 0}, nil, healthyThresholds(),
-		instant("count by (device_status) (omada_device_uptime_seconds{"+device+"})", "{{device_status}}"))
+		instant("count by (job, instance, bridge_id, site, site_id, device_status) (omada_device_uptime_seconds{"+device+"})", "{{device_status}}"))
 	deviceUptimePanel := b.barGauge("Device uptime", "Current uptime for each selected device. Select a series to open the portable device drill-down.", 8, 35, 8, 8, "s", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_uptime_seconds{"+device+"})", "{{device_name}} · {{device_mac}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_uptime_seconds{"+device+"})", "{{device_name}} · {{device_mac}}"))
 	addDataLink(deviceUptimePanel, "Open device details", deviceDetailsURL)
 	b.barGauge("Lowest Wi-Fi signal", "Ten lowest client signal-quality readings, useful for finding roaming or coverage problems.", 16, 35, 8, 8, "percent", object{"min": 0, "max": 100}, nil, signalThresholds(),
-		instant("bottomk(10, max by (name, mac, ssid) (omada_client_signal_pct{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}}"))
+		instant("bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_signal_pct{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}}"))
 	b.timeseries("AP radio utilization", "Receive and transmit utilization for every radio band exported by the selected access points.", 0, 43, 12, 8, "percent", object{"min": 0, "max": 100},
-		rangeQuery("max by (device_name, device_mac) (omada_device_2g_rx_util{"+device+"})", "{{device_name}} 2.4 GHz RX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_2g_tx_util{"+device+"})", "{{device_name}} 2.4 GHz TX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_5g_rx_util{"+device+"})", "{{device_name}} 5 GHz RX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_5g_tx_util{"+device+"})", "{{device_name}} 5 GHz TX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_5g2_rx_util{"+device+"})", "{{device_name}} 5 GHz-2 RX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_5g2_tx_util{"+device+"})", "{{device_name}} 5 GHz-2 TX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_6g_rx_util{"+device+"})", "{{device_name}} 6 GHz RX"),
-		rangeQuery("max by (device_name, device_mac) (omada_device_6g_tx_util{"+device+"})", "{{device_name}} 6 GHz TX"))
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_2g_rx_util{"+device+"})", "{{device_name}} 2.4 GHz RX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_2g_tx_util{"+device+"})", "{{device_name}} 2.4 GHz TX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g_rx_util{"+device+"})", "{{device_name}} 5 GHz RX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g_tx_util{"+device+"})", "{{device_name}} 5 GHz TX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g2_rx_util{"+device+"})", "{{device_name}} 5 GHz-2 RX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g2_tx_util{"+device+"})", "{{device_name}} 5 GHz-2 TX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_6g_rx_util{"+device+"})", "{{device_name}} 6 GHz RX"),
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_6g_tx_util{"+device+"})", "{{device_name}} 6 GHz TX"))
 	b.timeseries("Wi-Fi RSSI and SNR", "Signal strength and signal-to-noise readings for the ten weakest wireless clients.", 12, 43, 12, 8, "dBm", object{},
-		rangeQuery("bottomk(10, max by (name, mac, ssid) (omada_client_rssi_dbm{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} RSSI"),
-		rangeQuery("bottomk(10, max by (name, mac, ssid) (omada_client_snr_dbm{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} SNR"))
+		rangeQuery("bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_rssi_dbm{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} RSSI"),
+		rangeQuery("bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_snr_dbm{"+site+",wireless=\"true\"}))", "{{name}} · {{ssid}} SNR"))
 
 	b.row("Switching", 51)
 	b.barGauge("Port link state", "Current link state for ports. Requires OMADA_TRACK_PORT_METRICS.", 0, 52, 8, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Disconnected", "Connected"), binaryThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_port_link_status{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_link_status{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
 	b.barGauge("Port link speed", "Negotiated port link capability in Mbit/s.", 8, 52, 8, 8, "Mbits", object{"min": 0}, linkSpeedMappings(), linkSpeedThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_port_link_speed_mbps{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_link_speed_mbps{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
 	b.barGauge("PoE by port", "Current per-port PoE draw.", 16, 52, 8, 8, "watt", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_port_power_watts{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_power_watts{"+device+"})", "{{device_name}} · port {{port}} {{name}}"))
 	b.timeseries("Port throughput", "Per-port byte counters converted to bit/s with the adaptive rate interval.", 0, 60, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} RX"),
-		rateQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} TX"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (rate(omada_port_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} RX"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (rate(omada_port_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · {{port}} TX"))
 	b.timeseries("LAG throughput", "Link-aggregation byte counters converted to bit/s.", 12, 60, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} RX"),
-		rateQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} TX"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} RX"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} · LAG {{lag_id}} TX"))
 	b.barGauge("LAG link state", "Current state of switch link-aggregation groups.", 0, 68, 8, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Disconnected", "Connected"), binaryThresholds(),
-		instant("max by (device_name, device_mac, lag_id, name) (omada_lag_link_status{"+device+"})", "{{device_name}} · LAG {{lag_id}} {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (omada_lag_link_status{"+device+"})", "{{device_name}} · LAG {{lag_id}} {{name}}"))
 	b.barGauge("LAG link speed", "Aggregate negotiated link speed for each LAG.", 8, 68, 8, 8, "Mbits", object{"min": 0}, linkSpeedMappings(), linkSpeedThresholds(),
-		instant("max by (device_name, device_mac, lag_id, name) (omada_lag_link_speed_mbps{"+device+"})", "{{device_name}} · LAG {{lag_id}} {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (omada_lag_link_speed_mbps{"+device+"})", "{{device_name}} · LAG {{lag_id}} {{name}}"))
 	b.barGauge("PoE remaining", "Remaining PoE budget on switches that report PoE capacity.", 16, 68, 8, 8, "watt", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_poe_remain_watts{"+device+"})", "{{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_poe_remain_watts{"+device+"})", "{{device_name}}"))
 
 	b.row("Controller, WAN, and ISP", 76)
 	b.stat("Controller uptime by site", "Controller uptime grouped by site and controller name.", 0, 77, 6, 4, "s", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (site, device_name) (omada_controller_uptime_seconds{"+site+"})", "{{site}} · {{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name) (omada_controller_uptime_seconds{"+site+"})", "{{site}} · {{device_name}}"))
 	b.stat("Controller free storage", "Available storage grouped by storage volume.", 6, 77, 6, 4, "bytes", object{"min": 0}, nil, healthyThresholds(),
-		instant("sum by (site, device_name, storage_name) (omada_controller_storage_available_bytes{"+site+"})", "{{site}} · {{storage_name}}"))
+		instant("sum by (job, instance, bridge_id, site, site_id, device_name, storage_name) (omada_controller_storage_available_bytes{"+site+"})", "{{site}} · {{storage_name}}"))
 	b.stat("WAN internet state", "Internet reachability state for each WAN interface.", 12, 77, 6, 4, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
-		instant("max by (device_name, device_mac, port, name, ip) (omada_wan_internet_state{"+device+"})", "{{device_name}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name, ip) (omada_wan_internet_state{"+device+"})", "{{device_name}} · {{name}}"))
 	b.stat("WAN link state", "Current connected or disconnected state reported for each WAN interface.", 18, 77, 6, 4, "short", object{"min": 0, "max": 1}, binaryMappings("Disconnected", "Connected"), binaryThresholds(),
-		instant("max by (device_name, device_mac, port, name, ip) (omada_wan_status{"+device+"})", "{{device_name}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name, ip) (omada_wan_status{"+device+"})", "{{device_name}} · {{name}}"))
 	b.timeseries("WAN throughput", "Omada WAN KB/s gauges converted to bit/s.", 0, 81, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (device_name, device_mac, port, name) (omada_wan_rx_rate{"+device+"}) * 8000", "{{device_name}} · {{name}} RX"),
-		rangeQuery("sum by (device_name, device_mac, port, name) (omada_wan_tx_rate{"+device+"}) * 8000", "{{device_name}} · {{name}} TX"))
+		rangeQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_rx_rate{"+device+"}) * 8000", "{{device_name}} · {{name}} RX"),
+		rangeQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_tx_rate{"+device+"}) * 8000", "{{device_name}} · {{name}} TX"))
 	b.timeseries("WAN latency", "Latency reported for each WAN interface.", 12, 81, 12, 8, "ms", object{"min": 0},
-		rangeQuery("max by (device_name, device_mac, port, name) (omada_wan_latency{"+device+"})", "{{device_name}} · {{name}}"))
+		rangeQuery("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_latency{"+device+"})", "{{device_name}} · {{name}}"))
 	b.barGauge("WAN link speed", "Negotiated WAN link capability in Mbit/s.", 0, 89, 8, 8, "Mbits", object{"min": 0}, linkSpeedMappings(), linkSpeedThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_link_speed_mbps{"+device+"})", "{{device_name}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_link_speed_mbps{"+device+"})", "{{device_name}} · {{name}}"))
 	b.stat("ISP state", "Current Omada ISP state for each gateway interface.", 8, 89, 8, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
-		instant("max by (gateway_name, gateway_mac, port, name, ip) (omada_isp_status{"+site+"})", "{{gateway_name}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, gateway_name, gateway_mac, port, name, ip) (omada_isp_status{"+site+"})", "{{gateway_name}} · {{name}}"))
 	b.barGauge("Configured ISP bandwidth", "Configured ISP download and upload speeds in Mbit/s.", 16, 89, 8, 8, "Mbits", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (gateway_name, gateway_mac, port, name) (omada_isp_download_speed{"+site+"})", "{{gateway_name}} · {{name}} down"),
-		instant("max by (gateway_name, gateway_mac, port, name) (omada_isp_upload_speed{"+site+"})", "{{gateway_name}} · {{name}} up"))
+		instant("max by (job, instance, bridge_id, site, site_id, gateway_name, gateway_mac, port, name) (omada_isp_download_speed{"+site+"})", "{{gateway_name}} · {{name}} down"),
+		instant("max by (job, instance, bridge_id, site, site_id, gateway_name, gateway_mac, port, name) (omada_isp_upload_speed{"+site+"})", "{{gateway_name}} · {{name}} up"))
 
 	b.row("VPN", 97)
-	vpnUptime := "max by (job, instance, site, site_id, name, interface_name, vpn_type) (omada_vpn_uptime{" + site + "})" +
-		" or (max by (job, instance, site, site_id, vpn_id, name, vpn_type) (clamp_min(time() - (omada_site_to_site_vpn_peer_login_timestamp{" + site + "} > 0), 0))" +
-		" unless on (job, instance, site, site_id, name, vpn_type) max by (job, instance, site, site_id, name, vpn_type) (omada_vpn_uptime{" + site + "}))"
+	vpnUptime := "max by (job, instance, bridge_id, site, site_id, name, interface_name, vpn_type) (omada_vpn_uptime{" + site + "})" +
+		" or (max by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type) (clamp_min(time() - (omada_site_to_site_vpn_peer_login_timestamp{" + site + "} > 0), 0))" +
+		" unless on (job, instance, bridge_id, site, site_id, name, vpn_type) max by (job, instance, bridge_id, site, site_id, name, vpn_type) (omada_vpn_uptime{" + site + "}))"
 	b.stat("VPN configuration state", "Enabled or disabled state for every configured VPN.", 0, 98, 6, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Disabled", "Enabled"), binaryThresholds(),
-		instant("max by (site, name, vpn_type) (omada_vpn_status{"+site+"})", "{{site}} · {{name}} {{vpn_type}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, name, vpn_type) (omada_vpn_status{"+site+"})", "{{site}} · {{name}} {{vpn_type}}"))
 	b.stat("Site-to-site peer state", "Online state returned for peers that expose it.", 6, 98, 6, 8, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
-		instant("max by (site, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_status{"+site+"})", "{{name}} · {{peer_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_status{"+site+"})", "{{name}} · {{peer_name}}"))
 	b.barGauge("VPN uptime", "Current generic tunnel uptime, with the longest site-to-site peer session age inferred when generic tunnel stats are unavailable.", 12, 98, 6, 8, "s", object{"min": 0}, nil, healthyThresholds(),
 		instant(vpnUptime, "{{site}} · {{name}} · {{vpn_type}}"))
 	b.stat("Peer login time", "Most recent peer login timestamp, displayed relative to now.", 18, 98, 6, 8, "dateTimeFromNow", object{}, nil, healthyThresholds(),
-		instant("max by (site, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_login_timestamp{"+site+"} > 0) * 1000", "{{name}} · {{peer_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_login_timestamp{"+site+"} > 0) * 1000", "{{name}} · {{peer_name}}"))
 	b.timeseries("VPN throughput", "General VPN tunnel byte counters converted to bit/s.", 0, 106, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
-		rateQuery("sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
 	b.timeseries("Site-to-site VPN throughput", "Aggregate site-to-site VPN byte counters converted to bit/s.", 12, 106, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
-		rateQuery("sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · down"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · up"))
 	b.timeseries("Site-to-site peer throughput", "Per-peer site-to-site counters converted to bit/s.", 0, 114, 24, 8, "bps", object{"min": 0},
-		rateQuery("sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} down"),
-		rateQuery("sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} up"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} down"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{"+site+"}["+rateInterval+"])) * 8", "{{name}} · {{peer_name}} up"))
 
 	b.row("DPI insights", 122)
 	b.barGauge("Top DPI categories", "Largest DPI traffic categories within the exporter's configured insight window. Requires OMADA_TRACK_INSIGHT_METRICS=true.", 0, 123, 12, 8, "bytes", object{"min": 0}, nil, healthyThresholds(),
-		instant("topk(10, sum by (site, family_id, family_name) (omada_dpi_category_traffic_bytes{"+site+"}))", "{{site}} · {{family_name}}"))
+		instant("topk(10, sum by (job, instance, bridge_id, site, site_id, family_id, family_name) (omada_dpi_category_traffic_bytes{"+site+"}))", "{{site}} · {{family_name}}"))
 	b.barGauge("Top DPI applications", "Largest DPI-classified applications within the configured insight window. Requires OMADA_TRACK_INSIGHT_METRICS=true and a non-zero application limit.", 12, 123, 12, 8, "bytes", object{"min": 0}, nil, healthyThresholds(),
-		instant("topk(10, sum by (site, application_id, application_name) (omada_dpi_application_traffic_bytes{"+site+"}))", "{{site}} · {{application_name}}"))
+		instant("topk(10, sum by (job, instance, bridge_id, site, site_id, application_id, application_name) (omada_dpi_application_traffic_bytes{"+site+"}))", "{{site}} · {{application_name}}"))
 	b.stat("DPI-classified traffic", "Total classified bytes for the current insight window. No data means insight metrics are disabled or unsupported.", 0, 131, 12, 4, "bytes", object{"min": 0}, nil, healthyThresholds(),
 		instant("sum(omada_dpi_total_traffic_bytes{"+site+"})", "Classified"))
 	b.stat("DPI insight window", "Window used by the exporter when querying DPI insights. No data means insight metrics are disabled or unsupported.", 12, 131, 12, 4, "s", object{"min": 0}, nil, healthyThresholds(),
 		instant("max(omada_dpi_scrape_window_seconds{"+site+"})", "Window"))
 
-	return dashboard("Omada Overview", "omada-overview", 12,
+	return dashboard("Omada Overview", "omada-overview", 13,
 		"Comprehensive TP-Link Omada dashboard for the current omada_exporter metric and label contract.", b.panels, true)
 }
 
@@ -223,88 +223,88 @@ func deviceDetailsDashboard() object {
 	apClient := site + ",ap_mac=~\"" + deviceVariable + "\""
 	clientThroughput := func(topologyLabel string) string {
 		client := site + "," + topologyLabel + "=~\"" + deviceVariable + "\""
-		return "sum by (name, mac, device_type) ((rate(omada_client_traffic_down_bytes{" + client + "}[" + rateInterval + "]) + rate(omada_client_traffic_up_bytes{" + client + "}[" + rateInterval + "])) * 8)"
+		return "sum by (job, instance, bridge_id, site, site_id, name, mac, device_type) ((rate(omada_client_traffic_down_bytes{" + client + "}[" + rateInterval + "]) + rate(omada_client_traffic_up_bytes{" + client + "}[" + rateInterval + "])) * 8)"
 	}
 	topClients := "topk(10, (" + clientThroughput("ap_mac") + " or " + clientThroughput("switch_mac") + " or " + clientThroughput("gateway_mac") + "))"
 
 	b.row("Selected device", 0)
 	b.stat("Device uptime", "Current uptime for the selected device; the legend also identifies its hardware type.", 0, 1, 4, 4, "s", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac, device_type, device_model) (omada_device_uptime_seconds{"+device+"})", "{{device_name}} · {{device_type}} · {{device_model}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_type, device_model) (omada_device_uptime_seconds{"+device+"})", "{{device_name}} · {{device_type}} · {{device_model}}"))
 	b.stat("CPU", "Current CPU utilization for the selected device.", 4, 1, 4, 4, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_cpu_percentage{"+device+"})", "{{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_cpu_percentage{"+device+"})", "{{device_name}}"))
 	b.stat("Memory", "Current memory utilization for the selected device.", 8, 1, 4, 4, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_mem_percentage{"+device+"})", "{{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_mem_percentage{"+device+"})", "{{device_name}}"))
 	b.stat("Temperature", "Current temperature when reported by the selected gateway or switch.", 12, 1, 4, 4, "celsius", object{}, nil, temperatureThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_temp{"+device+"})", "{{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_temp{"+device+"})", "{{device_name}}"))
 	b.stat("Current RX", "Controller-reported receive rate for the selected access point or switch.", 16, 1, 4, 4, "binBps", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_rx_rate{"+device+"})", "{{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_rx_rate{"+device+"})", "{{device_name}}"))
 	b.stat("Current TX", "Controller-reported transmit rate for the selected access point or switch.", 20, 1, 4, 4, "binBps", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac) (omada_device_tx_rate{"+device+"})", "{{device_name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_tx_rate{"+device+"})", "{{device_name}}"))
 	b.stat("Online", "Whether the selected device status starts with Connected, including wireless-backhaul variants.", 0, 5, 6, 4, "short", object{"min": 0}, nil, onlineThresholds(),
 		instant("count(omada_device_uptime_seconds{"+device+",device_status=~\"^Connected.*$\"}) or vector(0)", "Online"))
 	b.stat("Not online", "Whether the selected device is disconnected, provisioning, upgrading, pending, isolated, or in another non-connected state.", 6, 5, 6, 4, "short", object{"min": 0}, nil, problemThresholds(),
 		instant("count(omada_device_uptime_seconds{"+device+",device_status!~\"^Connected.*$\"}) or vector(0)", "Not online"))
 	b.stat("Firmware", "Firmware upgrade state and advertised target version for the selected device.", 12, 5, 6, 4, "short", object{"min": 0, "max": 1}, binaryMappings("Current", "Upgrade available"), warningThresholds(),
-		instant("max by (device_name, device_mac, device_version, device_version_upgrade) (omada_device_need_upgrade{"+device+"})", "{{device_name}} · {{device_version}} → {{device_version_upgrade}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_version, device_version_upgrade) (omada_device_need_upgrade{"+device+"})", "{{device_name}} · {{device_version}} → {{device_version_upgrade}}"))
 	b.stat("PoE remaining", "Remaining PoE budget when the selected switch reports its capacity.", 18, 5, 6, 4, "watt", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac, device_total_power) (omada_device_poe_remain_watts{"+device+"})", "{{device_name}} · {{device_total_power}} W total"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_total_power) (omada_device_poe_remain_watts{"+device+"})", "{{device_name}} · {{device_total_power}} W total"))
 
 	b.row("Traffic and attached clients", 9)
 	b.timeseries("Device throughput", "Selected-device traffic counters converted to bit/s with an adaptive rate window.", 0, 10, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (device_name, device_mac) (rate(omada_device_download{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} download"),
-		rateQuery("sum by (device_name, device_mac) (rate(omada_device_upload{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} upload"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac) (rate(omada_device_download{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} download"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac) (rate(omada_device_upload{"+device+"}["+rateInterval+"])) * 8", "{{device_name}} upload"))
 	b.barGauge("Top clients through selected device", "Ten busiest clients associated through the selected access point, switch, or gateway topology label. Requires client metrics.", 12, 10, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
 		rateInstant(topClients, "{{device_type}} · {{name}} · {{mac}}"))
 	b.barGauge("Client link rates through selected AP", "Current negotiated link rates for wireless clients associated with the selected access point. No data is expected when the selected device is not an access point or the AP has no associated wireless clients.", 0, 18, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
-		instant("topk(10, max by (name, mac, ssid) (omada_client_rx_rate{"+apClient+",wireless=\"true\"}))", "{{name}} · {{ssid}} RX"),
-		instant("topk(10, max by (name, mac, ssid) (omada_client_tx_rate{"+apClient+",wireless=\"true\"}))", "{{name}} · {{ssid}} TX"))
+		instant("topk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_rx_rate{"+apClient+",wireless=\"true\"}))", "{{name}} · {{ssid}} RX"),
+		instant("topk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_tx_rate{"+apClient+",wireless=\"true\"}))", "{{name}} · {{ssid}} TX"))
 	b.barGauge("Client signal through selected AP", "Current signal quality for wireless clients associated with the selected access point. No data is expected when the selected device is not an access point or the AP has no associated wireless clients.", 12, 18, 12, 8, "percent", object{"min": 0, "max": 100}, nil, signalThresholds(),
-		instant("bottomk(10, max by (name, mac, ssid) (omada_client_signal_pct{"+apClient+",wireless=\"true\"}))", "{{name}} · {{ssid}}"))
+		instant("bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_signal_pct{"+apClient+",wireless=\"true\"}))", "{{name}} · {{ssid}}"))
 
 	b.row("Access-point radios (AP only)", 26)
 	b.barGauge("2.4 GHz utilization", "Current receive and transmit utilization when the selected device has a 2.4 GHz radio.", 0, 27, 6, 8, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac, device_wp2g_mode, device_wp2g_band_width) (omada_device_2g_rx_util{"+device+"})", "RX · {{device_wp2g_mode}} · {{device_wp2g_band_width}} MHz"),
-		instant("max by (device_name, device_mac, device_wp2g_mode, device_wp2g_band_width) (omada_device_2g_tx_util{"+device+"})", "TX · {{device_wp2g_mode}} · {{device_wp2g_band_width}} MHz"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp2g_mode, device_wp2g_band_width) (omada_device_2g_rx_util{"+device+"})", "RX · {{device_wp2g_mode}} · {{device_wp2g_band_width}} MHz"),
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp2g_mode, device_wp2g_band_width) (omada_device_2g_tx_util{"+device+"})", "TX · {{device_wp2g_mode}} · {{device_wp2g_band_width}} MHz"))
 	b.barGauge("5 GHz utilization", "Current receive and transmit utilization when the selected device has a 5 GHz radio.", 6, 27, 6, 8, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac, device_wp5g_mode, device_wp5g_band_width) (omada_device_5g_rx_util{"+device+"})", "RX · {{device_wp5g_mode}} · {{device_wp5g_band_width}} MHz"),
-		instant("max by (device_name, device_mac, device_wp5g_mode, device_wp5g_band_width) (omada_device_5g_tx_util{"+device+"})", "TX · {{device_wp5g_mode}} · {{device_wp5g_band_width}} MHz"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp5g_mode, device_wp5g_band_width) (omada_device_5g_rx_util{"+device+"})", "RX · {{device_wp5g_mode}} · {{device_wp5g_band_width}} MHz"),
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp5g_mode, device_wp5g_band_width) (omada_device_5g_tx_util{"+device+"})", "TX · {{device_wp5g_mode}} · {{device_wp5g_band_width}} MHz"))
 	b.barGauge("5 GHz-2 utilization", "Current receive and transmit utilization when the selected device has a second 5 GHz radio.", 12, 27, 6, 8, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac, device_wp5g2_mode, device_wp5g2_band_width) (omada_device_5g2_rx_util{"+device+"})", "RX · {{device_wp5g2_mode}} · {{device_wp5g2_band_width}} MHz"),
-		instant("max by (device_name, device_mac, device_wp5g2_mode, device_wp5g2_band_width) (omada_device_5g2_tx_util{"+device+"})", "TX · {{device_wp5g2_mode}} · {{device_wp5g2_band_width}} MHz"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp5g2_mode, device_wp5g2_band_width) (omada_device_5g2_rx_util{"+device+"})", "RX · {{device_wp5g2_mode}} · {{device_wp5g2_band_width}} MHz"),
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp5g2_mode, device_wp5g2_band_width) (omada_device_5g2_tx_util{"+device+"})", "TX · {{device_wp5g2_mode}} · {{device_wp5g2_band_width}} MHz"))
 	b.barGauge("6 GHz utilization", "Current receive and transmit utilization when the selected device has a 6 GHz radio.", 18, 27, 6, 8, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac, device_wp6g_mode, device_wp6g_band_width) (omada_device_6g_rx_util{"+device+"})", "RX · {{device_wp6g_mode}} · {{device_wp6g_band_width}} MHz"),
-		instant("max by (device_name, device_mac, device_wp6g_mode, device_wp6g_band_width) (omada_device_6g_tx_util{"+device+"})", "TX · {{device_wp6g_mode}} · {{device_wp6g_band_width}} MHz"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp6g_mode, device_wp6g_band_width) (omada_device_6g_rx_util{"+device+"})", "RX · {{device_wp6g_mode}} · {{device_wp6g_band_width}} MHz"),
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_wp6g_mode, device_wp6g_band_width) (omada_device_6g_tx_util{"+device+"})", "TX · {{device_wp6g_mode}} · {{device_wp6g_band_width}} MHz"))
 
 	b.row("Ports and link aggregation (supported devices only)", 35)
 	portSpeeds := b.barGauge("Port link speeds", "Scrollable port list colored by negotiated speed; Down indicates a disconnected port. Requires port metrics.", 0, 36, 24, 8, "Mbits", object{"min": 0}, linkSpeedMappings(), linkSpeedThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_port_link_speed_mbps{"+device+"})", "Port {{port}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_link_speed_mbps{"+device+"})", "Port {{port}} · {{name}}"))
 	configureScrollableBarGauge(portSpeeds)
 	b.timeseries("Port throughput", "Per-port traffic counters converted to bit/s with an adaptive rate window.", 0, 44, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_rx{"+device+"}["+rateInterval+"])) * 8", "Port {{port}} · {{name}} RX"),
-		rateQuery("sum by (device_name, device_mac, port, name) (rate(omada_port_link_tx{"+device+"}["+rateInterval+"])) * 8", "Port {{port}} · {{name}} TX"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (rate(omada_port_link_rx{"+device+"}["+rateInterval+"])) * 8", "Port {{port}} · {{name}} RX"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (rate(omada_port_link_tx{"+device+"}["+rateInterval+"])) * 8", "Port {{port}} · {{name}} TX"))
 	b.barGauge("PoE draw by port", "Current PoE draw for every port on the selected device. No data is expected on devices without PoE output.", 12, 44, 12, 8, "watt", object{"min": 0}, nil, healthyThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_port_power_watts{"+device+"})", "Port {{port}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_power_watts{"+device+"})", "Port {{port}} · {{name}}"))
 	lagSpeeds := b.barGauge("LAG link speeds", "Configured link-aggregation groups colored by negotiated aggregate speed. No data is expected when the selected device is not a switch or the switch has no configured LAGs.", 0, 52, 12, 8, "Mbits", object{"min": 0}, linkSpeedMappings(), linkSpeedThresholds(),
-		instant("max by (device_name, device_mac, lag_id, name, lag_ports) (omada_lag_link_speed_mbps{"+device+"})", "LAG {{lag_id}} · {{name}} · {{lag_ports}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name, lag_ports) (omada_lag_link_speed_mbps{"+device+"})", "LAG {{lag_id}} · {{name}} · {{lag_ports}}"))
 	configureScrollableBarGauge(lagSpeeds)
 	b.timeseries("LAG throughput", "Per-LAG traffic counters converted to bit/s with an adaptive rate window. No data is expected when the selected device is not a switch or the switch has no configured LAGs.", 12, 52, 12, 8, "bps", object{"min": 0},
-		rateQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{"+device+"}["+rateInterval+"])) * 8", "LAG {{lag_id}} · {{name}} RX"),
-		rateQuery("sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{"+device+"}["+rateInterval+"])) * 8", "LAG {{lag_id}} · {{name}} TX"))
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{"+device+"}["+rateInterval+"])) * 8", "LAG {{lag_id}} · {{name}} RX"),
+		rateQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{"+device+"}["+rateInterval+"])) * 8", "LAG {{lag_id}} · {{name}} TX"))
 
 	b.row("Gateway WAN (gateway only)", 60)
 	b.stat("Internet state", "Current internet reachability for each WAN interface on the selected gateway.", 0, 61, 6, 6, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_internet_state{"+device+"})", "{{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_internet_state{"+device+"})", "{{name}}"))
 	b.stat("Link state", "Current connected or disconnected state reported for each WAN interface on the selected gateway.", 6, 61, 6, 6, "short", object{"min": 0, "max": 1}, binaryMappings("Disconnected", "Connected"), binaryThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_status{"+device+"})", "{{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_status{"+device+"})", "{{name}}"))
 	b.barGauge("WAN link speed", "Negotiated WAN link capability for each interface on the selected gateway.", 12, 61, 6, 6, "Mbits", object{"min": 0}, nil, linkSpeedThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_link_speed_mbps{"+device+"})", "{{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_link_speed_mbps{"+device+"})", "{{name}}"))
 	b.barGauge("WAN latency", "Current latency for each WAN interface on the selected gateway.", 18, 61, 6, 6, "ms", object{"min": 0}, nil, durationThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_latency{"+device+"})", "{{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_latency{"+device+"})", "{{name}}"))
 	b.timeseries("WAN throughput", "Controller-reported WAN receive and transmit rates converted from KB/s to bit/s.", 0, 67, 24, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (device_name, device_mac, port, name) (omada_wan_rx_rate{"+device+"}) * 8000", "{{name}} RX"),
-		rangeQuery("sum by (device_name, device_mac, port, name) (omada_wan_tx_rate{"+device+"}) * 8000", "{{name}} TX"))
+		rangeQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_rx_rate{"+device+"}) * 8000", "{{name}} RX"),
+		rangeQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_tx_rate{"+device+"}) * 8000", "{{name}} TX"))
 
-	result := dashboard("Omada Device Details", "omada-device-details", 2,
+	result := dashboard("Omada Device Details", "omada-device-details", 3,
 		"Portable per-device TP-Link Omada drill-down inspired by compact device rows without hard-coded sites, MAC addresses, or port layouts.", b.panels, false)
 	result["tags"] = []string{"omada", "network", "prometheus", "device-details"}
 	result["templating"] = object{"list": deviceDetailsVariables()}
@@ -335,29 +335,29 @@ func simpleDashboard() object {
 		rateQuery("sum(rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"])) * 8", "Download"),
 		rateQuery("sum(rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8", "Upload"))
 	b.timeseries("WAN throughput", "Omada WAN KB/s gauges converted to bit/s.", 12, 6, 12, 8, "bps", object{"min": 0},
-		rangeQuery("sum by (site, device_name, device_mac, port, name) (omada_wan_rx_rate{"+site+"}) * 8000", "{{site}} · {{device_name}} · {{name}} RX"),
-		rangeQuery("sum by (site, device_name, device_mac, port, name) (omada_wan_tx_rate{"+site+"}) * 8000", "{{site}} · {{device_name}} · {{name}} TX"))
+		rangeQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_rx_rate{"+site+"}) * 8000", "{{site}} · {{device_name}} · {{name}} RX"),
+		rangeQuery("sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_tx_rate{"+site+"}) * 8000", "{{site}} · {{device_name}} · {{name}} TX"))
 	b.barGauge("Top clients", "Ten busiest clients by combined upload and download rate.", 0, 14, 12, 8, "bps", object{"min": 0}, nil, healthyThresholds(),
-		rateInstant("topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
+		rateInstant("topk(10, sum by (job, instance, bridge_id, site, site_id, name, mac) ((rate(omada_client_traffic_down_bytes{"+site+"}["+rateInterval+"]) + rate(omada_client_traffic_up_bytes{"+site+"}["+rateInterval+"])) * 8))", "{{name}} · {{mac}}"))
 	b.barGauge("Device states", "Current count by Omada status, with wireless Connected variants shown separately.", 12, 14, 12, 8, "short", object{"min": 0}, nil, healthyThresholds(),
-		instant("count by (device_status) (omada_device_uptime_seconds{"+site+"})", "{{device_status}}"))
+		instant("count by (job, instance, bridge_id, site, site_id, device_status) (omada_device_uptime_seconds{"+site+"})", "{{device_status}}"))
 
 	b.row("Health", 22)
 	deviceCPU := b.barGauge("Device CPU", "Current CPU utilization by device. Select a series to open the portable device drill-down.", 0, 23, 8, 8, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac, device_model) (omada_device_cpu_percentage{"+site+"})", "{{device_name}} · {{device_model}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_cpu_percentage{"+site+"})", "{{device_name}} · {{device_model}}"))
 	addDataLink(deviceCPU, "Open device details", deviceDetailsURL)
 	b.barGauge("Device memory", "Current memory utilization by device.", 8, 23, 8, 8, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
-		instant("max by (device_name, device_mac, device_model) (omada_device_mem_percentage{"+site+"})", "{{device_name}} · {{device_model}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_mem_percentage{"+site+"})", "{{device_name}} · {{device_model}}"))
 	b.barGauge("WAN latency", "Current latency by WAN interface.", 16, 23, 8, 8, "ms", object{"min": 0}, nil, durationThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_latency{"+site+"})", "{{device_name}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_latency{"+site+"})", "{{device_name}} · {{name}}"))
 	b.stat("PoE draw", "Current PoE draw across all ports in the selected sites.", 0, 31, 8, 4, "watt", object{"min": 0}, nil, healthyThresholds(),
 		instant("sum(omada_port_power_watts{"+site+"}) or vector(0)", "Draw"))
 	b.stat("Controller storage used", "Used storage divided by total controller storage.", 8, 31, 8, 4, "percent", object{"min": 0, "max": 100}, nil, utilizationThresholds(),
 		instant("100 * sum(omada_controller_storage_used_bytes{"+site+"}) / clamp_min(sum(omada_controller_storage_total_bytes{"+site+"}), 1)", "Used"))
 	b.stat("WAN internet state", "Current internet reachability for each WAN interface.", 16, 31, 8, 4, "short", object{"min": 0, "max": 1}, binaryMappings("Offline", "Online"), binaryThresholds(),
-		instant("max by (device_name, device_mac, port, name) (omada_wan_internet_state{"+site+"})", "{{device_name}} · {{name}}"))
+		instant("max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_internet_state{"+site+"})", "{{device_name}} · {{name}}"))
 
-	return dashboard("Simple Omada dashboard", "ad5dtmf", 8,
+	return dashboard("Simple Omada dashboard", "ad5dtmf", 9,
 		"Focused TP-Link Omada health and traffic dashboard for the current omada_exporter metrics.", b.panels, false)
 }
 
@@ -375,7 +375,7 @@ func dashboard(title, uid string, version int, description string, panels []any,
 				"type":       "dashboard",
 			},
 		}},
-		"description":          description,
+		"description":          description + " Select exactly one scrape job and bridge endpoint; legacy unlabelled series remain supported.",
 		"editable":             true,
 		"fiscalYearStartMonth": 0,
 		"graphTooltip":         1,
@@ -402,6 +402,9 @@ func dashboard(title, uid string, version int, description string, panels []any,
 }
 
 func dashboardVariables(includeDevice bool) []any {
+	// One scrape endpoint is one bridge. Single-select source variables also
+	// protect totals which intentionally aggregate across sites on that bridge.
+	// Do not require bridge_id: legacy exporters and their history lack it.
 	variables := []any{
 		object{
 			"current":    object{},
@@ -416,15 +419,15 @@ func dashboardVariables(includeDevice bool) []any {
 			"type":       "datasource",
 		},
 		object{
-			"allValue":   ".+",
-			"current":    object{"text": "All", "value": "$__all"},
-			"datasource": prometheusDatasource(),
-			"definition": "label_values(omada_device_uptime_seconds, job)",
-			"includeAll": true,
-			"label":      "Job",
-			"multi":      true,
-			"name":       "job",
-			"options":    []any{},
+			"current":     object{},
+			"datasource":  prometheusDatasource(),
+			"definition":  "label_values(omada_device_uptime_seconds, job)",
+			"includeAll":  false,
+			"label":       "Scrape job",
+			"description": "Select one scrape job. Sources are never combined automatically.",
+			"multi":       false,
+			"name":        "job",
+			"options":     []any{},
 			"query": object{
 				"label":   "job",
 				"metric":  "omada_device_uptime_seconds",
@@ -438,15 +441,15 @@ func dashboardVariables(includeDevice bool) []any {
 			"type":    "query",
 		},
 		object{
-			"allValue":   ".+",
-			"current":    object{"text": "All", "value": "$__all"},
-			"datasource": prometheusDatasource(),
-			"definition": "label_values(omada_device_uptime_seconds{job=~\"" + jobVariable + "\"}, instance)",
-			"includeAll": true,
-			"label":      "Instance",
-			"multi":      true,
-			"name":       "instance",
-			"options":    []any{},
+			"current":     object{},
+			"datasource":  prometheusDatasource(),
+			"definition":  "label_values(omada_device_uptime_seconds{job=~\"" + jobVariable + "\"}, instance)",
+			"includeAll":  false,
+			"label":       "Bridge endpoint",
+			"description": "Select one unique exporter endpoint. Legacy series without bridge_id remain supported.",
+			"multi":       false,
+			"name":        "instance",
+			"options":     []any{},
 			"query": object{
 				"label":   "instance",
 				"metric":  "omada_device_uptime_seconds{job=~\"" + jobVariable + "\"}",
@@ -513,7 +516,7 @@ func dashboardVariables(includeDevice bool) []any {
 func deviceDetailsVariables() []any {
 	variables := dashboardVariables(false)
 	metric := "omada_device_uptime_seconds{job=~\"" + jobVariable + "\",instance=~\"" + instanceVariable + "\",site=~\"" + siteVariable + "\"}"
-	query := "query_result(max by (device_mac, device_name) (" + metric + "))"
+	query := "query_result(max by (job, instance, bridge_id, site, site_id, device_mac, device_name) (" + metric + "))"
 	return append(variables, object{
 		"current":    object{},
 		"datasource": prometheusDatasource(),
@@ -642,7 +645,7 @@ func targets(queries []querySpec) []any {
 			"expr":         query.expr,
 			"instant":      query.instant,
 			"interval":     query.interval,
-			"legendFormat": query.legend,
+			"legendFormat": "${job} / ${instance} · " + query.legend,
 			"range":        !query.instant,
 			"refId":        string(rune('A' + i)),
 		})

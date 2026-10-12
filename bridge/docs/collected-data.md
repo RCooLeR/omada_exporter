@@ -23,6 +23,7 @@ No database is used. The bridge state is the latest collected Omada API response
 | `vpn-stats` | `/metrics/vpn-stats` | VPN tunnel uptime, traffic, packets, peer stats, and derived MQTT speed sensors. |
 | `isp` | `/metrics/isp` | ISP status, gateway, port, IP, load balancing, max bandwidth, and configured speed. |
 | `insights` | `/metrics/insights` | Optional DPI traffic totals by category and application. Disabled by default. |
+| `network-quality` | `/metrics/network-quality` | Optional AP wired-uplink packet/drop/error counters and gateway WAN latency, jitter, loss and MOS window averages. Disabled by default. |
 
 ## Controller And Site
 
@@ -46,6 +47,7 @@ Device-level metrics cover gateways, switches, APs, controllers, and OLTs when t
 - uptime
 - current device upload and download counters
 - device RX and TX rate
+- current AP radio interference utilization, when reported for an online AP
 - temperature
 - firmware and upgrade metadata
 - device type, subtype, model, display model, hardware version, firmware version, IP, MAC, and name

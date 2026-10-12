@@ -1,9 +1,23 @@
 ## [Unreleased]
 
+## [2.4.2] - 2026-10-12
+
 ### Added
+- Add opt-in, bridge/site-scoped Home Assistant controls for managed-device reboot and Wi-Fi client reconnect, with confirmation in the card and fresh controller-side target validation.
+- Publish the ready-to-install Home Assistant JavaScript bundle and all three Grafana dashboards as checksummed release assets.
+- Add optional immutable `OMADA_BRIDGE_ID` / `--bridge-id` namespaces for multiple controllers sharing MQTT, Home Assistant and Prometheus; leaving it unset preserves the existing installation's identities and metric label sets.
+- Add exact bridge/site-ID filters to both Home Assistant cards and source-selecting Grafana dashboards, with an isolated Fusion `omada-appt` deployment example.
+- Show AP radio interference and cumulative wired-uplink counters, plus gateway-wide WAN quality averages with their configured rolling window, in Home Assistant selected-device panels; distinguish missing, offline, failed and wireless-backhaul data.
+- Export AP radio interference without additional API requests; add opt-in AP wired-uplink packet/drop/error counters and gateway WAN quality window averages with explicit availability and API-success metrics.
 - Add a portable Omada Device Details Grafana dashboard with a friendly single-device selector, readable port and LAG inventories, AP client and radio views, and gateway WAN details.
 
+### Changed
+- Update Go to 1.27.2, Prometheus client to 1.25.0, CLI to 3.14.0, and remaining compatible Go dependencies; retain verified Alpine 3.24.2 runtime images.
+- Update Vite to 8.3.4, Vitest to 5.0.3, npm to 12.2.0, compatible transitive dependencies, and current pinned CI/release tools; validate against current Node 24 LTS.
+
 ### Fixed
+- Keep trackers, retained cleanup, availability, device/client joins, WAN rows, VPNs, DPI and quality data separate across bridge/site identities; preserve scrape-source labels in Grafana aggregations and drill-downs.
+- Preserve unavailable quality measurements instead of fabricating zeros, keep Home Assistant uplink directions/radio bands distinct, and accept WAN latency readings above 127 ms.
 - Give Grafana rate queries a one-minute Min step so dashboards work when Omada is scraped every 60 seconds, show site-to-site peer session age when generic VPN uptime is unavailable, and stop presenting disabled DPI insights as real zero values.
 - Map the exporter WAN status value correctly as disconnected or connected in the bundled Grafana dashboards.
 - Render device port and LAG speeds as readable scrollable gauges, identify hardware-specific sections where no data is expected, and show unavailable panel data neutrally instead of as healthy or failed.

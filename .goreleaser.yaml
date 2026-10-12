@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.18.0/www/docs/static/schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.18.3/www/docs/static/schema.json
 
 version: 2
 
@@ -40,6 +40,12 @@ archives:
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256
+  # Keep these inputs outside the root dist directory: release --clean removes it.
+  extra_files:
+    - glob: ha-cards/dist/omada-network-card.js
+    - glob: bridge/docs/dashboards/dashboard.json
+    - glob: bridge/docs/dashboards/omada-device-details.json
+    - glob: bridge/docs/dashboards/simple-omada-dashboard.json
 
 docker_digest:
   name_template: "digests.txt"
@@ -50,6 +56,12 @@ release:
     name: omada_exporter
   draft: false
   prerelease: auto
+  # These must also be listed in checksum.extra_files for checksum attestations.
+  extra_files:
+    - glob: ha-cards/dist/omada-network-card.js
+    - glob: bridge/docs/dashboards/dashboard.json
+    - glob: bridge/docs/dashboards/omada-device-details.json
+    - glob: bridge/docs/dashboards/simple-omada-dashboard.json
 
 dockers_v2:
   - id: omada_exporter

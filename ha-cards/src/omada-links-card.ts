@@ -4,6 +4,7 @@ import type { DashboardModel, HomeAssistant, LinkRow, LovelaceCardConfig } from 
 import { formatBytes, formatLatency, formatRateBytes, formatSpeedMbps, formatUptimeSeconds } from "./format";
 import {
   cardHassChanged,
+  findWanForRow,
   getDashboardModel,
   vpnModeLabel,
   vpnPeerLoginSeconds,
@@ -15,7 +16,7 @@ import { registerCustomCard } from "./register-card";
 
 export class OmadaLinksCard extends LitElement {
   static override properties = {
-    hass: { attribute: false, hasChanged: cardHassChanged },
+    hass: { attribute: false, noAccessor: true },
     _config: { state: true },
     _model: { state: true }
   };
@@ -120,7 +121,13 @@ export class OmadaLinksCard extends LitElement {
     }
   `;
 
-  public hass?: HomeAssistant;
+  private _hass: HomeAssistant | undefined;
+  public get hass(): HomeAssistant | undefined { return this._hass; }
+  public set hass(value: HomeAssistant | undefined) {
+    const previous = this._hass;
+    this._hass = value;
+    if (cardHassChanged(value, previous, this._config)) this.requestUpdate("hass", previous);
+  }
   private _config?: LovelaceCardConfig;
   private _model?: DashboardModel;
 
@@ -137,7 +144,7 @@ export class OmadaLinksCard extends LitElement {
 
   protected override willUpdate(changed: Map<string, unknown>): void {
     if ((changed.has("hass") || changed.has("_config")) && this.hass) {
-      this._model = getDashboardModel(this.hass, this._config?.site);
+      this._model = getDashboardModel(this.hass, this._config);
     }
   }
 
@@ -268,7 +275,7 @@ export class OmadaLinksCard extends LitElement {
       return undefined;
     }
 
-    return this._model.wanByName.get(row.name) ?? this._model.wanByPort.get(String(row.attrs.port));
+    return findWanForRow(this._model, row);
   }
 
   private ispDisplayName(row: LinkRow, wan?: LinkRow): string {

@@ -28,6 +28,7 @@ func TestCLIFlagValidatorsRejectInvalidConfiguration(t *testing.T) {
 		{name: "request timeout", args: []string{"--timeout", "0"}, want: "timeout must be greater than zero"},
 		{name: "cache TTL", args: []string{"--cache-ttl", "-1"}, want: "cache-ttl must not be negative"},
 		{name: "insight window", args: []string{"--insight-window-seconds", "0"}, want: "insight-window-seconds must be greater than zero"},
+		{name: "quality window", args: []string{"--network-quality-window-seconds", "0"}, want: "network-quality-window-seconds must be greater than zero"},
 		{name: "insight limit", args: []string{"--insight-application-limit", "-1"}, want: "insight-application-limit must not be negative"},
 		{name: "MQTT interval", args: []string{"--mqtt-interval", "0"}, want: "mqtt-interval must be greater than zero"},
 		{name: "MQTT expiry", args: []string{"--mqtt-expire-after", "-1"}, want: "mqtt-expire-after must not be negative"},
@@ -39,6 +40,7 @@ func TestCLIFlagValidatorsRejectInvalidConfiguration(t *testing.T) {
 			validatorTest{name: "request timeout overflow", args: []string{"--timeout", overflow}, want: "timeout must not exceed"},
 			validatorTest{name: "cache TTL overflow", args: []string{"--cache-ttl", overflow}, want: "cache-ttl must not exceed"},
 			validatorTest{name: "insight window overflow", args: []string{"--insight-window-seconds", overflow}, want: "insight-window-seconds must not exceed"},
+			validatorTest{name: "quality window overflow", args: []string{"--network-quality-window-seconds", overflow}, want: "network-quality-window-seconds must not exceed"},
 			validatorTest{name: "MQTT interval overflow", args: []string{"--mqtt-interval", overflow}, want: "mqtt-interval must not exceed"},
 			validatorTest{name: "MQTT expiry overflow", args: []string{"--mqtt-expire-after", overflow}, want: "mqtt-expire-after must not exceed"},
 		)

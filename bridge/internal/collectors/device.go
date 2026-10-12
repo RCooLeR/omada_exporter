@@ -38,16 +38,17 @@ type DeviceCollector struct {
 	omadaLagLinkRx        *prometheus.Desc
 	omadaLagLinkTx        *prometheus.Desc
 	//ap
-	omadaDeviceTxRate    *prometheus.Desc
-	omadaDeviceRxRate    *prometheus.Desc
-	omadaDevice2gTxUtil  *prometheus.Desc
-	omadaDevice2gRxUtil  *prometheus.Desc
-	omadaDevice5gTxUtil  *prometheus.Desc
-	omadaDevice5gRxUtil  *prometheus.Desc
-	omadaDevice5g2TxUtil *prometheus.Desc
-	omadaDevice5g2RxUtil *prometheus.Desc
-	omadaDevice6gTxUtil  *prometheus.Desc
-	omadaDevice6gRxUtil  *prometheus.Desc
+	omadaDeviceTxRate      *prometheus.Desc
+	omadaDeviceRxRate      *prometheus.Desc
+	omadaDevice2gTxUtil    *prometheus.Desc
+	omadaDevice2gRxUtil    *prometheus.Desc
+	omadaDevice5gTxUtil    *prometheus.Desc
+	omadaDevice5gRxUtil    *prometheus.Desc
+	omadaDevice5g2TxUtil   *prometheus.Desc
+	omadaDevice5g2RxUtil   *prometheus.Desc
+	omadaDevice6gTxUtil    *prometheus.Desc
+	omadaDevice6gRxUtil    *prometheus.Desc
+	omadaRadioInterference *prometheus.Desc
 
 	webClient *webapi.Client
 }
@@ -94,6 +95,7 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.omadaDevice5g2RxUtil
 	ch <- c.omadaDevice6gTxUtil
 	ch <- c.omadaDevice6gRxUtil
+	ch <- c.omadaRadioInterference
 }
 
 // trackPortMetrics reports whether port metrics.
@@ -281,6 +283,9 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 	)
 
 	return &DeviceCollector{
+		omadaRadioInterference: prometheus.NewDesc("omada_ap_interference_percentage",
+			"Current radio interference utilization reported by Omada, in percent. Missing or invalid readings are omitted.",
+			[]string{"device_mac", "device_name", "device_type", "site", "site_id", "radio_band"}, nil),
 		omadaDeviceUptimeSeconds: prometheus.NewDesc("omada_device_uptime_seconds",
 			"Uptime of the device.",
 			deviceLabels,

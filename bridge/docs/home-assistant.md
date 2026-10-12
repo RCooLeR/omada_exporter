@@ -33,6 +33,90 @@ If the broker does not require authentication, omit `OMADA_MQTT_USER` and `OMADA
 
 If the MQTT broker is unavailable when OmadaBridge starts, the exporter still starts and Prometheus endpoints remain available. MQTT publishing retries in the background until the broker is reachable.
 
+## Optional Device Controls
+
+Control buttons are **disabled by default**. To opt in, keep MQTT enabled and set:
+
+```yaml
+environment:
+  OMADA_ALLOW_DEVICE_CONTROL: "true"
+```
+
+The bridge discovers Home Assistant MQTT buttons for:
+
+- Rebooting a currently connected AP, standalone switch, or gateway, including a supported Fusion gateway. Controller appliances/software, OLTs, and switch stacks are excluded.
+- Reconnecting a currently active, unblocked wireless client. This disconnects its Wi-Fi association; the client decides whether and when to reconnect. It does not reboot or block the client.
+
+Reboots interrupt service; rebooting the gateway may also interrupt access to the controller. The Home Assistant cards ask for confirmation. Native Home Assistant button entities and MQTT publishers can bypass the card's confirmation, so restrict MQTT command-topic publishing and Home Assistant access to trusted administrators. This switch is not an authentication mechanism. Controller accounts must have the appropriate permissions, and no HTTP write endpoint is added to the exporter.
+
+Eligibility comes from fresh controller inventory, independently of telemetry caches, and is checked again immediately before each controller command. An inventory or subscription failure makes controls unavailable. Availability requires the bridge, the controls subsystem, and the target to all be online. A bridge restart or MQTT reconnect starts unavailable until inventory is refreshed. Setting the option back to `false` publishes a retained controls-offline marker: previously discovered buttons cannot remain available, and the disabled bridge does not subscribe to commands.
+
+Commands use QoS 0, `retain: false`, and the exact payload `PRESS`. Retained/replayed, duplicate, non-QoS-0, malformed, unknown-target, stale, or wrong-site requests are rejected. The bridge allows one pending/in-flight command globally and a 60-second cooldown per action and target. Queued requests expire after 15 seconds and cannot cross an MQTT reconnect. A timed-out or failed controller mutation is **never automatically retried**; verify the device's state before trying again.
+
+Buttons use the existing device/client registry identity and expose these JSON attributes for card integrations:
+
+```yaml
+omada_control: reboot_device # or reconnect_client
+target_mac: aa:bb:cc:dd:ee:ff
+site: Default
+site_id: controller-site-id
+bridge_id: slobidska44 # omitted for the legacy bridge
+```
+
+Control attributes deliberately have no `metric` field. After a request, `last_status` is `accepted`, `rejected`, or `failed`, with `last_status_at` as a UTC timestamp; controller response bodies and credentials are not published. `accepted` means the controller accepted the request, **not** that the reboot/reconnection completed. Cards therefore report “Request sent” and continue showing normal live telemetry.
+
+Command and target-availability topics are scoped below `<effective MQTT prefix>/controls/<site key>/<action>/<MAC key>/`. Named bridges use their existing `_<bridge_id>` prefix and discovery node. Retained button cleanup can remove only verified control discovery records in that bridge's own namespace; it does not adopt another bridge's devices or commands. Removed clients/devices have their buttons withdrawn after a successful inventory refresh.
+
+## Multiple bridges on one MQTT broker and Home Assistant
+
+Leave `OMADA_BRIDGE_ID` unset on an existing installation to retain its MQTT
+topics, discovery identifiers, Home Assistant entities, history and automations.
+Give every additional bridge a permanent, unique ID, for example:
+
+```yaml
+environment:
+  OMADA_BRIDGE_ID: "slobidska44"
+  OMADA_MQTT_ENABLED: "true"
+  OMADA_MQTT_BROKER: "tcp://homeassistant.local:1883"
+```
+
+The ID is added automatically; do not also append it to the configured MQTT
+prefix/client ID. With the default MQTT settings the effective values are:
+
+| Resource | Existing bridge (no ID) | Apartment (`slobidska44`) |
+| --- | --- | --- |
+| MQTT client ID | `omada_exporter` | `omada_exporter_slobidska44` |
+| State prefix | `omada_exporter` | `omada_exporter_slobidska44` |
+| Availability | `omada_exporter/status` | `omada_exporter_slobidska44/status` |
+| Discovery node | `omada_exporter` | `omada_exporter_slobidska44` |
+| Discovery root | `homeassistant` | `homeassistant` |
+| JSON `bridge_id` attribute | absent | `slobidska44` |
+
+Custom state prefixes and MQTT client IDs are also suffixed with `_<bridge_id>`.
+For example, `my/omada` becomes `my/omada_slobidska44`, not
+`my/omada/slobidska44`. The discovery root stays unchanged so Home Assistant
+can discover every bridge. Keep effective prefixes/client IDs unique; do not
+manually configure one installation to use another's effective namespace.
+
+Metric entities include the bridge ID in their identity. Named bridges also
+scope Home Assistant device identifiers and client trackers by bridge and site,
+so the same phone, MAC address, VPN name or controller-provided site ID can
+exist independently at both locations. Presence means “connected at this
+bridge's site”: a phone may correctly be `home` at one location and `not_home`
+at the other. A disconnect/restart affects only that bridge's availability.
+
+State/derived metric payloads and online, configured-offline and recovered
+trackers all carry `bridge_id`. Retained startup recovery and duplicate cleanup
+are limited to the bridge's own topic namespace and identity; a named bridge
+does not adopt or delete the legacy bridge's retained entities.
+
+Do not rename an ID once deployed unless you intend to create a separate set
+of entities. Setting an ID on the existing bridge is not an automatic migration
+and does not remove its previous retained records. The default card selection
+without `bridge_id` is the legacy installation; set `bridge_id: slobidska44` in
+each apartment card. See [Home Assistant cards](../../ha-cards/README.md) for
+the card configuration.
+
 ## MQTT Topics
 
 Default prefixes:

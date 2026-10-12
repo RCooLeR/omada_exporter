@@ -20,5 +20,8 @@ func initCollectors(client *api.Client) map[string]prometheus.Collector {
 	if client == nil || client.Config == nil || client.Config.TrackInsightMetrics {
 		collectors["insights"] = collector.NewInsightsCollector(client)
 	}
+	if client == nil || client.Config == nil || client.Config.TrackNetworkQualityMetrics {
+		collectors["network-quality"] = collector.NewNetworkQualityCollector(client)
+	}
 	return collectors
 }

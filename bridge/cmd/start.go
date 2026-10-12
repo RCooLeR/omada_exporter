@@ -46,6 +46,8 @@ func newCLICommand(conf *config.Config) *cli.Command {
 		"Roman (RCooLeR) Derevianko <RCooLeR@users.noreply.github.com>",
 	}
 	app.Flags = []cli.Flag{
+		&cli.BoolFlag{Destination: &conf.AllowDeviceControl, Name: "allow-device-control", Value: false, Usage: "Enable opt-in MQTT device reboot and Wi-Fi client reconnect controls. Requires MQTT and controller write permissions.", Sources: cli.EnvVars("OMADA_ALLOW_DEVICE_CONTROL")},
+		&cli.StringFlag{Destination: &conf.BridgeID, Name: "bridge-id", Value: "", Usage: "Stable bridge namespace for isolated MQTT/HA identities and Prometheus labels. Empty preserves legacy identities.", Sources: cli.EnvVars("OMADA_BRIDGE_ID"), Validator: config.ValidateBridgeID},
 		&cli.StringFlag{Destination: &conf.Host, Name: "host", Value: "", Usage: "The hostname of the Omada Controller, including protocol.", Sources: cli.EnvVars("OMADA_HOST"), Validator: validateControllerURL},
 		&cli.StringFlag{Destination: &conf.ClientId, Name: "client-id", Value: "", Usage: "ClientId for Omada OpenAPI client-credentials authentication.", Sources: cli.EnvVars("OMADA_CLIENT_ID")},
 		&cli.StringFlag{Destination: &conf.SecretId, Name: "secret-id", Value: "", Usage: "SecretId for Omada OpenAPI client-credentials authentication.", Sources: cli.EnvVars("OMADA_SECRET_ID")},
@@ -65,6 +67,8 @@ func newCLICommand(conf *config.Config) *cli.Command {
 		&cli.BoolFlag{Destination: &conf.TrackPortMetrics, Name: "track-port-metrics", Value: true, Usage: "Export per-port metrics.", Sources: cli.EnvVars("OMADA_TRACK_PORT_METRICS")},
 		&cli.BoolFlag{Destination: &conf.TrackClientMetrics, Name: "track-client-metrics", Value: true, Usage: "Export per-client metrics.", Sources: cli.EnvVars("OMADA_TRACK_CLIENT_METRICS")},
 		&cli.BoolFlag{Destination: &conf.TrackInsightMetrics, Name: "track-insight-metrics", Value: false, Usage: "Export optional DPI insight metrics from Omada Web API.", Sources: cli.EnvVars("OMADA_TRACK_INSIGHT_METRICS")},
+		&cli.BoolFlag{Destination: &conf.TrackNetworkQualityMetrics, Name: "track-network-quality-metrics", Value: false, Usage: "Export optional AP wired-uplink packet counters and gateway WAN quality averages from Omada OpenAPI.", Sources: cli.EnvVars("OMADA_TRACK_NETWORK_QUALITY_METRICS")},
+		&cli.IntFlag{Destination: &conf.NetworkQualityWindowSeconds, Name: "network-quality-window-seconds", Value: 86400, Usage: "Rolling query window for gateway WAN quality averages, in seconds.", Sources: cli.EnvVars("OMADA_NETWORK_QUALITY_WINDOW_SECONDS"), Validator: positiveSeconds("network-quality-window-seconds")},
 		&cli.IntFlag{Destination: &conf.InsightWindowSeconds, Name: "insight-window-seconds", Value: 86400, Usage: "DPI insight query window in seconds.", Sources: cli.EnvVars("OMADA_INSIGHT_WINDOW_SECONDS"), Validator: positiveSeconds("insight-window-seconds")},
 		&cli.IntFlag{Destination: &conf.InsightApplicationLimit, Name: "insight-application-limit", Value: 50, Usage: "Maximum DPI application metric series to export. Set 0 to disable application metrics.", Sources: cli.EnvVars("OMADA_INSIGHT_APPLICATION_LIMIT"), Validator: nonNegativeInt("insight-application-limit")},
 		&cli.BoolFlag{Destination: &conf.GoCollectorDisabled, Name: "disable-go-collector", Value: true, Usage: "Disable Go collector metrics.", Sources: cli.EnvVars("OMADA_DISABLE_GO_COLLECTOR")},

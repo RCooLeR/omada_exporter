@@ -21,7 +21,7 @@
       }
     ]
   },
-  "description": "Comprehensive TP-Link Omada dashboard for the current omada_exporter metric and label contract.",
+  "description": "Comprehensive TP-Link Omada dashboard for the current omada_exporter metric and label contract. Select exactly one scrape job and bridge endpoint; legacy unlabelled series remain supported.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -108,10 +108,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\",device_status=~\"^Connected.*$\"}) or vector(0)",
+          "expr": "count(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\",device_status=~\"^Connected.*$\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Online",
+          "legendFormat": "${job} / ${instance} · Online",
           "range": false,
           "refId": "A"
         }
@@ -185,10 +185,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\",device_status!~\"^Connected.*$\"}) or vector(0)",
+          "expr": "count(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\",device_status!~\"^Connected.*$\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Not online",
+          "legendFormat": "${job} / ${instance} · Not online",
           "range": false,
           "refId": "A"
         }
@@ -258,10 +258,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_client_connected_total{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "sum(omada_client_connected_total{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Clients",
+          "legendFormat": "${job} / ${instance} · Clients",
           "range": false,
           "refId": "A"
         }
@@ -335,10 +335,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_site_alert_num{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "sum(omada_site_alert_num{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Alerts",
+          "legendFormat": "${job} / ${instance} · Alerts",
           "range": false,
           "refId": "A"
         }
@@ -412,10 +412,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(sum(omada_device_need_upgrade{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) or vector(0)) + (sum(omada_controller_upgrade_available{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0))",
+          "expr": "(sum(omada_device_need_upgrade{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) or vector(0)) + (sum(omada_controller_upgrade_available{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0))",
           "instant": true,
           "interval": "",
-          "legendFormat": "Upgrades",
+          "legendFormat": "${job} / ${instance} · Upgrades",
           "range": false,
           "refId": "A"
         }
@@ -489,10 +489,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_collector_last_scrape_completed{job=~\"$job\",instance=~\"$instance\"} == 0) or vector(0)",
+          "expr": "sum(omada_collector_last_scrape_completed{job=~\"${job:regex}\",instance=~\"${instance:regex}\"} == 0) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Failed",
+          "legendFormat": "${job} / ${instance} · Failed",
           "range": false,
           "refId": "A"
         }
@@ -562,10 +562,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(omada_controller_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or vector(0)",
+          "expr": "max(omada_controller_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Uptime",
+          "legendFormat": "${job} / ${instance} · Uptime",
           "range": false,
           "refId": "A"
         }
@@ -644,10 +644,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "100 * sum(omada_controller_storage_used_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) / clamp_min(sum(omada_controller_storage_total_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}), 1)",
+          "expr": "100 * sum(omada_controller_storage_used_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) / clamp_min(sum(omada_controller_storage_total_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}), 1)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Used",
+          "legendFormat": "${job} / ${instance} · Used",
           "range": false,
           "refId": "A"
         }
@@ -717,10 +717,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_port_power_watts{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) or vector(0)",
+          "expr": "sum(omada_port_power_watts{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Draw",
+          "legendFormat": "${job} / ${instance} · Draw",
           "range": false,
           "refId": "A"
         }
@@ -794,10 +794,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(increase(omada_collector_panics_total{job=~\"$job\",instance=~\"$instance\"}[$__range])) or vector(0)",
+          "expr": "sum(increase(omada_collector_panics_total{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}[$__range])) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Panics",
+          "legendFormat": "${job} / ${instance} · Panics",
           "range": false,
           "refId": "A"
         }
@@ -875,10 +875,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(omada_collector_last_scrape_duration_seconds{job=~\"$job\",instance=~\"$instance\"}) or vector(0)",
+          "expr": "max(omada_collector_last_scrape_duration_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Duration",
+          "legendFormat": "${job} / ${instance} · Duration",
           "range": false,
           "refId": "A"
         }
@@ -948,10 +948,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(max by (site, vpn_id, tunnel_id, name) (omada_site_to_site_vpn_total_peers{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})) or vector(0)",
+          "expr": "sum(max by (job, instance, bridge_id, site, site_id, vpn_id, tunnel_id, name) (omada_site_to_site_vpn_total_peers{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})) or vector(0)",
           "instant": true,
           "interval": "",
-          "legendFormat": "Peers",
+          "legendFormat": "${job} / ${instance} · Peers",
           "range": false,
           "refId": "A"
         }
@@ -1062,10 +1062,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum(rate(omada_client_traffic_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "Download",
+          "legendFormat": "${job} / ${instance} · Download",
           "range": true,
           "refId": "A"
         },
@@ -1076,10 +1076,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum(rate(omada_client_traffic_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "Upload",
+          "legendFormat": "${job} / ${instance} · Upload",
           "range": true,
           "refId": "B"
         }
@@ -1156,10 +1156,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10, sum by (name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
+          "expr": "topk(10, sum by (job, instance, bridge_id, site, site_id, name, mac) ((rate(omada_client_traffic_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval]) + rate(omada_client_traffic_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8))",
           "instant": true,
           "interval": "1m",
-          "legendFormat": "{{name}} · {{mac}}",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{mac}}",
           "range": false,
           "refId": "A"
         }
@@ -1257,10 +1257,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac) (rate(omada_device_download{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac) (rate(omada_device_download{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{device_name}} download",
+          "legendFormat": "${job} / ${instance} · {{device_name}} download",
           "range": true,
           "refId": "A"
         },
@@ -1271,10 +1271,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac) (rate(omada_device_upload{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac) (rate(omada_device_upload{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{device_name}} upload",
+          "legendFormat": "${job} / ${instance} · {{device_name}} upload",
           "range": true,
           "refId": "B"
         }
@@ -1351,10 +1351,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10, max by (name, mac, ssid) (omada_client_rx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",wireless=\"true\"}))",
+          "expr": "topk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_rx_rate{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",wireless=\"true\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{name}} · {{ssid}} RX",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{ssid}} RX",
           "range": false,
           "refId": "A"
         },
@@ -1365,10 +1365,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10, max by (name, mac, ssid) (omada_client_tx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",wireless=\"true\"}))",
+          "expr": "topk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_tx_rate{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",wireless=\"true\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{name}} · {{ssid}} TX",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{ssid}} TX",
           "range": false,
           "refId": "B"
         }
@@ -1480,10 +1480,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (site, device_name, device_mac, device_model) (omada_device_cpu_percentage{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_cpu_percentage{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_model}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{device_model}}",
           "range": true,
           "refId": "A"
         }
@@ -1582,10 +1582,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (site, device_name, device_mac, device_model) (omada_device_mem_percentage{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_mem_percentage{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_model}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{device_model}}",
           "range": true,
           "refId": "A"
         }
@@ -1682,10 +1682,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (site, device_name, device_mac, device_model) (omada_device_temp{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, device_model) (omada_device_temp{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_model}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{device_model}}",
           "range": true,
           "refId": "A"
         }
@@ -1762,10 +1762,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count by (device_status) (omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "count by (job, instance, bridge_id, site, site_id, device_status) (omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_status}}",
+          "legendFormat": "${job} / ${instance} · {{device_status}}",
           "range": false,
           "refId": "A"
         }
@@ -1849,10 +1849,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac) (omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{device_mac}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{device_mac}}",
           "range": false,
           "refId": "A"
         }
@@ -1938,10 +1938,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "bottomk(10, max by (name, mac, ssid) (omada_client_signal_pct{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",wireless=\"true\"}))",
+          "expr": "bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_signal_pct{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",wireless=\"true\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{name}} · {{ssid}}",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{ssid}}",
           "range": false,
           "refId": "A"
         }
@@ -2040,10 +2040,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_2g_rx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_2g_rx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 2.4 GHz RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 2.4 GHz RX",
           "range": true,
           "refId": "A"
         },
@@ -2054,10 +2054,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_2g_tx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_2g_tx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 2.4 GHz TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 2.4 GHz TX",
           "range": true,
           "refId": "B"
         },
@@ -2068,10 +2068,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_5g_rx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g_rx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 5 GHz RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 5 GHz RX",
           "range": true,
           "refId": "C"
         },
@@ -2082,10 +2082,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_5g_tx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g_tx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 5 GHz TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 5 GHz TX",
           "range": true,
           "refId": "D"
         },
@@ -2096,10 +2096,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_5g2_rx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g2_rx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 5 GHz-2 RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 5 GHz-2 RX",
           "range": true,
           "refId": "E"
         },
@@ -2110,10 +2110,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_5g2_tx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_5g2_tx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 5 GHz-2 TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 5 GHz-2 TX",
           "range": true,
           "refId": "F"
         },
@@ -2124,10 +2124,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_6g_rx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_6g_rx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 6 GHz RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 6 GHz RX",
           "range": true,
           "refId": "G"
         },
@@ -2138,10 +2138,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac) (omada_device_6g_tx_util{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_6g_tx_util{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} 6 GHz TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} 6 GHz TX",
           "range": true,
           "refId": "H"
         }
@@ -2238,10 +2238,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "bottomk(10, max by (name, mac, ssid) (omada_client_rssi_dbm{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",wireless=\"true\"}))",
+          "expr": "bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_rssi_dbm{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",wireless=\"true\"}))",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{name}} · {{ssid}} RSSI",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{ssid}} RSSI",
           "range": true,
           "refId": "A"
         },
@@ -2252,10 +2252,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "bottomk(10, max by (name, mac, ssid) (omada_client_snr_dbm{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",wireless=\"true\"}))",
+          "expr": "bottomk(10, max by (job, instance, bridge_id, site, site_id, name, mac, ssid) (omada_client_snr_dbm{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",wireless=\"true\"}))",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{name}} · {{ssid}} SNR",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{ssid}} SNR",
           "range": true,
           "refId": "B"
         }
@@ -2366,10 +2366,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name) (omada_port_link_status{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_link_status{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · port {{port}} {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · port {{port}} {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -2477,10 +2477,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name) (omada_port_link_speed_mbps{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_link_speed_mbps{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · port {{port}} {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · port {{port}} {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -2557,10 +2557,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name) (omada_port_power_watts{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_port_power_watts{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · port {{port}} {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · port {{port}} {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -2658,10 +2658,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac, port, name) (rate(omada_port_link_rx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (rate(omada_port_link_rx{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{device_name}} · {{port}} RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{port}} RX",
           "range": true,
           "refId": "A"
         },
@@ -2672,10 +2672,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac, port, name) (rate(omada_port_link_tx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (rate(omada_port_link_tx{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{device_name}} · {{port}} TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{port}} TX",
           "range": true,
           "refId": "B"
         }
@@ -2773,10 +2773,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (rate(omada_lag_link_rx{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{device_name}} · LAG {{lag_id}} RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · LAG {{lag_id}} RX",
           "range": true,
           "refId": "A"
         },
@@ -2787,10 +2787,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (rate(omada_lag_link_tx{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{device_name}} · LAG {{lag_id}} TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · LAG {{lag_id}} TX",
           "range": true,
           "refId": "B"
         }
@@ -2888,10 +2888,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, lag_id, name) (omada_lag_link_status{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (omada_lag_link_status{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · LAG {{lag_id}} {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · LAG {{lag_id}} {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -2999,10 +2999,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, lag_id, name) (omada_lag_link_speed_mbps{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, lag_id, name) (omada_lag_link_speed_mbps{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · LAG {{lag_id}} {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · LAG {{lag_id}} {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -3079,10 +3079,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac) (omada_device_poe_remain_watts{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac) (omada_device_poe_remain_watts{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}}",
           "range": false,
           "refId": "A"
         }
@@ -3165,10 +3165,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (site, device_name) (omada_controller_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name) (omada_controller_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{device_name}}",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{device_name}}",
           "range": false,
           "refId": "A"
         }
@@ -3238,10 +3238,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (site, device_name, storage_name) (omada_controller_storage_available_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, storage_name) (omada_controller_storage_available_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{storage_name}}",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{storage_name}}",
           "range": false,
           "refId": "A"
         }
@@ -3332,10 +3332,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name, ip) (omada_wan_internet_state{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name, ip) (omada_wan_internet_state{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -3426,10 +3426,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name, ip) (omada_wan_status{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name, ip) (omada_wan_status{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -3527,10 +3527,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac, port, name) (omada_wan_rx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) * 8000",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_rx_rate{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) * 8000",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}} RX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}} RX",
           "range": true,
           "refId": "A"
         },
@@ -3541,10 +3541,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (device_name, device_mac, port, name) (omada_wan_tx_rate{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) * 8000",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_tx_rate{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"}) * 8000",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}} TX",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}} TX",
           "range": true,
           "refId": "B"
         }
@@ -3642,10 +3642,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "max by (device_name, device_mac, port, name) (omada_wan_latency{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_latency{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": false,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}}",
           "range": true,
           "refId": "A"
         }
@@ -3753,10 +3753,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (device_name, device_mac, port, name) (omada_wan_link_speed_mbps{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, device_name, device_mac, port, name) (omada_wan_link_speed_mbps{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\",device_mac=~\"${Device:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{device_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{device_name}} · {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -3847,10 +3847,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (gateway_name, gateway_mac, port, name, ip) (omada_isp_status{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, gateway_name, gateway_mac, port, name, ip) (omada_isp_status{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{gateway_name}} · {{name}}",
+          "legendFormat": "${job} / ${instance} · {{gateway_name}} · {{name}}",
           "range": false,
           "refId": "A"
         }
@@ -3927,10 +3927,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (gateway_name, gateway_mac, port, name) (omada_isp_download_speed{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, gateway_name, gateway_mac, port, name) (omada_isp_download_speed{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{gateway_name}} · {{name}} down",
+          "legendFormat": "${job} / ${instance} · {{gateway_name}} · {{name}} down",
           "range": false,
           "refId": "A"
         },
@@ -3941,10 +3941,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (gateway_name, gateway_mac, port, name) (omada_isp_upload_speed{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, gateway_name, gateway_mac, port, name) (omada_isp_upload_speed{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{gateway_name}} · {{name}} up",
+          "legendFormat": "${job} / ${instance} · {{gateway_name}} · {{name}} up",
           "range": false,
           "refId": "B"
         }
@@ -4048,10 +4048,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (site, name, vpn_type) (omada_vpn_status{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, name, vpn_type) (omada_vpn_status{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{name}} {{vpn_type}}",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{name}} {{vpn_type}}",
           "range": false,
           "refId": "A"
         }
@@ -4142,10 +4142,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (site, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_status{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_status{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{name}} · {{peer_name}}",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{peer_name}}",
           "range": false,
           "refId": "A"
         }
@@ -4222,10 +4222,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (job, instance, site, site_id, name, interface_name, vpn_type) (omada_vpn_uptime{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}) or (max by (job, instance, site, site_id, vpn_id, name, vpn_type) (clamp_min(time() - (omada_site_to_site_vpn_peer_login_timestamp{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"} \u003e 0), 0)) unless on (job, instance, site, site_id, name, vpn_type) max by (job, instance, site, site_id, name, vpn_type) (omada_vpn_uptime{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}))",
+          "expr": "max by (job, instance, bridge_id, site, site_id, name, interface_name, vpn_type) (omada_vpn_uptime{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}) or (max by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type) (clamp_min(time() - (omada_site_to_site_vpn_peer_login_timestamp{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"} \u003e 0), 0)) unless on (job, instance, bridge_id, site, site_id, name, vpn_type) max by (job, instance, bridge_id, site, site_id, name, vpn_type) (omada_vpn_uptime{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{name}} · {{vpn_type}}",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{name}} · {{vpn_type}}",
           "range": false,
           "refId": "A"
         }
@@ -4294,10 +4294,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max by (site, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_login_timestamp{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"} \u003e 0) * 1000",
+          "expr": "max by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (omada_site_to_site_vpn_peer_login_timestamp{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"} \u003e 0) * 1000",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{name}} · {{peer_name}}",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{peer_name}}",
           "range": false,
           "refId": "A"
         }
@@ -4395,10 +4395,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, name, interface_name, vpn_type) (rate(omada_vpn_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{name}} · down",
+          "legendFormat": "${job} / ${instance} · {{name}} · down",
           "range": true,
           "refId": "A"
         },
@@ -4409,10 +4409,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, name, interface_name, vpn_type) (rate(omada_vpn_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{name}} · up",
+          "legendFormat": "${job} / ${instance} · {{name}} · up",
           "range": true,
           "refId": "B"
         }
@@ -4510,10 +4510,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{name}} · down",
+          "legendFormat": "${job} / ${instance} · {{name}} · down",
           "range": true,
           "refId": "A"
         },
@@ -4524,10 +4524,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, vpn_id, name, vpn_type) (rate(omada_site_to_site_vpn_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{name}} · up",
+          "legendFormat": "${job} / ${instance} · {{name}} · up",
           "range": true,
           "refId": "B"
         }
@@ -4625,10 +4625,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_down_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{name}} · {{peer_name}} down",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{peer_name}} down",
           "range": true,
           "refId": "A"
         },
@@ -4639,10 +4639,10 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (site, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
+          "expr": "sum by (job, instance, bridge_id, site, site_id, name, peer_name, peer_id) (rate(omada_site_to_site_vpn_peer_up_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}[$__rate_interval])) * 8",
           "instant": false,
           "interval": "1m",
-          "legendFormat": "{{name}} · {{peer_name}} up",
+          "legendFormat": "${job} / ${instance} · {{name}} · {{peer_name}} up",
           "range": true,
           "refId": "B"
         }
@@ -4732,10 +4732,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10, sum by (site, family_id, family_name) (omada_dpi_category_traffic_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}))",
+          "expr": "topk(10, sum by (job, instance, bridge_id, site, site_id, family_id, family_name) (omada_dpi_category_traffic_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{family_name}}",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{family_name}}",
           "range": false,
           "refId": "A"
         }
@@ -4812,10 +4812,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10, sum by (site, application_id, application_name) (omada_dpi_application_traffic_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}))",
+          "expr": "topk(10, sum by (job, instance, bridge_id, site, site_id, application_id, application_name) (omada_dpi_application_traffic_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}))",
           "instant": true,
           "interval": "",
-          "legendFormat": "{{site}} · {{application_name}}",
+          "legendFormat": "${job} / ${instance} · {{site}} · {{application_name}}",
           "range": false,
           "refId": "A"
         }
@@ -4885,10 +4885,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(omada_dpi_total_traffic_bytes{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "sum(omada_dpi_total_traffic_bytes{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "Classified",
+          "legendFormat": "${job} / ${instance} · Classified",
           "range": false,
           "refId": "A"
         }
@@ -4958,10 +4958,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "max(omada_dpi_scrape_window_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"})",
+          "expr": "max(omada_dpi_scrape_window_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"})",
           "instant": true,
           "interval": "",
-          "legendFormat": "Window",
+          "legendFormat": "${job} / ${instance} · Window",
           "range": false,
           "refId": "A"
         }
@@ -4993,19 +4993,16 @@
         "type": "datasource"
       },
       {
-        "allValue": ".+",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "$datasource"
         },
         "definition": "label_values(omada_device_uptime_seconds, job)",
-        "includeAll": true,
-        "label": "Job",
-        "multi": true,
+        "description": "Select one scrape job. Sources are never combined automatically.",
+        "includeAll": false,
+        "label": "Scrape job",
+        "multi": false,
         "name": "job",
         "options": [],
         "query": {
@@ -5021,26 +5018,23 @@
         "type": "query"
       },
       {
-        "allValue": ".+",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\"}, instance)",
-        "includeAll": true,
-        "label": "Instance",
-        "multi": true,
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\"}, instance)",
+        "description": "Select one unique exporter endpoint. Legacy series without bridge_id remain supported.",
+        "includeAll": false,
+        "label": "Bridge endpoint",
+        "multi": false,
         "name": "instance",
         "options": [],
         "query": {
           "label": "instance",
-          "metric": "omada_device_uptime_seconds{job=~\"$job\"}",
+          "metric": "omada_device_uptime_seconds{job=~\"${job:regex}\"}",
           "qryType": 1,
-          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\"}, instance)",
+          "query": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\"}, instance)",
           "refId": "PrometheusVariableQueryEditor-Instance"
         },
         "refresh": 2,
@@ -5058,7 +5052,7 @@
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}, site)",
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}, site)",
         "includeAll": true,
         "label": "Site",
         "multi": true,
@@ -5066,9 +5060,9 @@
         "options": [],
         "query": {
           "label": "site",
-          "metric": "omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}",
+          "metric": "omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}",
           "qryType": 1,
-          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\"}, site)",
+          "query": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\"}, site)",
           "refId": "PrometheusVariableQueryEditor-Site"
         },
         "refresh": 2,
@@ -5086,7 +5080,7 @@
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}, device_mac)",
+        "definition": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}, device_mac)",
         "includeAll": true,
         "label": "Device MAC",
         "multi": true,
@@ -5094,9 +5088,9 @@
         "options": [],
         "query": {
           "label": "device_mac",
-          "metric": "omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}",
+          "metric": "omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}",
           "qryType": 1,
-          "query": "label_values(omada_device_uptime_seconds{job=~\"$job\",instance=~\"$instance\",site=~\"${Site:regex}\"}, device_mac)",
+          "query": "label_values(omada_device_uptime_seconds{job=~\"${job:regex}\",instance=~\"${instance:regex}\",site=~\"${Site:regex}\"}, device_mac)",
           "refId": "PrometheusVariableQueryEditor-Device"
         },
         "refresh": 2,
@@ -5134,6 +5128,6 @@
   "timezone": "browser",
   "title": "Omada Overview",
   "uid": "omada-overview",
-  "version": 12,
+  "version": 13,
   "weekStart": ""
 }
