@@ -2,6 +2,7 @@
 
 ### Fixed
 - Stop promoting historical clients classified as "Omada Controller" into connected controller rows in Home Assistant; identify infrastructure by scoped device metrics and require active client presence for other client data.
+- Discover Wi-Fi reconnect controls beyond the first ten clients on standard and Fusion controllers by using Web API pagination and counting actual returned rows, including when the controller caps page sizes.
 
 ## [2.4.2] - 2026-10-12
 
