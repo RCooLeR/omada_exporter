@@ -236,6 +236,7 @@ The Docker image health check calls `/healthz`.
 | Variable | Default | Required | Purpose |
 | --- | --- | --- | --- |
 | `OMADA_BRIDGE_ID` | empty | no | Immutable unique namespace for an additional bridge (`--bridge-id`). Empty preserves legacy identities. Non-empty: 1–64 lowercase letters/digits/hyphens, beginning and ending with a letter or digit. |
+| `OMADA_ALLOW_DEVICE_CONTROL` | `false` | no | Opt in to MQTT reboot/reconnect buttons (`--allow-device-control`). Requires MQTT and controller write permissions; see [Home Assistant controls](./home-assistant.md). |
 | `OMADA_HOST` | empty | yes | Controller URL including protocol. |
 | `OMADA_USER` | empty | yes | Omada service user. |
 | `OMADA_PASS` | empty | yes | Omada service user password. |

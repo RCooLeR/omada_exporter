@@ -1,6 +1,18 @@
 # Card Installation
 
-The cards are built with Vite and Lit. Build them locally, copy the output to Home Assistant `www`, then register the JavaScript module as a Lovelace resource.
+Download the tested `omada-network-card.js` bundle from the [latest release](https://github.com/RCooLeR/omada_exporter/releases/latest), or build it locally with Vite and Lit. Copy the bundle to Home Assistant `www`, then register the JavaScript module as a Lovelace resource.
+
+## Release Download
+
+Release assets include `omada-network-card.js` and the three sample Grafana dashboards (`dashboard.json`, `omada-device-details.json`, and `simple-omada-dashboard.json`). Download the bundle and `checksums.txt` from the same release. Its SHA-256 hash is listed in `checksums.txt`, and the release workflow generates GitHub artifact attestations for these assets.
+
+On Linux or macOS, verify the downloaded bundle without requiring the other release assets:
+
+```bash
+grep '  omada-network-card.js$' checksums.txt | shasum -a 256 --check
+```
+
+For Home Assistant, install the JavaScript file below; the JSON files are imported separately in Grafana. No local Node.js installation is needed when using the release bundle.
 
 ## Build
 

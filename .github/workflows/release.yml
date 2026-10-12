@@ -46,6 +46,38 @@ jobs:
           go-version-file: bridge/go.mod
           cache-dependency-path: bridge/go.sum
 
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ha-cards/package-lock.json
+
+      - name: Set up pinned npm
+        run: |
+          npm install --global "$(node -p 'require("./ha-cards/package.json").packageManager')"
+          npm --version
+
+      - name: Validate and build Home Assistant release bundle
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run typecheck
+          npm test
+          npm run build
+          test -s dist/omada-network-card.js
+        working-directory: ha-cards
+
+      - name: Validate Grafana release dashboards
+        run: |
+          go generate ./docs/dashboards
+          git diff --exit-code -- docs/dashboards/*.json
+          go test ./cmd -run '^TestGrafanaDashboards' -count=1
+          for dashboard in dashboard.json omada-device-details.json simple-omada-dashboard.json; do
+            test -s "docs/dashboards/${dashboard}"
+          done
+        working-directory: bridge
+
       - name: Smoke test release image
         run: |
           smoke_dir="${RUNNER_TEMP}/omada-exporter-smoke/linux/amd64"

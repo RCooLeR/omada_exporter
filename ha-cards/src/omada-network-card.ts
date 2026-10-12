@@ -44,8 +44,17 @@ import {
   vpnUptimeSeconds
 } from "./model";
 import { registerCustomCard } from "./register-card";
+import { controlAvailable, controlScopeLabel, controlTarget, findControlEntity } from "./control-model";
+import type { ControlTarget } from "./control-model";
 
 type Selection = { kind: "device"; key: string } | { kind: "client"; key: string } | { kind: "dpi"; key: "dpi" };
+type ControlState = {
+  phase: "confirm" | "pending" | "success" | "error";
+  context: string;
+  target: ControlTarget;
+  entityId: string;
+  message?: string;
+};
 type DeviceMeta = {
   pendingUpdate: boolean;
   updateTarget: string;
@@ -93,7 +102,9 @@ export class OmadaNetworkCard extends LitElement {
     _selection: { state: true },
     _dpiCategoryFilters: { state: true },
     _clientFilter: { state: true },
-    _deviceFilter: { state: true }
+    _deviceFilter: { state: true },
+    _controlState: { state: true },
+    _controlPending: { state: true }
   };
 
   static override styles = [css`
@@ -274,6 +285,14 @@ export class OmadaNetworkCard extends LitElement {
       .header, .content, .link-grid, .detail-hero, .chart-stack, .detail-bottom { grid-template-columns: 1fr; }
     }
     @media (max-width: 600px) { .chips, .chips.has-dpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .control-box { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+    .control-box p { margin: 8px 0; overflow-wrap: anywhere; }
+    .control-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .control-action { cursor: pointer; font: inherit; color: inherit; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--surface-strong); }
+    .control-action.danger { border-color: #f19a68; color: #ffd2b8; }
+    .control-action:focus-visible { outline: 2px solid #54d1ff; outline-offset: 3px; }
+    .control-action:disabled { opacity: 0.55; cursor: not-allowed; }
+    .control-error { color: #ffb1b1; }
   `, dpiStyles, networkQualityStyles];
 
   private _hass: HomeAssistant | undefined;
@@ -296,6 +315,8 @@ export class OmadaNetworkCard extends LitElement {
   private _pendingUpdateCount = 0;
   private _selectedDevice: DeviceRecord | undefined;
   private _selectedClient: ClientRecord | undefined;
+  private _controlState: ControlState | undefined;
+  private _controlPending = false;
   private readonly _chartController = new ChartController(this, () => this.syncCharts());
   private readonly _deviceMeta = new WeakMap<DeviceRecord, DeviceMeta>();
   private readonly _clientMeta = new WeakMap<ClientRecord, ClientMeta>();
@@ -307,6 +328,7 @@ export class OmadaNetworkCard extends LitElement {
     if (!config?.type) {
       throw new Error("Card type is required");
     }
+    this._controlState = undefined;
     this._config = { logo_mode: "auto", device_limit: 100, client_limit: 150, show_vpn_peers: true, ...config };
   }
 
@@ -352,6 +374,10 @@ export class OmadaNetworkCard extends LitElement {
 
     if (modelChanged || changed.has("_selection")) {
       this.refreshSelectedRecords();
+    }
+    if (this._controlState && (this._controlState.context !== this.controlContext() ||
+        this.currentControl()?.target.key !== this._controlState.target.key)) {
+      this._controlState = undefined;
     }
   }
 
@@ -499,10 +525,12 @@ export class OmadaNetworkCard extends LitElement {
   }
 
   private selectDevice(key: string): void {
+    if (this._selection?.kind !== "device" || this._selection.key !== key) this._controlState = undefined;
     this._selection = { kind: "device", key };
   }
 
   private selectClient(key: string): void {
+    if (this._selection?.kind !== "client" || this._selection.key !== key) this._controlState = undefined;
     this._selection = { kind: "client", key };
   }
 
@@ -541,7 +569,7 @@ export class OmadaNetworkCard extends LitElement {
     return html`${chips}${dpi.available ? html`
       <button type="button" class="chip ${this._selection?.kind === "dpi" ? "active" : ""}"
         aria-label="Show DPI traffic insights" aria-controls="inspection-detail" aria-pressed=${this._selection?.kind === "dpi"}
-        @click=${() => { this._selection = { kind: "dpi", key: "dpi" }; }}>
+        @click=${() => { this._controlState = undefined; this._selection = { kind: "dpi", key: "dpi" }; }}>
         <span class="chip-copy"><span class="chip-label">DPI</span><span class="chip-sub">${dpi.categories.length} categories</span></span>
         <span class="chip-value">${dpi.applications.length} apps</span>
       </button>
@@ -848,6 +876,7 @@ export class OmadaNetworkCard extends LitElement {
               ${this.renderDetailStat("Uptime", formatUptimeSeconds(uptime))}
               ${this.renderDetailStat("Clients", String(device.clients.length))}
             </div>
+            ${this.renderControl(controlTarget("device", device))}
           </div>
           <div class="detail-card">
             <div class="section-title">Quick Read</div>
@@ -963,6 +992,7 @@ export class OmadaNetworkCard extends LitElement {
                 : this.renderDetailStat("Upload", upActivity ? formatRateBytes(upActivity) : formatRateBits(tx))}
               ${client.wireless ? this.renderDetailStat("TX", formatRateBits(tx)) : nothing}
             </div>
+            ${this.renderControl(controlTarget("client", client))}
           </div>
           <div class="detail-card">
             <div class="section-title">Path</div>
@@ -1019,6 +1049,89 @@ export class OmadaNetworkCard extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  private controlContext(): string {
+    return JSON.stringify([this._selection, this._config?.bridge_id ?? "", this._config?.site_id ?? "", this._config?.site ?? ""]);
+  }
+
+  private currentControl() {
+    if (!this.hass || typeof this.hass.callService !== "function" || !this._selection || this._selection.kind === "dpi") return undefined;
+    // Re-read the current HA snapshot, even if Lit has not processed a pending
+    // selection/configuration/state update yet.
+    const model = getDashboardModel(this.hass, this._config);
+    const kind = this._selection.kind;
+    const record = kind === "device" ? model.deviceByKey.get(this._selection.key) : model.clientByKey.get(this._selection.key);
+    const target = record && controlTarget(kind, record);
+    if (!target) return undefined;
+    const entity = findControlEntity(this.hass, target);
+    return entity ? { target, entity } : undefined;
+  }
+
+  private beginControl(target: ControlTarget): void {
+    if (this._controlPending) return;
+    const current = this.currentControl();
+    if (!current || current.target.key !== target.key || !controlAvailable(current.entity)) return;
+    this._controlState = { phase: "confirm", context: this.controlContext(), target, entityId: current.entity.entity_id };
+  }
+
+  private async confirmControl(): Promise<void> {
+    const confirmation = this._controlState;
+    if (!confirmation || confirmation.phase !== "confirm" || this._controlPending) return;
+    const current = this.currentControl();
+    if (confirmation.context !== this.controlContext()) {
+      this._controlState = undefined;
+      return;
+    }
+    if (!current || current.target.key !== confirmation.target.key || current.entity.entity_id !== confirmation.entityId || !controlAvailable(current.entity)) {
+      this._controlState = { ...confirmation, phase: "error", message: "Control is no longer available. Refresh the selection before trying again." };
+      return;
+    }
+    const operation: ControlState = { ...confirmation, phase: "pending" };
+    this._controlPending = true;
+    this._controlState = operation;
+    try {
+      await this.hass!.callService!("button", "press", { entity_id: operation.entityId });
+      if (this._controlState === operation && operation.context === this.controlContext() && this.currentControl()?.target.key === operation.target.key) {
+        this._controlState = { ...operation, phase: "success", message: "Request sent to bridge. This does not confirm the controller completed the operation." };
+      }
+    } catch {
+      if (this._controlState === operation && operation.context === this.controlContext() && this.currentControl()?.target.key === operation.target.key) {
+        this._controlState = { ...operation, phase: "error", message: "Unable to send the request through Home Assistant. Check your permissions, bridge availability and logs before retrying." };
+      }
+    } finally {
+      this._controlPending = false;
+    }
+  }
+
+  private renderControl(target: ControlTarget | undefined) {
+    if (!target || !this.hass || typeof this.hass.callService !== "function") return nothing;
+    const entity = findControlEntity(this.hass, target);
+    if (!entity) return nothing;
+    const label = target.action === "reboot_device" ? "Reboot device" : "Reconnect Wi-Fi client";
+    const state = this._controlState?.target.key === target.key && this._controlState.context === this.controlContext() ? this._controlState : undefined;
+    const available = controlAvailable(entity);
+    return html`<div class="control-box" aria-busy=${state?.phase === "pending"}>
+      ${state?.phase === "confirm" ? html`
+        <p><strong>${label}: ${target.name}</strong> · ${target.mac}</p>
+        <p>${controlScopeLabel(target)}</p>
+        <p>${target.action === "reboot_device" ? "Rebooting disconnects this device and may interrupt the network and access to this bridge." : "This momentarily disconnects the client's Wi-Fi connection; reconnecting depends on the client."}</p>
+        <div class="control-actions">
+          <button type="button" class="control-action danger" ?disabled=${!available || this._controlPending}
+            aria-label=${`Confirm ${label.toLowerCase()} for ${target.name} at ${controlScopeLabel(target)}`}
+            @click=${() => this.confirmControl()}>Confirm ${label.toLowerCase()}</button>
+          <button type="button" class="control-action" @click=${() => { this._controlState = undefined; }}>Cancel</button>
+        </div>
+      ` : html`
+        <div class="control-actions">
+          <button type="button" class="control-action" ?disabled=${!available || this._controlPending}
+            aria-label=${`${label} ${target.name} at ${controlScopeLabel(target)}`}
+            @click=${() => this.beginControl(target)}>${state?.phase === "pending" ? "Sending request…" : label}</button>
+          ${!available ? html`<span>Unavailable</span>` : nothing}
+        </div>
+      `}
+      ${state?.message ? html`<p class=${state.phase === "error" ? "control-error" : ""} role=${state.phase === "error" ? "alert" : "status"}>${state.message}</p>` : nothing}
+    </div>`;
   }
 
   private renderDetailStat(label: string, value: string) {

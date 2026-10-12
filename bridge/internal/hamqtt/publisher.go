@@ -39,6 +39,7 @@ type Publisher struct {
 	retainedStates     map[string]map[string]string
 	retainedLoaded     bool
 	mu                 sync.Mutex
+	controls           *controlState
 }
 
 // clientTracker stores MQTT topics and labels for a tracked client.
@@ -113,16 +114,20 @@ func NewPublisher(client *api.Client, collectors map[string]prometheus.Collector
 		metricSamples:      map[string]metricSample{},
 		retainedDiscovery:  map[string]string{},
 		retainedStates:     map[string]map[string]string{},
+		controls:           newControlState(),
 	}, nil
 }
 
 // Run connects to MQTT and publishes metric updates on a schedule.
 func (p *Publisher) Run(ctx context.Context) error {
+	stopControls := p.startControls(ctx)
+	defer stopControls()
 	p.mqtt = mqtt.NewClient(p.mqttClientOptions())
 	if err := p.connect(ctx); err != nil {
 		return err
 	}
 	defer func() {
+		stopControls()
 		p.publishBytes(p.availabilityTopic, []byte("offline"), true)
 		p.mqtt.Disconnect(250)
 	}()
@@ -174,9 +179,11 @@ func (p *Publisher) mqttClientOptions() *mqtt.ClientOptions {
 	opts.SetWill(p.availabilityTopic, "offline", 0, true)
 	opts.OnConnect = func(client mqtt.Client) {
 		log.Info().Msg("connected to mqtt broker")
+		p.controlsConnected(client)
 		p.publishBytes(p.availabilityTopic, []byte("online"), true)
 	}
 	opts.OnConnectionLost = func(client mqtt.Client, err error) {
+		p.controlsDisconnected()
 		log.Warn().Err(err).Msg("mqtt connection lost")
 	}
 	return opts

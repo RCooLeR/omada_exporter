@@ -14,6 +14,7 @@ const (
 // Config stores the exporter configuration values.
 type Config struct {
 	BridgeID                    string
+	AllowDeviceControl          bool
 	Host                        string
 	Username                    string
 	Password                    string

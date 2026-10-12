@@ -66,6 +66,9 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 	if err := config.ValidateBridgeID(conf.BridgeID); err != nil {
 		return err
 	}
+	if conf.AllowDeviceControl && !conf.MQTTEnabled {
+		return fmt.Errorf("allow-device-control requires mqtt-enabled")
+	}
 	if conf.DumpResponsesOnly && strings.TrimSpace(conf.DumpResponsesDir) == "" {
 		return fmt.Errorf("dump-responses-only requires dump-responses-dir")
 	}

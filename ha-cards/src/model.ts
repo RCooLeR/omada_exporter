@@ -16,6 +16,7 @@ import type {
 } from "./ha-types";
 import { toNumber } from "./format";
 import { attachNetworkQuality, isNetworkQualityMetric } from "./network-quality-model";
+import { isControlEntity } from "./control-model";
 
 const dashboardModelCache = new WeakMap<HomeAssistant["states"], Map<string, DashboardModel>>();
 const recordUpdatedAt = new WeakMap<object, number>();
@@ -96,7 +97,7 @@ export function isDeviceConnected(status: string): boolean {
 }
 
 function isDashboardEntity(entity: HassEntity): boolean {
-  return getMetric(entity).startsWith("omada_") || isClientTrackerEntity(entity) || looksLikeClientEntity(entity);
+  return isControlEntity(entity) || getMetric(entity).startsWith("omada_") || isClientTrackerEntity(entity) || looksLikeClientEntity(entity);
 }
 
 function dashboardStatesChanged(current: HomeAssistant["states"], previous: HomeAssistant["states"], scope: DashboardScope): boolean {
@@ -134,6 +135,7 @@ export function cardHassChanged(current: HomeAssistant | undefined, previous: Ho
   if (current.themes?.darkMode !== previous.themes?.darkMode) {
     return true;
   }
+  if (typeof current.callService !== typeof previous.callService) return true;
 
   return dashboardStatesChanged(current.states, previous.states, scope);
 }
@@ -817,7 +819,7 @@ export function buildDashboardModel(hass: HomeAssistant, filter?: string | Dashb
   const qualityEntities: HassEntity[] = [];
 
   for (const entity of Object.values(hass.states)) {
-    if (!matchesScope(entity, scope)) {
+    if (entity.entity_id.startsWith("button.") || !matchesScope(entity, scope)) {
       continue;
     }
     if (isClientTrackerEntity(entity)) {
@@ -840,7 +842,7 @@ export function buildDashboardModel(hass: HomeAssistant, filter?: string | Dashb
   }
 
   for (const entity of Object.values(hass.states)) {
-    if (!matchesScope(entity, scope)) {
+    if (entity.entity_id.startsWith("button.") || !matchesScope(entity, scope)) {
       continue;
     }
 

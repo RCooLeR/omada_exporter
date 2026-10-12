@@ -17,9 +17,10 @@ It ships:
 
 ## Development
 
-Use Node.js 22.12 or newer (Node.js 24 LTS is recommended) and npm 11.
+Use Node.js 24.15 or newer in the 24 LTS series (recommended), Node.js 22.22.2 or newer in the 22 series, or Node.js 26+. Install the pinned npm 12.2.0 version before installing dependencies.
 
 ```bash
+npm install --global npm@12.2.0
 npm ci
 npm run typecheck
 npm test

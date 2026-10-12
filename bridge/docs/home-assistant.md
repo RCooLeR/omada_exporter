@@ -33,6 +33,40 @@ If the broker does not require authentication, omit `OMADA_MQTT_USER` and `OMADA
 
 If the MQTT broker is unavailable when OmadaBridge starts, the exporter still starts and Prometheus endpoints remain available. MQTT publishing retries in the background until the broker is reachable.
 
+## Optional Device Controls
+
+Control buttons are **disabled by default**. To opt in, keep MQTT enabled and set:
+
+```yaml
+environment:
+  OMADA_ALLOW_DEVICE_CONTROL: "true"
+```
+
+The bridge discovers Home Assistant MQTT buttons for:
+
+- Rebooting a currently connected AP, standalone switch, or gateway, including a supported Fusion gateway. Controller appliances/software, OLTs, and switch stacks are excluded.
+- Reconnecting a currently active, unblocked wireless client. This disconnects its Wi-Fi association; the client decides whether and when to reconnect. It does not reboot or block the client.
+
+Reboots interrupt service; rebooting the gateway may also interrupt access to the controller. The Home Assistant cards ask for confirmation. Native Home Assistant button entities and MQTT publishers can bypass the card's confirmation, so restrict MQTT command-topic publishing and Home Assistant access to trusted administrators. This switch is not an authentication mechanism. Controller accounts must have the appropriate permissions, and no HTTP write endpoint is added to the exporter.
+
+Eligibility comes from fresh controller inventory, independently of telemetry caches, and is checked again immediately before each controller command. An inventory or subscription failure makes controls unavailable. Availability requires the bridge, the controls subsystem, and the target to all be online. A bridge restart or MQTT reconnect starts unavailable until inventory is refreshed. Setting the option back to `false` publishes a retained controls-offline marker: previously discovered buttons cannot remain available, and the disabled bridge does not subscribe to commands.
+
+Commands use QoS 0, `retain: false`, and the exact payload `PRESS`. Retained/replayed, duplicate, non-QoS-0, malformed, unknown-target, stale, or wrong-site requests are rejected. The bridge allows one pending/in-flight command globally and a 60-second cooldown per action and target. Queued requests expire after 15 seconds and cannot cross an MQTT reconnect. A timed-out or failed controller mutation is **never automatically retried**; verify the device's state before trying again.
+
+Buttons use the existing device/client registry identity and expose these JSON attributes for card integrations:
+
+```yaml
+omada_control: reboot_device # or reconnect_client
+target_mac: aa:bb:cc:dd:ee:ff
+site: Default
+site_id: controller-site-id
+bridge_id: slobidska44 # omitted for the legacy bridge
+```
+
+Control attributes deliberately have no `metric` field. After a request, `last_status` is `accepted`, `rejected`, or `failed`, with `last_status_at` as a UTC timestamp; controller response bodies and credentials are not published. `accepted` means the controller accepted the request, **not** that the reboot/reconnection completed. Cards therefore report “Request sent” and continue showing normal live telemetry.
+
+Command and target-availability topics are scoped below `<effective MQTT prefix>/controls/<site key>/<action>/<MAC key>/`. Named bridges use their existing `_<bridge_id>` prefix and discovery node. Retained button cleanup can remove only verified control discovery records in that bridge's own namespace; it does not adopt another bridge's devices or commands. Removed clients/devices have their buttons withdrawn after a successful inventory refresh.
+
 ## Multiple bridges on one MQTT broker and Home Assistant
 
 Leave `OMADA_BRIDGE_ID` unset on an existing installation to retain its MQTT
