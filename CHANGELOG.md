@@ -1,6 +1,9 @@
 ## [Unreleased]
 
+## [2.4.3] - 2026-10-17
+
 ### Fixed
+- Report missing optional OpenAPI credentials once at startup, including at the default log level, and skip unavailable client, ISP, VPN, WAN and network-quality polling instead of repeating expected errors. Keep Web API metrics and Fusion web-session authentication active; advertise only enabled collector endpoints.
 - Stop promoting historical clients classified as "Omada Controller" into connected controller rows in Home Assistant; identify infrastructure by scoped device metrics and require active client presence for other client data.
 - Discover Wi-Fi reconnect controls beyond the first ten clients on standard and Fusion controllers by using Web API pagination and counting actual returned rows, including when the controller caps page sizes.
 

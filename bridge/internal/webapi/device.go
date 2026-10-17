@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/RCooLeR/omada_exporter/internal/api"
+	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/RCooLeR/omada_exporter/internal/model"
 	"github.com/RCooLeR/omada_exporter/internal/openapi"
 	"github.com/rs/zerolog/log"
@@ -73,11 +74,12 @@ func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
 				}
 			}
 		case *model.Gateway:
-			err := openClient.GetWans(dev)
-			if err != nil {
-				log.Error().Err(err).Msg("Error getting wans")
+			if c.OpenAPIAuthMode != config.OpenAPIAuthDisabled {
+				if err := openClient.GetWans(dev); err != nil {
+					log.Error().Err(err).Msg("Error getting wans")
+				}
 			}
-			err = c.GetGatewayPorts(dev)
+			err := c.GetGatewayPorts(dev)
 			if err != nil {
 				log.Error().Err(err).Msg("Error getting gateway ports")
 			}
