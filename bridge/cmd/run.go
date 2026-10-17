@@ -161,60 +161,10 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 		}
 	}
 
-	insightsLink := ""
-	if conf.TrackInsightMetrics {
-		insightsLink = `<p>
-				<a href="/metrics/insights">Insights Metrics</a>
-			</p>`
-	}
-	if conf.TrackNetworkQualityMetrics {
-		insightsLink += `<p><a href="/metrics/network-quality">Network Quality Metrics</a></p>`
-	}
-
 	mux.HandleFunc("/healthz", health.livez)
 	mux.HandleFunc("/readyz", health.readyz)
 	log.Info().Msg(fmt.Sprintf("listening on :%s", conf.Port))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(fmt.Sprintf(`<html>
-    <head>
-	<title>Omada exporter</title>
-	</head>
-    	<body>
-			<h1>Omada exporter</h1>
-			<p>
-				<a href="/healthz">Health</a>
-			</p>
-			<p>
-				<a href="/readyz">Ready</a>
-			</p>
-			<p>
-				<a href="/metrics">Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/controller">Controller Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/alert">Alert Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/device">Device Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/client">Client Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/vpn">Vpn Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/vpn-stats">Vpn Stats Metrics</a>
-			</p>
-			<p>
-				<a href="/metrics/isp">ISP Metrics</a>
-			</p>
-			%s
-    	</body>
-    </html>`, insightsLink)))
-	})
+	mux.HandleFunc("/", newExporterIndexHandler(collectors))
 
 	metricsHandler := newMetricsHandler(registry, registerer)
 	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(registerer, metricsHandler))
@@ -246,6 +196,34 @@ func runExporterWithConfig(ctx context.Context, _ *cli.Command, conf *config.Con
 			return nil
 		}
 		return err
+	}
+}
+
+func newExporterIndexHandler(collectors map[string]prometheus.Collector) http.HandlerFunc {
+	var links strings.Builder
+	for _, endpoint := range []struct{ name, title string }{
+		{"controller", "Controller"}, {"alert", "Alert"}, {"device", "Device"},
+		{"client", "Client"}, {"vpn", "Vpn"}, {"vpn-stats", "Vpn Stats"},
+		{"isp", "ISP"}, {"insights", "Insights"}, {"network-quality", "Network Quality"},
+	} {
+		if _, enabled := collectors[endpoint.name]; enabled {
+			fmt.Fprintf(&links, `<p><a href="/metrics/%s">%s Metrics</a></p>`, endpoint.name, endpoint.title)
+		}
+	}
+	page := fmt.Sprintf(`<html><head><title>Omada exporter</title></head><body>
+<h1>Omada exporter</h1>
+<p><a href="/healthz">Health</a></p>
+<p><a href="/readyz">Ready</a></p>
+<p><a href="/metrics">Metrics</a></p>
+%s</body></html>`, links.String())
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Missing collector routes must not masquerade as successful HTML scrapes.
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(page))
 	}
 }
 

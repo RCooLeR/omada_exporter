@@ -342,7 +342,9 @@ func (c *Client) configureOpenAPIAuth() error {
 	}
 
 	c.OpenAPIAuthMode = config.OpenAPIAuthDisabled
-	log.Warn().Msg("OpenAPI credentials are not configured; OpenAPI-backed metrics will be skipped")
+	// This startup-only configuration notice must remain visible at the default
+	// error threshold without reporting an expected disabled capability as an error.
+	log.Log().Str("event", "openapi_disabled").Msg("OMADA_CLIENT_ID and OMADA_SECRET_ID are not configured; skipping OpenAPI-backed client, ISP, VPN, WAN and network-quality data; Web API collection continues")
 	return nil
 }
 

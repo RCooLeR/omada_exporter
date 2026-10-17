@@ -43,6 +43,17 @@ Short version: create a service user under `Global View > Account > Account`. Fo
 
 The CLI requires `OMADA_HOST`, `OMADA_USER`, and `OMADA_PASS`. `OMADA_CLIENT_ID` and `OMADA_SECRET_ID` are optional. When they are present, OmadaBridge uses standard OpenAPI client-credentials authentication. When they are absent and Fusion is detected, OmadaBridge uses Fusion's web-session OpenAPI mode. When OpenAPI is unavailable, Web API-backed controller, alert, device, port, and optional DPI insight metrics can still be collected.
 
+On a standard controller without either optional OpenAPI credential, startup emits
+one `openapi_disabled` configuration notice naming the missing variables and the
+skipped data. It is visible even at the default `LOG_LEVEL=error`, without error
+severity; `LOG_LEVEL=disabled` suppresses it. Client, ISP, VPN, WAN enrichment and
+optional network-quality polling are skipped instead of logging the same failure
+on every Prometheus scrape or MQTT poll. Their per-collector endpoints are omitted
+from the index and return HTTP 404 when unregistered. Explicit
+`OMADA_OPENAPI_AUTH=disabled` skips these sources without claiming credentials are
+missing. Incomplete credential pairs still fail startup, and real request or
+authentication failures in enabled modes remain errors.
+
 ## Docker Compose
 
 ```yaml
