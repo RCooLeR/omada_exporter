@@ -46,6 +46,7 @@ import {
 import { registerCustomCard } from "./register-card";
 import { controlAvailable, controlScopeLabel, controlTarget, findControlEntity } from "./control-model";
 import type { ControlTarget } from "./control-model";
+import { wanDisplayStatus } from "./wan-status-model";
 
 type Selection = { kind: "device"; key: string } | { kind: "client"; key: string } | { kind: "dpi"; key: "dpi" };
 type ControlState = {
@@ -262,6 +263,7 @@ export class OmadaNetworkCard extends LitElement {
     .status-dot { width: 0.7rem; height: 0.7rem; border-radius: 999px; display: inline-block; margin-right: 0.45rem; background: var(--muted); box-shadow: 0 0 18px currentColor; vertical-align: middle; }
     .status-up { color: var(--good); background: var(--good); }
     .status-down { color: var(--bad); background: var(--bad); }
+    .status-unknown { color: var(--muted); background: var(--muted); }
     .detail-shell { grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; height: calc(100% - 2rem); }
     .detail-panel .detail-stat { padding: 0.5rem; }
     .detail-hero { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
@@ -595,7 +597,7 @@ export class OmadaNetworkCard extends LitElement {
             ${repeat(this._model!.isps, (row) => row.key, (row) => {
               const wan = this.findWanFor(row);
               const ispName = this.ispDisplayName(row, wan);
-              const isUp = (row.metrics.omada_isp_status ?? wan?.metrics.omada_wan_status ?? 0) > 0;
+              const status = wanDisplayStatus(row, wan);
               const latency = wan?.metrics.omada_wan_latency ?? 0;
               const speed = wan?.metrics.omada_wan_link_speed_mbps ?? 0;
               const rx = (wan?.metrics.omada_wan_rx_rate ?? 0) * 1024;
@@ -604,7 +606,7 @@ export class OmadaNetworkCard extends LitElement {
                 <tr>
                   <td>${ispName}</td>
                   <td>${String(row.attrs.ip ?? "-")}</td>
-                  <td><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</td>
+                  <td><span class="status-dot ${status.className}"></span>${status.label}</td>
                   <td>${formatLatency(latency)}</td>
                   <td>${formatSpeedMbps(speed)}</td>
                   <td>${formatRateBytes(rx)} / ${formatRateBytes(tx)}</td>

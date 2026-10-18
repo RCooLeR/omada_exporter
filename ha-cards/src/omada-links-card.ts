@@ -13,6 +13,7 @@ import {
   vpnUptimeSeconds
 } from "./model";
 import { registerCustomCard } from "./register-card";
+import { wanDisplayStatus } from "./wan-status-model";
 
 export class OmadaLinksCard extends LitElement {
   static override properties = {
@@ -111,6 +112,10 @@ export class OmadaLinksCard extends LitElement {
       color: var(--bad);
       background: var(--bad);
     }
+    .status-unknown {
+      color: var(--muted);
+      background: var(--muted);
+    }
     .empty {
       display: grid;
       place-items: center;
@@ -185,7 +190,7 @@ export class OmadaLinksCard extends LitElement {
             ${repeat(this._model!.isps, (row) => row.key, (row) => {
               const wan = this.findWanFor(row);
               const ispName = this.ispDisplayName(row, wan);
-              const isUp = (row.metrics.omada_isp_status ?? wan?.metrics.omada_wan_status ?? 0) > 0;
+              const status = wanDisplayStatus(row, wan);
               const latency = wan?.metrics.omada_wan_latency ?? 0;
               const speed = wan?.metrics.omada_wan_link_speed_mbps ?? 0;
               const rx = (wan?.metrics.omada_wan_rx_rate ?? 0) * 1024;
@@ -194,7 +199,7 @@ export class OmadaLinksCard extends LitElement {
                 <tr>
                   <td>${ispName}</td>
                   <td>${String(row.attrs.ip ?? "-")}</td>
-                  <td><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${isUp ? "Online" : "Offline"}</td>
+                  <td><span class="status-dot ${status.className}"></span>${status.label}</td>
                   <td>${formatLatency(latency)}</td>
                   <td>${formatSpeedMbps(speed)}</td>
                   <td>${formatRateBytes(rx)} / ${formatRateBytes(tx)}</td>
