@@ -1,0 +1,153 @@
+package omada
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/RCooLeR/omada_exporter/internal/model"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
+)
+
+const deviceEnrichmentConcurrency = 4
+
+// GetDevices returns cached device inventory enriched with related port, LAG,
+// and WAN details for the current site.
+func (c *Client) GetDevices() ([]model.DevicesInterface, error) {
+	return c.session.FetchCached("webapi:devices", c.getDevicesFresh)
+}
+
+// getDevicesFresh loads the base device inventory from the Web API, decodes the
+// concrete device types, and enriches switches, APs, and gateways with
+// additional port and WAN details from follow-up requests.
+func (c *Client) getDevicesFresh() ([]model.DevicesInterface, error) {
+	omadaCID, siteID := c.ContextIDs()
+	url := fmt.Sprintf("%s/%s/api/v2/sites/%s/devices", c.session.Config.Host, omadaCID, siteID)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.session.MakeLoggedInRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	body, err := session.ReadResponseBody(resp, "devices")
+	if err != nil {
+		return nil, err
+	}
+	log.Info().Msg("Received data from devices endpoint")
+	log.Debug().Bytes("data", body).Msg("Received data from devices endpoint")
+
+	if err := session.ValidateAPIResponse(body, "devices"); err != nil {
+		return nil, err
+	}
+
+	var devicedata devicesResponse
+	err = json.Unmarshal(body, &devicedata)
+	if err != nil {
+		return nil, err
+	}
+
+	enrichDevices(devicedata.Result, func(d model.DevicesInterface) {
+		switch dev := d.(type) {
+		case *model.Switch:
+			err := c.GetPortsAndLags(dev)
+			if err != nil {
+				log.Error().Err(err).Msg("Error getting ports and lags")
+			}
+		case *model.AccessPoint:
+			if dev.DeviceMisc.LanPortsNum > 0 {
+				err := c.GetApPorts(dev)
+				if err != nil {
+					log.Error().Err(err).Msg("Error getting ports and lags")
+				}
+			}
+		case *model.Gateway:
+			if c.OpenAPIEnabled() {
+				if err := c.GetWans(dev); err != nil {
+					log.Error().Err(err).Msg("Error getting wans")
+				}
+			}
+			err := c.GetGatewayPorts(dev)
+			if err != nil {
+				log.Error().Err(err).Msg("Error getting gateway ports")
+			}
+		}
+	})
+
+	return devicedata.Result, nil
+}
+
+func enrichDevices(devices []model.DevicesInterface, enrich func(model.DevicesInterface)) {
+	var group errgroup.Group
+	group.SetLimit(deviceEnrichmentConcurrency)
+	for _, device := range devices {
+		group.Go(func() error {
+			enrich(device)
+			return nil
+		})
+	}
+	_ = group.Wait()
+}
+
+// devicesResponse wraps the mixed-type device list returned by the Web API.
+type devicesResponse struct {
+	Result []model.DevicesInterface
+}
+
+// UnmarshalJSON decodes device payloads into their concrete model types.
+func (d *devicesResponse) UnmarshalJSON(data []byte) error {
+	var tmp struct {
+		Result []json.RawMessage `json:"result"`
+	}
+
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	for _, raw := range tmp.Result {
+		var hint struct {
+			Type string `json:"type"`
+		}
+
+		if err := json.Unmarshal(raw, &hint); err != nil {
+			return err
+		}
+
+		switch hint.Type {
+		case "gateway":
+			var gw model.Gateway
+			if err := json.Unmarshal(raw, &gw); err != nil {
+				return err
+			}
+			d.Result = append(d.Result, &gw)
+		case "switch":
+			var sw model.Switch
+			if err := json.Unmarshal(raw, &sw); err != nil {
+				return err
+			}
+			d.Result = append(d.Result, &sw)
+		case "ap":
+			var ap model.AccessPoint
+			if err := json.Unmarshal(raw, &ap); err != nil {
+				return err
+			}
+			d.Result = append(d.Result, &ap)
+		case "olt":
+			var olt model.Olt
+			if err := json.Unmarshal(raw, &olt); err != nil {
+				return err
+			}
+			d.Result = append(d.Result, &olt)
+		default:
+			return fmt.Errorf("unknown device type: %s", hint.Type)
+		}
+	}
+
+	return nil
+}

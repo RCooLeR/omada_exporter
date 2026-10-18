@@ -1,9 +1,8 @@
 package collector
 
 import (
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -50,7 +49,7 @@ type DeviceCollector struct {
 	omadaDevice6gRxUtil    *prometheus.Desc
 	omadaRadioInterference *prometheus.Desc
 
-	webClient *webapi.Client
+	client *omada.Client
 }
 
 // Describe sends the collector metric descriptors to Prometheus.
@@ -100,12 +99,12 @@ func (c *DeviceCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // trackPortMetrics reports whether port metrics.
 func (c *DeviceCollector) trackPortMetrics() bool {
-	return trackPortMetrics(c.webClient.Client)
+	return trackPortMetrics(c.client)
 }
 
 // includePortActivityLabel reports whether port activity label.
 func (c *DeviceCollector) includePortActivityLabel() bool {
-	return includePortActivityLabel(c.webClient.Client)
+	return includePortActivityLabel(c.client)
 }
 
 // buildPortLabels builds the port labels.
@@ -142,7 +141,7 @@ func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 		device.GetIp(),
 		device.GetName(),
 		device.GetStatus(),
-		c.webClient.Client.Config.Site,
+		c.client.Settings().Site,
 		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceUptimeSeconds, prometheus.GaugeValue, device.GetUptime(), labels...)
@@ -156,12 +155,12 @@ func (c *DeviceCollector) collectDevice(ch chan<- prometheus.Metric, device mode
 
 // Collect fetches current data and emits Prometheus metrics.
 func (c *DeviceCollector) Collect(ch chan<- prometheus.Metric) {
-	devices, err := c.webClient.GetDevices()
+	devices, err := c.client.GetDevices()
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get devices")
 		return
 	}
-	_, siteID := c.webClient.ContextIDs()
+	_, siteID := c.client.ContextIDs()
 
 	for _, d := range devices {
 		switch item := d.(type) {
@@ -207,7 +206,7 @@ func (c *DeviceCollector) Collect(ch chan<- prometheus.Metric) {
 
 // NewDeviceCollector builds the Prometheus descriptors used to export device,
 // uplink, port, LAG, WAN, and radio metrics.
-func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
+func NewDeviceCollector(apiClient *omada.Client) *DeviceCollector {
 	deviceLabels := []string{
 		"device_mac",
 		"device_type",
@@ -458,8 +457,6 @@ func NewDeviceCollector(apiClient *api.Client) *DeviceCollector {
 			nil,
 		),
 		//api-client
-		webClient: &webapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }

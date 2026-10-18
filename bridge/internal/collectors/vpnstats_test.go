@@ -7,9 +7,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/RCooLeR/omada_exporter/internal/model"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -817,7 +818,7 @@ func TestVpnStatsCollectorGatherDeduplicatesOverlappingQueries(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			apiClient, err := api.Configure(&config.Config{
+			apiClient, err := session.Configure(&config.Config{
 				Host:        server.URL,
 				Username:    "user",
 				Password:    "pass",
@@ -833,7 +834,7 @@ func TestVpnStatsCollectorGatherDeduplicatesOverlappingQueries(t *testing.T) {
 			}
 
 			registry := prometheus.NewPedanticRegistry()
-			if err := registry.Register(NewVpnStatsCollector(apiClient)); err != nil {
+			if err := registry.Register(NewVpnStatsCollector(omada.NewClient(apiClient))); err != nil {
 				t.Fatalf("register VPN collector: %v", err)
 			}
 			families, err := registry.Gather()

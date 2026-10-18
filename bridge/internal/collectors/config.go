@@ -1,51 +1,51 @@
 package collector
 
-import "github.com/RCooLeR/omada_exporter/internal/api"
+import "github.com/RCooLeR/omada_exporter/internal/omada"
 
 // includePortActivityLabel reports whether port activity label.
-func includePortActivityLabel(client *api.Client) bool {
-	if client == nil || client.Config == nil {
+func includePortActivityLabel(client *omada.Client) bool {
+	if client == nil || client.Settings() == nil {
 		return true
 	}
-	return client.Config.IncludePortActivityLabel
+	return client.Settings().IncludePortActivityLabel
 }
 
 // trackPortMetrics reports whether port metrics.
-func trackPortMetrics(client *api.Client) bool {
-	if client == nil || client.Config == nil {
+func trackPortMetrics(client *omada.Client) bool {
+	if client == nil || client.Settings() == nil {
 		return true
 	}
-	return client.Config.TrackPortMetrics
+	return client.Settings().TrackPortMetrics
 }
 
 // trackClientMetrics reports whether client metrics.
-func trackClientMetrics(client *api.Client) bool {
-	if client == nil || client.Config == nil {
+func trackClientMetrics(client *omada.Client) bool {
+	if client == nil || client.Settings() == nil {
 		return true
 	}
-	return client.Config.TrackClientMetrics
+	return client.Settings().TrackClientMetrics
 }
 
 // trackInsightMetrics reports whether optional DPI insight metrics are enabled.
-func trackInsightMetrics(client *api.Client) bool {
-	if client == nil || client.Config == nil {
+func trackInsightMetrics(client *omada.Client) bool {
+	if client == nil || client.Settings() == nil {
 		return true
 	}
-	return client.Config.TrackInsightMetrics
+	return client.Settings().TrackInsightMetrics
 }
 
 // insightWindowSeconds returns the configured DPI insight query window.
-func insightWindowSeconds(client *api.Client) int {
-	if client == nil || client.Config == nil || client.Config.InsightWindowSeconds <= 0 {
+func insightWindowSeconds(client *omada.Client) int {
+	if client == nil || client.Settings() == nil || client.Settings().InsightWindowSeconds <= 0 {
 		return 86400
 	}
-	return client.Config.InsightWindowSeconds
+	return client.Settings().InsightWindowSeconds
 }
 
 // insightApplicationLimit returns the configured DPI application series limit.
-func insightApplicationLimit(client *api.Client) int {
-	if client == nil || client.Config == nil {
+func insightApplicationLimit(client *omada.Client) int {
+	if client == nil || client.Settings() == nil {
 		return 50
 	}
-	return client.Config.InsightApplicationLimit
+	return client.Settings().InsightApplicationLimit
 }

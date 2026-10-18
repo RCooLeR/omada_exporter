@@ -10,8 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -19,7 +19,7 @@ import (
 
 func scopeTestPublisher(t *testing.T, bridgeID string, broker mqtt.Client) *Publisher {
 	t.Helper()
-	client := &api.Client{Config: &config.Config{
+	client := &session.Client{Config: &config.Config{
 		BridgeID: bridgeID, MQTTBroker: "mqtt:1883", MQTTClientID: "omada_exporter",
 		MQTTTopicPrefix: "omada_exporter", MQTTDiscoveryPrefix: "homeassistant", MQTTRetain: true,
 		Site: "Default", MQTTTrackedClientMACs: "aa:bb:cc:dd:ee:ff",
@@ -153,9 +153,9 @@ func TestBridgeScopeMetricDerivedDeviceAndTrackerIdentities(t *testing.T) {
 
 func TestBridgeScopeCustomPrefixesAndClientIDs(t *testing.T) {
 	p := scopeTestPublisher(t, "flat-2", &recordingMQTTClient{})
-	p.client.Config.MQTTTopicPrefix = "/custom/state/"
-	p.client.Config.MQTTClientID = "custom-client"
-	p.client.Config.MQTTDiscoveryPrefix = "ha/discovery"
+	p.client.Settings().MQTTTopicPrefix = "/custom/state/"
+	p.client.Settings().MQTTClientID = "custom-client"
+	p.client.Settings().MQTTDiscoveryPrefix = "ha/discovery"
 	if p.statePrefix() != "custom/state_flat-2" || p.mqttClientOptions().ClientID != "custom-client_flat-2" || p.discoveryNode() != "omada_exporter_flat-2" {
 		t.Fatal("custom settings are not deterministically scoped")
 	}
@@ -282,7 +282,7 @@ func TestBridgeScopeReconciliationAndInfrastructureCleanupCannotDeleteOtherBridg
 				t.Fatalf("cleanup escaped namespace: %s", topic)
 			}
 		}
-		if pub.client.Config.BridgeID != "" {
+		if pub.client.Settings().BridgeID != "" {
 			if _, touched := broker.messages[otherSiteState]; touched {
 				t.Fatal("same-name different site was deleted")
 			}

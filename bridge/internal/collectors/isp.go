@@ -3,8 +3,7 @@ package collector
 import (
 	"fmt"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
-	"github.com/RCooLeR/omada_exporter/internal/openapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -14,7 +13,7 @@ type ispCollector struct {
 	omadaIspStatus        *prometheus.Desc
 	omadaIspDownloadSpeed *prometheus.Desc
 	omadaIspUploadSpeed   *prometheus.Desc
-	client                *openapi.Client
+	client                *omada.Client
 }
 
 // Describe sends the collector metric descriptors to Prometheus.
@@ -27,7 +26,7 @@ func (c *ispCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches current data and emits Prometheus metrics.
 func (c *ispCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
-	config := c.client.Config
+	config := c.client.Settings()
 
 	site := config.Site
 	isp, err := client.GetIsp()
@@ -59,7 +58,7 @@ func (c *ispCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // NewISPCollector builds the Prometheus descriptors used to export ISP metrics.
-func NewISPCollector(apiClient *api.Client) *ispCollector {
+func NewISPCollector(apiClient *omada.Client) *ispCollector {
 	labels := []string{
 		"gateway_name",
 		"gateway_mac",
@@ -92,8 +91,6 @@ func NewISPCollector(apiClient *api.Client) *ispCollector {
 			labels,
 			nil,
 		),
-		client: &openapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }

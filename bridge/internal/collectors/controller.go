@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -17,7 +16,7 @@ type controllerCollector struct {
 	omadaControllerStorageAvailableBytes   *prometheus.Desc
 	omadaControllerStorageTotalBytes       *prometheus.Desc
 	omadaControllerStorageUpgradeAvailable *prometheus.Desc
-	client                                 *webapi.Client
+	client                                 *omada.Client
 }
 
 const controllerStorageBytesPerGB = 1000000000
@@ -34,7 +33,7 @@ func (c *controllerCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches current data and emits Prometheus metrics.
 func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
-	config := c.client.Config
+	config := c.client.Settings()
 	site := config.Site
 	controller, err := client.GetController()
 	if err != nil {
@@ -88,7 +87,7 @@ func (c *controllerCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // NewControllerCollector builds the Prometheus descriptors used to export controller metrics.
-func NewControllerCollector(apiClient *api.Client) *controllerCollector {
+func NewControllerCollector(apiClient *omada.Client) *controllerCollector {
 	labels := []string{
 		"device_name",
 		"device_model",
@@ -139,8 +138,6 @@ func NewControllerCollector(apiClient *api.Client) *controllerCollector {
 			upgradeLabels,
 			nil,
 		),
-		client: &webapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }

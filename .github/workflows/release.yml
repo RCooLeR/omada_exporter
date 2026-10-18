@@ -72,7 +72,7 @@ jobs:
         run: |
           go generate ./docs/dashboards
           git diff --exit-code -- docs/dashboards/*.json
-          go test ./cmd -run '^TestGrafanaDashboards' -count=1
+          go test ./internal/app -run '^TestGrafanaDashboards' -count=1
           for dashboard in dashboard.json omada-device-details.json simple-omada-dashboard.json; do
             test -s "docs/dashboards/${dashboard}"
           done

@@ -23,7 +23,7 @@ func (c *DeviceCollector) collectSwitch(ch chan<- prometheus.Metric, sw *model.S
 		sw.GetIp(),
 		sw.GetName(),
 		sw.GetStatus(),
-		c.webClient.Client.Config.Site,
+		c.client.Settings().Site,
 		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTxRate, prometheus.GaugeValue, sw.TxRate, labels...)

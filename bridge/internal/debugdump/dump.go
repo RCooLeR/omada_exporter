@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	"github.com/rs/zerolog/log"
 )
 
@@ -79,7 +79,7 @@ type manifestFile struct {
 
 // DumpResponses writes a private diagnostic snapshot to a new directory below dir.
 // Raw responses contain private network data and must not be published unreviewed.
-func DumpResponses(ctx context.Context, client *api.Client, dir string) error {
+func DumpResponses(ctx context.Context, client *session.Client, dir string) error {
 	if client == nil || client.Config == nil {
 		return fmt.Errorf("nil client or configuration")
 	}
@@ -500,7 +500,7 @@ func dumpEndpoint(ctx context.Context, client requestClient, dir string, spec en
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		err = fmt.Errorf("%s returned HTTP %d", spec.Name, resp.StatusCode)
 	} else {
-		err = api.ValidateAPIResponse(responseBody, spec.Name)
+		err = session.ValidateAPIResponse(responseBody, spec.Name)
 	}
 	if err != nil {
 		result.Error = err.Error()
@@ -540,7 +540,7 @@ func doRequest(client requestClient, req *http.Request, useOpenAPI bool) (*http.
 }
 
 func parseDevices(body []byte) ([]deviceRef, error) {
-	if err := api.ValidateAPIResponse(body, "devices"); err != nil {
+	if err := session.ValidateAPIResponse(body, "devices"); err != nil {
 		return nil, err
 	}
 	var parsed devicesResponse

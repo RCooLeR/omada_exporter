@@ -20,7 +20,7 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		} {
 			if band.radio != nil && validQualityValue(band.radio.InterUtilization, 100) {
 				ch <- prometheus.MustNewConstMetric(c.omadaRadioInterference, prometheus.GaugeValue,
-					*band.radio.InterUtilization, ap.GetMac(), ap.GetName(), ap.GetType(), c.webClient.Config.Site, siteID, band.name)
+					*band.radio.InterUtilization, ap.GetMac(), ap.GetName(), ap.GetType(), c.client.Settings().Site, siteID, band.name)
 			}
 		}
 	}
@@ -37,7 +37,7 @@ func (c *DeviceCollector) collectAccessPoint(ch chan<- prometheus.Metric, ap *mo
 		ap.GetIp(),
 		ap.GetName(),
 		ap.GetStatus(),
-		c.webClient.Client.Config.Site,
+		c.client.Settings().Site,
 		siteID,
 	}
 	labels := append(deviceLabels,

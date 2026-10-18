@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"strconv"
 	"strings"
@@ -10,6 +11,41 @@ import (
 
 	"github.com/RCooLeR/omada_exporter/internal/config"
 )
+
+func TestCLIInformationalCommandsUseCommandWriter(t *testing.T) {
+	for _, name := range []string{"version", "v", "mdocs", "md"} {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			command := newCLICommand(&config.Config{})
+			command.Writer, command.ErrWriter = &output, io.Discard
+			if err := command.Run(t.Context(), []string{"omada_exporter", name}); err != nil {
+				t.Fatal(err)
+			}
+			if name == "version" || name == "v" {
+				if output.String() != version+"\n" {
+					t.Fatalf("version output = %q", output.String())
+				}
+			} else if !strings.Contains(output.String(), "| Name | Description | Labels |") {
+				t.Fatal("metric docs did not use the command writer")
+			}
+		})
+	}
+}
+
+type failingCommandWriter struct{ err error }
+
+func (writer failingCommandWriter) Write([]byte) (int, error) { return 0, writer.err }
+
+func TestCLIInformationalCommandsPropagateWriteErrors(t *testing.T) {
+	wantErr := errors.New("output unavailable")
+	for _, name := range []string{"version", "mdocs"} {
+		command := newCLICommand(&config.Config{})
+		command.Writer, command.ErrWriter = failingCommandWriter{err: wantErr}, io.Discard
+		if err := command.Run(t.Context(), []string{"omada_exporter", name}); !errors.Is(err, wantErr) {
+			t.Fatalf("%s error = %v, want %v", name, err, wantErr)
+		}
+	}
+}
 
 func TestCLIFlagValidatorsRejectInvalidConfiguration(t *testing.T) {
 	type validatorTest struct {

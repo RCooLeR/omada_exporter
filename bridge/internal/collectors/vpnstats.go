@@ -4,9 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/RCooLeR/omada_exporter/internal/openapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -27,7 +26,7 @@ type vpnStatsCollector struct {
 	omadaSiteToSiteVpnPeerUpPackets      *prometheus.Desc
 	omadaSiteToSiteVpnPeerUpBytes        *prometheus.Desc
 	omadaSiteToSiteVpnPeerLoginTimestamp *prometheus.Desc
-	client                               *openapi.Client
+	client                               *omada.Client
 }
 
 type vpnTunnelSeries struct {
@@ -115,7 +114,7 @@ func (c *vpnStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches current data and emits Prometheus metrics.
 func (c *vpnStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
-	site := client.Config.Site
+	site := client.Settings().Site
 
 	vpn, err := client.GetVpnStats()
 	seenPacketSeries := map[string]struct{}{}
@@ -523,7 +522,7 @@ func (c *vpnStatsCollector) collectSiteToSiteVpnPeerMetrics(ch chan<- prometheus
 
 // NewVpnStatsCollector builds the Prometheus descriptors used to export VPN
 // tunnel, site-to-site, and peer statistics.
-func NewVpnStatsCollector(apiClient *api.Client) *vpnStatsCollector {
+func NewVpnStatsCollector(apiClient *omada.Client) *vpnStatsCollector {
 	labels := []string{"name", "interface_name", "vpn_mode", "vpn_type", "local_ip", "remote_ip", "site", "site_id"}
 	siteToSiteTrafficLabels := []string{"vpn_id", "name", "vpn_type", "site_vpn_type", "site", "site_id"}
 	siteToSiteLabels := []string{"vpn_id", "tunnel_id", "name", "vpn_type", "site_vpn_type", "interface_name", "direction", "local_ip", "remote_ip", "local_peer_ip", "remote_peer_ip", "site", "site_id"}
@@ -605,9 +604,7 @@ func NewVpnStatsCollector(apiClient *api.Client) *vpnStatsCollector {
 			siteToSitePeerLabels,
 			nil,
 		),
-		client: &openapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }
 

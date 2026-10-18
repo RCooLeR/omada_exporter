@@ -12,23 +12,24 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 type controlTestAPI struct {
 	mu                       sync.Mutex
-	targets                  []webapi.ControlTarget
+	targets                  []omada.ControlTarget
 	inventoryErr, commandErr error
 	calls                    []string
 	block                    bool
 	started                  chan struct{}
 }
 
-func (f *controlTestAPI) ControlTargets(ctx context.Context) ([]webapi.ControlTarget, error) {
+func (f *controlTestAPI) ControlTargets(ctx context.Context) ([]omada.ControlTarget, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]webapi.ControlTarget(nil), f.targets...), f.inventoryErr
+	return append([]omada.ControlTarget(nil), f.targets...), f.inventoryErr
 }
 func (f *controlTestAPI) command(ctx context.Context, action, siteID, mac string) error {
 	f.mu.Lock()
@@ -107,17 +108,17 @@ func (b *controlTestBroker) payload(topic string) []byte {
 	return append([]byte(nil), b.messages[topic]...)
 }
 
-func controlTargetsFixture() []webapi.ControlTarget {
-	return []webapi.ControlTarget{
-		{SiteID: "same-site-id", MAC: "AA-BB-CC-DD-EE-01", Name: "Access point", DeviceType: "ap", Model: "EAP", Action: webapi.ControlActionRebootDevice},
-		{SiteID: "same-site-id", MAC: "AA-BB-CC-DD-EE-02", Name: "Phone", Action: webapi.ControlActionReconnectWiFiClient},
+func controlTargetsFixture() []omada.ControlTarget {
+	return []omada.ControlTarget{
+		{SiteID: "same-site-id", MAC: "AA-BB-CC-DD-EE-01", Name: "Access point", DeviceType: "ap", Model: "EAP", Action: omada.ControlActionRebootDevice},
+		{SiteID: "same-site-id", MAC: "AA-BB-CC-DD-EE-02", Name: "Phone", Action: omada.ControlActionReconnectWiFiClient},
 	}
 }
 func controlFixture(t *testing.T, bridge string) (*Publisher, *controlTestAPI, *controlTestBroker) {
 	t.Helper()
 	b := newControlTestBroker()
 	p := scopeTestPublisher(t, bridge, b)
-	p.client.Config.AllowDeviceControl = true
+	p.client.Settings().AllowDeviceControl = true
 	f := &controlTestAPI{targets: controlTargetsFixture()}
 	p.controls.api = f
 	p.controls.ctx = context.Background()
@@ -215,9 +216,9 @@ func TestControlDiscoveryContractAndDeviceRegistryIdentity(t *testing.T) {
 func TestControlTargetsRejectWrongSiteAndUnsupportedDeviceTypes(t *testing.T) {
 	p, f, _ := controlFixture(t, "slobidska44")
 	for _, kind := range []string{"controller", "olt", "stack", "unknown"} {
-		f.targets = append(f.targets, webapi.ControlTarget{SiteID: "same-site-id", MAC: "AA-BB-CC-DD-EE-09", DeviceType: kind, Action: controlReboot})
+		f.targets = append(f.targets, omada.ControlTarget{SiteID: "same-site-id", MAC: "AA-BB-CC-DD-EE-09", DeviceType: kind, Action: controlReboot})
 	}
-	f.targets = append(f.targets, webapi.ControlTarget{SiteID: "foreign-site", MAC: "AA-BB-CC-DD-EE-08", DeviceType: "ap", Action: controlReboot})
+	f.targets = append(f.targets, omada.ControlTarget{SiteID: "foreign-site", MAC: "AA-BB-CC-DD-EE-08", DeviceType: "ap", Action: controlReboot})
 	p.refreshControls(context.Background())
 	if len(p.controls.buttons) != 2 {
 		t.Fatal("unsupported targets became controls")
@@ -327,7 +328,7 @@ func TestControlInventoryAndDiscoveryFailureFailClosed(t *testing.T) {
 			case "stale":
 				p.controls.validatedAt = time.Now().Add(-controlInventoryMaxAge - time.Second)
 			case "disabled":
-				p.client.Config.AllowDeviceControl = false
+				p.client.Settings().AllowDeviceControl = false
 			case "canceled":
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
@@ -352,7 +353,7 @@ func TestControlBridgeAndSiteIsolation(t *testing.T) {
 	}
 	apartment.handleControlMessage(b, controlMessage{topic: old.CommandTopic, payload: "PRESS"})
 	requireNoControlCommand(t, apartment)
-	apartment.client.SetContextIDs("same-controller-id", "new-site")
+	apartment.client.(*session.Client).SetContextIDs("same-controller-id", "new-site")
 	apartment.handleControlMessage(b, controlMessage{topic: current.CommandTopic, payload: "PRESS"})
 	requireNoControlCommand(t, apartment)
 	api := apartment.controls.api.(*controlTestAPI)
@@ -385,7 +386,7 @@ func TestControlQueuedCommandCannotCrossReconnectOrExpire(t *testing.T) {
 			case "expired":
 				command.ReceivedAt = time.Now().Add(-controlCommandMaxAge - time.Second)
 			case "site-change":
-				p.client.SetContextIDs("same-controller-id", "different-site")
+				p.client.(*session.Client).SetContextIDs("same-controller-id", "different-site")
 			case "removed":
 				f.targets = nil
 				p.refreshControls(context.Background())
