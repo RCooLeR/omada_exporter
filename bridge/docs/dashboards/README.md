@@ -96,7 +96,7 @@ selection/escaped matchers replace the linter's multi-select job/instance
 conventions. Go contract tests enforce those source rules on every selector.
 
 With Prometheus `promtool` installed (or `PROMTOOL_BIN` pointing to its binary),
-run `go test ./cmd -run TestGrafana -v` from `bridge` to also evaluate the generated
+run `go test ./internal/app -run TestGrafana -v` from `bridge` to also evaluate the generated
 queries against two synthetic bridges with identical site/device/client/VPN
 identities. This checks unlabelled legacy data, apartment-only totals, source
 grouping, VPN fallback isolation, and literal endpoint matching. Without

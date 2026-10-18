@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -17,7 +16,7 @@ type insightsCollector struct {
 	omadaDPICategoryTrafficBytes    *prometheus.Desc
 	omadaDPIApplicationTrafficBytes *prometheus.Desc
 	omadaDPIScrapeWindowSeconds     *prometheus.Desc
-	client                          *webapi.Client
+	client                          *omada.Client
 }
 
 // Describe sends the collector metric descriptors to Prometheus.
@@ -30,14 +29,14 @@ func (c *insightsCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches current DPI insight data and emits Prometheus metrics.
 func (c *insightsCollector) Collect(ch chan<- prometheus.Metric) {
-	if !trackInsightMetrics(c.client.Client) {
+	if !trackInsightMetrics(c.client) {
 		return
 	}
 
 	client := c.client
-	site := client.Config.Site
+	site := client.Settings().Site
 
-	insights, err := client.GetDPIInsights(insightWindowSeconds(client.Client))
+	insights, err := client.GetDPIInsights(insightWindowSeconds(client))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get DPI insights")
 		return
@@ -58,7 +57,7 @@ func (c *insightsCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.omadaDPICategoryTrafficBytes, prometheus.GaugeValue, category.Traffic, labels...)
 	}
 
-	for _, app := range limitedDPIApplications(insights.Applications, insightApplicationLimit(client.Client)) {
+	for _, app := range limitedDPIApplications(insights.Applications, insightApplicationLimit(client)) {
 		labels := []string{
 			fmt.Sprintf("%d", app.FamilyID),
 			app.FamilyName,
@@ -72,7 +71,7 @@ func (c *insightsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // NewInsightsCollector builds the Prometheus descriptors used to export DPI insights.
-func NewInsightsCollector(apiClient *api.Client) *insightsCollector {
+func NewInsightsCollector(apiClient *omada.Client) *insightsCollector {
 	siteLabels := []string{"site", "site_id"}
 	categoryLabels := []string{"family_id", "family_name", "site", "site_id"}
 	applicationLabels := []string{"family_id", "family_name", "application_id", "application_name", "site", "site_id"}
@@ -98,9 +97,7 @@ func NewInsightsCollector(apiClient *api.Client) *insightsCollector {
 			siteLabels,
 			nil,
 		),
-		client: &webapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }
 

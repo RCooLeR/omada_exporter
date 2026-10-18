@@ -4,10 +4,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/RCooLeR/omada_exporter/internal/openapi"
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -16,7 +14,7 @@ import (
 // NetworkQualityCollector reads optional OpenAPI telemetry independently of the
 // device collector: an unsupported endpoint must not hide ordinary device data.
 type NetworkQualityCollector struct {
-	client                             *api.Client
+	client                             *omada.Client
 	getDevices                         func() ([]model.DevicesInterface, error)
 	getAPUplink                        func(string) (*model.APUplinkStats, error)
 	getWANQuality                      func(string, int) (*model.WANQuality, error)
@@ -26,9 +24,7 @@ type NetworkQualityCollector struct {
 }
 
 // NewNetworkQualityCollector builds descriptors without fetching API data.
-func NewNetworkQualityCollector(client *api.Client) *NetworkQualityCollector {
-	webClient := &webapi.Client{Client: client}
-	openClient := &openapi.Client{Client: client}
+func NewNetworkQualityCollector(client *omada.Client) *NetworkQualityCollector {
 	labels := []string{"device_mac", "device_name", "device_type", "site", "site_id"}
 	packetLabels := append(append([]string{}, labels...), "direction")
 	statusLabels := append(append([]string{}, labels...), "source")
@@ -36,7 +32,7 @@ func NewNetworkQualityCollector(client *api.Client) *NetworkQualityCollector {
 		return prometheus.NewDesc(name, help, labels, nil)
 	}
 	return &NetworkQualityCollector{
-		client: client, getDevices: webClient.GetDevices, getAPUplink: openClient.GetAPUplinkStats, getWANQuality: openClient.GetWANQuality,
+		client: client, getDevices: client.GetDevices, getAPUplink: client.GetAPUplinkStats, getWANQuality: client.GetWANQuality,
 		packets:   desc("omada_ap_uplink_packets_total", "Controller-reported wired AP uplink packet counter; up/down follow Omada direction. May reset on device/controller restart or counter reset.", packetLabels),
 		drops:     desc("omada_ap_uplink_dropped_packets_total", "Controller-reported wired AP uplink dropped-packet counter; up/down follow Omada direction. May reset on device/controller restart or counter reset.", packetLabels),
 		errors:    desc("omada_ap_uplink_error_packets_total", "Controller-reported wired AP uplink error-packet counter; up/down follow Omada direction. May reset on device/controller restart or counter reset.", packetLabels),
@@ -57,12 +53,12 @@ func (c *NetworkQualityCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *NetworkQualityCollector) Collect(ch chan<- prometheus.Metric) {
-	if c.client == nil || c.client.Config == nil || !c.client.Config.TrackNetworkQualityMetrics {
+	if c.client == nil || c.client.Settings() == nil || !c.client.Settings().TrackNetworkQualityMetrics {
 		return
 	}
 	devices, err := c.getDevices()
 	_, siteID := c.client.ContextIDs()
-	inventoryLabels := []string{"", "", "", c.client.Config.Site, siteID, "inventory"}
+	inventoryLabels := []string{"", "", "", c.client.Settings().Site, siteID, "inventory"}
 	ch <- prometheus.MustNewConstMetric(c.success, prometheus.GaugeValue, boolFloat64(err == nil), inventoryLabels...)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get network-quality device inventory")
@@ -85,7 +81,7 @@ func (c *NetworkQualityCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c *NetworkQualityCollector) labels(device model.DeviceInterface, siteID string) []string {
-	return []string{device.GetMac(), device.GetName(), device.GetType(), c.client.Config.Site, siteID}
+	return []string{device.GetMac(), device.GetName(), device.GetType(), c.client.Settings().Site, siteID}
 }
 
 func (c *NetworkQualityCollector) collectAP(ch chan<- prometheus.Metric, ap *model.AccessPoint, siteID string) {
@@ -136,7 +132,7 @@ func (c *NetworkQualityCollector) collectWAN(ch chan<- prometheus.Metric, gatewa
 	if !strings.HasPrefix(gateway.GetStatus(), "Connected") {
 		return
 	}
-	window := c.client.Config.NetworkQualityWindowSeconds
+	window := c.client.Settings().NetworkQualityWindowSeconds
 	if window <= 0 {
 		window = 86400
 	}

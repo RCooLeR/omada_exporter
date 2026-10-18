@@ -7,17 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/RCooLeR/omada_exporter/internal/model"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
 func qualityTestCollector() *NetworkQualityCollector {
-	client := &api.Client{Config: &config.Config{Site: "test", TrackNetworkQualityMetrics: true, NetworkQualityWindowSeconds: 3600}}
+	client := &session.Client{Config: &config.Config{Site: "test", TrackNetworkQualityMetrics: true, NetworkQualityWindowSeconds: 3600}}
 	client.SetContextIDs("controller", "site-id")
-	c := NewNetworkQualityCollector(client)
+	c := NewNetworkQualityCollector(omada.NewClient(client))
 	c.getDevices = func() ([]model.DevicesInterface, error) {
 		return []model.DevicesInterface{
 			&model.AccessPoint{Device: model.Device{Mac: "ap", Name: "AP", Type: "ap", Status: 14}},
@@ -158,12 +159,12 @@ func TestNetworkQualitySkipsOfflineAndWirelessUplinks(t *testing.T) {
 
 func TestNetworkQualityDisabledAndInventoryFailure(t *testing.T) {
 	c := qualityTestCollector()
-	c.client.Config.TrackNetworkQualityMetrics = false
+	c.client.Settings().TrackNetworkQualityMetrics = false
 	c.getDevices = func() ([]model.DevicesInterface, error) { t.Error("disabled collector made request"); return nil, nil }
 	if len(gatherQuality(t, c)) != 0 {
 		t.Fatal("disabled collector emitted data")
 	}
-	c.client.Config.TrackNetworkQualityMetrics = true
+	c.client.Settings().TrackNetworkQualityMetrics = true
 	c.getDevices = func() ([]model.DevicesInterface, error) { return nil, errors.New("inventory failed") }
 	f := gatherQuality(t, c)
 	if len(f) != 1 || f["omada_network_quality_scrape_success"].Metric[0].Gauge.GetValue() != 0 {
@@ -173,7 +174,7 @@ func TestNetworkQualityDisabledAndInventoryFailure(t *testing.T) {
 
 func TestNetworkQualityFiltersInvalidReadingsAndUsesDefaultWindow(t *testing.T) {
 	c := qualityTestCollector()
-	c.client.Config.NetworkQualityWindowSeconds = 0
+	c.client.Settings().NetworkQualityWindowSeconds = 0
 	c.getWANQuality = func(_ string, window int) (*model.WANQuality, error) {
 		if window != 86400 {
 			t.Errorf("window=%d", window)
@@ -193,7 +194,7 @@ func TestAPRadioInterferencePresenceAndBands(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"type":"ap","mac":"ap","name":"AP","status":15,"wp2g":{"interUtil":4},"wp5g":{"interUtil":0},"wp5g2":{"interUtil":2},"wp6g":{"interUtil":1}}`), &ap); err != nil {
 		t.Fatal(err)
 	}
-	c := NewDeviceCollector(&api.Client{Config: &config.Config{Site: "test"}})
+	c := NewDeviceCollector(omada.NewClient(&session.Client{Config: &config.Config{Site: "test"}}))
 	metrics := make(chan prometheus.Metric, 32)
 	if err := c.collectAccessPoint(metrics, &ap, "site-id"); err != nil {
 		t.Fatal(err)
@@ -231,7 +232,7 @@ func TestAPRadioInterferenceOmitsMissingInvalidAndOffline(t *testing.T) {
 		if err := json.Unmarshal([]byte(payload), &ap); err != nil {
 			t.Fatal(err)
 		}
-		c := NewDeviceCollector(&api.Client{Config: &config.Config{}})
+		c := NewDeviceCollector(omada.NewClient(&session.Client{Config: &config.Config{}}))
 		ch := make(chan prometheus.Metric, 32)
 		_ = c.collectAccessPoint(ch, &ap, "site-id")
 		close(ch)

@@ -23,7 +23,7 @@ func (c *DeviceCollector) collectGateway(ch chan<- prometheus.Metric, gateway *m
 		gateway.GetIp(),
 		gateway.GetName(),
 		gateway.GetStatus(),
-		c.webClient.Client.Config.Site,
+		c.client.Settings().Site,
 		siteID,
 	}
 	ch <- prometheus.MustNewConstMetric(c.omadaDeviceTemp, prometheus.GaugeValue, gateway.GetTemp(), labels...)

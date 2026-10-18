@@ -9,8 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -27,7 +27,7 @@ func TestParseTrackedClientMACs(t *testing.T) {
 
 func TestMQTTClientOptionsBoundWritesAndAllowConcurrentHandlers(t *testing.T) {
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTBroker:   "mqtt.example:1883",
 			MQTTClientID: "omada-test",
 		}},
@@ -76,7 +76,7 @@ func TestConnectStopsWhileTokenIsPendingWhenContextIsCanceled(t *testing.T) {
 }
 
 func TestConfiguredClientTrackers(t *testing.T) {
-	client := &api.Client{
+	client := &session.Client{
 		Config: &config.Config{
 			MQTTTopicPrefix: "omada_exporter",
 			Site:            "Default",
@@ -112,7 +112,7 @@ func TestConfiguredClientTrackers(t *testing.T) {
 }
 
 func TestPublishConfiguredClientTrackerOffline(t *testing.T) {
-	client := &api.Client{
+	client := &session.Client{
 		Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
@@ -180,7 +180,7 @@ func TestPublishConfiguredClientTrackerOffline(t *testing.T) {
 func TestClientTrackerAttributesPublishOnlyOnChange(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
 			MQTTRetain:          true,
@@ -235,7 +235,7 @@ func TestClientTrackerAttributesPublishOnlyOnChange(t *testing.T) {
 func TestClientTrackerAttributesReplayWhenRetainIsDisabled(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
 			MQTTRetain:          false,
@@ -263,7 +263,7 @@ func TestClientTrackerAttributesReplayWhenRetainIsDisabled(t *testing.T) {
 func TestClientTrackerLastSeenPublishesOnceWhenClientLeaves(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
 			MQTTRetain:          true,
@@ -393,7 +393,7 @@ func TestPublishDPIHomeAssistantMetadataAndSnapshot(t *testing.T) {
 		gauge.Set(tc.value)
 		collectors[tc.metric] = gauge
 	}
-	client := &api.Client{Config: &config.Config{
+	client := &session.Client{Config: &config.Config{
 		MQTTDiscoveryPrefix: "homeassistant",
 		MQTTTopicPrefix:     "omada_exporter",
 		MQTTRetain:          true,
@@ -470,7 +470,7 @@ func TestObjectIDIgnoresSiteDisplayNameWhenSiteIDExists(t *testing.T) {
 func TestReconcileSupersededEntitiesOnlyDeletesConfirmedCounterpart(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTRetain: true,
 		}},
 		mqtt:              mqttClient,
@@ -523,7 +523,7 @@ func TestReconcileSupersededEntitiesRetriesFailedTombstone(t *testing.T) {
 		publishFailures: map[string]int{oldDiscovery: 1},
 	}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{MQTTRetain: true}},
+		client: &session.Client{Config: &config.Config{MQTTRetain: true}},
 		mqtt:   mqttClient,
 		published: map[string]struct{}{
 			oldDiscovery: {},
@@ -574,7 +574,7 @@ func TestReconcileSupersededEntitiesRetriesFailedTombstone(t *testing.T) {
 
 func TestCanonicalEntityTopicsReuseNewestRetainedCounterpart(t *testing.T) {
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
 		}},
@@ -627,7 +627,7 @@ func TestCanonicalEntityTopicsReuseNewestRetainedCounterpart(t *testing.T) {
 func TestReconcileSupersededEntitiesPreservesUnconfirmedDifferentSite(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTRetain: true,
 		}},
 		mqtt:              mqttClient,
@@ -673,7 +673,7 @@ func TestInfrastructureClientMetricsUseInfrastructureDevice(t *testing.T) {
 		t.Fatalf("device_mac = %q, want infrastructure MAC", enriched["device_mac"])
 	}
 
-	device := deviceInfo(&api.Client{Config: &config.Config{}}, "omada_client_traffic_down_bytes", enriched)
+	device := deviceInfo(&session.Client{Config: &config.Config{}}, "omada_client_traffic_down_bytes", enriched)
 	identifiers, ok := device["identifiers"].([]string)
 	if !ok || len(identifiers) != 1 || identifiers[0] != "omada_device_aa_bb_cc_dd_ee_ff" {
 		t.Fatalf("device identifiers = %#v, want infrastructure device identifier", device["identifiers"])
@@ -683,7 +683,7 @@ func TestInfrastructureClientMetricsUseInfrastructureDevice(t *testing.T) {
 func TestRemoveInfrastructureClientTrackerTombstonesDuplicate(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
 		}},
@@ -710,7 +710,7 @@ func TestRemoveInfrastructureClientTrackerTombstonesDuplicate(t *testing.T) {
 func TestRemoveInfrastructureClientTrackerPreservesExplicitConfiguration(t *testing.T) {
 	mqttClient := &recordingMQTTClient{messages: map[string][]byte{}}
 	publisher := &Publisher{
-		client: &api.Client{Config: &config.Config{
+		client: &session.Client{Config: &config.Config{
 			MQTTDiscoveryPrefix: "homeassistant",
 			MQTTTopicPrefix:     "omada_exporter",
 		}},
@@ -782,7 +782,7 @@ func TestLoadRetainedInventoryMarksAbsentClientNotHome(t *testing.T) {
 			},
 		}
 		publisher := &Publisher{
-			client: &api.Client{Config: &config.Config{
+			client: &session.Client{Config: &config.Config{
 				MQTTDiscoveryPrefix: "homeassistant",
 				MQTTTopicPrefix:     "omada_exporter",
 				MQTTRetain:          true,

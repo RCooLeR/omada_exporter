@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -26,7 +26,7 @@ const (
 // only update bounded state or enqueue one command; no goroutine is started per
 // click. The controller API independently revalidates each mutation's target.
 type controlAPI interface {
-	ControlTargets(context.Context) ([]webapi.ControlTarget, error)
+	ControlTargets(context.Context) ([]omada.ControlTarget, error)
 	RebootDevice(context.Context, string, string) error
 	ReconnectWiFiClient(context.Context, string, string) error
 }
@@ -79,7 +79,7 @@ func (p *Publisher) controlAvailabilityTopic() string { return p.statePrefix() +
 
 func (p *Publisher) controlSiteKey() string {
 	_, siteID := p.client.ContextIDs()
-	return controlSiteKey(siteID, p.client.Config.Site)
+	return controlSiteKey(siteID, p.client.Settings().Site)
 }
 
 func controlSiteKey(siteID, site string) string {
@@ -93,7 +93,7 @@ func (p *Publisher) controlCommandFilter() string {
 }
 
 func (p *Publisher) controlDiscoveryFilter() string {
-	return fmt.Sprintf("%s/button/%s/+/config", topicPrefix(p.client.Config.MQTTDiscoveryPrefix), p.discoveryNode())
+	return fmt.Sprintf("%s/button/%s/+/config", topicPrefix(p.client.Settings().MQTTDiscoveryPrefix), p.discoveryNode())
 }
 
 func (p *Publisher) startControls(parent context.Context) func() {
@@ -105,11 +105,12 @@ func (p *Publisher) startControls(parent context.Context) func() {
 	c.mu.Lock()
 	c.ctx = ctx
 	if c.api == nil {
-		c.api = &webapi.Client{Client: p.client}
+		c.api, _ = p.client.(controlAPI)
 	}
+	canControl := c.api != nil
 	c.mu.Unlock()
 	done := make(chan struct{})
-	if p.client.Config.AllowDeviceControl {
+	if p.client.Settings().AllowDeviceControl && canControl {
 		go func() { defer close(done); p.runControls(ctx) }()
 	} else {
 		close(done)
@@ -150,7 +151,7 @@ func (p *Publisher) controlsConnected(client mqtt.Client) {
 	// This retained fail-closed marker is intentional even when controls are
 	// disabled: buttons from a formerly enabled process must not stay available.
 	p.publishBytes(p.controlAvailabilityTopic(), []byte("offline"), true)
-	if p.controls == nil || !p.client.Config.AllowDeviceControl {
+	if p.controls == nil || !p.client.Settings().AllowDeviceControl || p.controls.api == nil {
 		return
 	}
 	c := p.controls
@@ -176,7 +177,7 @@ func (p *Publisher) controlsConnected(client mqtt.Client) {
 	notifyControl(c.refresh)
 }
 
-func (p *Publisher) makeControlButton(target webapi.ControlTarget) (controlButton, bool) {
+func (p *Publisher) makeControlButton(target omada.ControlTarget) (controlButton, bool) {
 	_, siteID := p.client.ContextIDs()
 	mac, valid := normalizeClientMAC(target.MAC)
 	if !valid || siteID == "" || target.SiteID != siteID {
@@ -184,25 +185,25 @@ func (p *Publisher) makeControlButton(target webapi.ControlTarget) (controlButto
 	}
 	action := target.Action
 	switch action {
-	case webapi.ControlActionRebootDevice:
+	case omada.ControlActionRebootDevice:
 		if target.DeviceType != "ap" && target.DeviceType != "switch" && target.DeviceType != "gateway" {
 			return controlButton{}, false
 		}
-	case webapi.ControlActionReconnectWiFiClient:
+	case omada.ControlActionReconnectWiFiClient:
 		action = controlReconnect
 	default:
 		return controlButton{}, false
 	}
-	siteKey := controlSiteKey(siteID, p.client.Config.Site)
+	siteKey := controlSiteKey(siteID, p.client.Settings().Site)
 	button := p.controlButtonTopics(siteKey, action, mac)
 	button.SiteID = siteID
 	button.Attributes = map[string]any{
-		"omada_control": action, "target_mac": mac, "site": p.client.Config.Site, "site_id": siteID,
+		"omada_control": action, "target_mac": mac, "site": p.client.Settings().Site, "site_id": siteID,
 	}
-	if p.client.Config.BridgeID != "" {
-		button.Attributes["bridge_id"] = p.client.Config.BridgeID
+	if p.client.Settings().BridgeID != "" {
+		button.Attributes["bridge_id"] = p.client.Settings().BridgeID
 	}
-	labels := p.scopedLabels(map[string]string{"site": p.client.Config.Site, "site_id": siteID})
+	labels := p.scopedLabels(map[string]string{"site": p.client.Settings().Site, "site_id": siteID})
 	metric, name, icon := "omada_device_status", "Reboot device", "mdi:restart"
 	if action == controlReboot {
 		labels["device_mac"], labels["device_name"], labels["device_model"] = mac, target.Name, target.Model
@@ -235,7 +236,7 @@ func (p *Publisher) controlButtonTopics(siteKey, action, mac string) controlButt
 	base := fmt.Sprintf("%s/controls/%s/%s/%s", p.statePrefix(), siteKey, action, trackerID(mac))
 	return controlButton{
 		Action: action, MAC: mac, CommandTopic: base + "/command", AttributesTopic: base + "/attributes", AvailabilityTopic: base + "/status",
-		DiscoveryTopic: fmt.Sprintf("%s/button/%s/%s/config", topicPrefix(p.client.Config.MQTTDiscoveryPrefix), p.discoveryNode(), p.controlObjectID(siteKey, action, mac)),
+		DiscoveryTopic: fmt.Sprintf("%s/button/%s/%s/config", topicPrefix(p.client.Settings().MQTTDiscoveryPrefix), p.discoveryNode(), p.controlObjectID(siteKey, action, mac)),
 	}
 }
 
@@ -297,7 +298,7 @@ func (p *Publisher) handleControlMessage(_ mqtt.Client, message mqtt.Message) {
 		return
 	} // Never acknowledge or adopt arbitrary target topics.
 	now := time.Now().UTC()
-	eligible := p.client.Config.AllowDeviceControl && c.ctx != nil && c.ctx.Err() == nil && c.connected && c.ready && now.Sub(c.validatedAt) <= controlInventoryMaxAge && p.currentControlButton(button)
+	eligible := p.client.Settings().AllowDeviceControl && c.ctx != nil && c.ctx.Err() == nil && c.connected && c.ready && now.Sub(c.validatedAt) <= controlInventoryMaxAge && p.currentControlButton(button)
 	if !eligible || c.pending || message.Retained() || message.Duplicate() || message.Qos() != 0 || len(message.Payload()) != 5 || string(message.Payload()) != "PRESS" || now.Sub(c.lastAttempt[button.CommandTopic]) < controlCooldown {
 		p.setControlStatusLocked(button.CommandTopic, "rejected", now)
 		return
@@ -362,7 +363,7 @@ func (p *Publisher) refreshControls(ctx context.Context) {
 	if c.epoch != epoch || ctx.Err() != nil {
 		return
 	}
-	if err != nil || !p.client.Config.AllowDeviceControl {
+	if err != nil || !p.client.Settings().AllowDeviceControl {
 		c.ready = false
 		p.publishBytes(p.controlAvailabilityTopic(), []byte("offline"), true)
 		for _, button := range c.buttons {
@@ -465,7 +466,7 @@ func (p *Publisher) publishControlJSON(topic string, payload any) bool {
 
 func (p *Publisher) currentControlButton(button controlButton) bool {
 	_, siteID := p.client.ContextIDs()
-	return siteID != "" && siteID == button.SiteID && button.CommandTopic == p.controlButtonTopics(controlSiteKey(siteID, p.client.Config.Site), button.Action, button.MAC).CommandTopic
+	return siteID != "" && siteID == button.SiteID && button.CommandTopic == p.controlButtonTopics(controlSiteKey(siteID, p.client.Settings().Site), button.Action, button.MAC).CommandTopic
 }
 
 func (p *Publisher) executeControl(ctx context.Context, command controlCommand) {
@@ -473,7 +474,7 @@ func (p *Publisher) executeControl(ctx context.Context, command controlCommand) 
 	topic := command.Topic
 	c.mu.Lock()
 	button, known := c.buttons[topic]
-	eligible := known && p.client.Config.AllowDeviceControl && c.connected && c.ready && ctx.Err() == nil && time.Since(c.validatedAt) <= controlInventoryMaxAge && c.epoch == command.Epoch && time.Since(command.ReceivedAt) <= controlCommandMaxAge && p.currentControlButton(button)
+	eligible := known && p.client.Settings().AllowDeviceControl && c.connected && c.ready && ctx.Err() == nil && time.Since(c.validatedAt) <= controlInventoryMaxAge && c.epoch == command.Epoch && time.Since(command.ReceivedAt) <= controlCommandMaxAge && p.currentControlButton(button)
 	if !eligible {
 		c.pending = false
 		p.setControlStatusLocked(topic, "rejected", time.Now().UTC())

@@ -3,8 +3,7 @@ package collector
 import (
 	"strconv"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
-	"github.com/RCooLeR/omada_exporter/internal/webapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -12,7 +11,7 @@ import (
 // alertCollector collects and exports alert metrics.
 type alertCollector struct {
 	omadaAlertNum *prometheus.Desc
-	client        *webapi.Client
+	client        *omada.Client
 }
 
 // Describe sends the collector metric descriptors to Prometheus.
@@ -23,7 +22,7 @@ func (c *alertCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches current data and emits Prometheus metrics.
 func (c *alertCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
-	config := c.client.Config
+	config := c.client.Settings()
 	site := config.Site
 	alert, err := client.GetAlert()
 	if err != nil {
@@ -40,7 +39,7 @@ func (c *alertCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // NewAlertCollector builds the Prometheus descriptors used to export alert metrics.
-func NewAlertCollector(apiClient *api.Client) *alertCollector {
+func NewAlertCollector(apiClient *omada.Client) *alertCollector {
 	labels := []string{
 		"obscured",
 		"site",
@@ -52,8 +51,6 @@ func NewAlertCollector(apiClient *api.Client) *alertCollector {
 			labels,
 			nil,
 		),
-		client: &webapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }

@@ -3,16 +3,17 @@ package collector
 import (
 	"testing"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/RCooLeR/omada_exporter/internal/model"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
+	"github.com/RCooLeR/omada_exporter/internal/omada/session"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
 
 func TestCollectGatewayExportsTemperatureAsGauge(t *testing.T) {
-	apiClient := &api.Client{Config: &config.Config{Site: "test"}}
-	collector := NewDeviceCollector(apiClient)
+	apiClient := &session.Client{Config: &config.Config{Site: "test"}}
+	collector := NewDeviceCollector(omada.NewClient(apiClient))
 	gateway := &model.Gateway{Device: model.Device{Temp: 42}}
 	metrics := make(chan prometheus.Metric, 3)
 

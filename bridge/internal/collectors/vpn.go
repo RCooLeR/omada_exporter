@@ -1,9 +1,8 @@
 package collector
 
 import (
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/RCooLeR/omada_exporter/internal/openapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -11,7 +10,7 @@ import (
 // vpnCollector collects and exports VPN metrics.
 type vpnCollector struct {
 	omadaVpnStatus *prometheus.Desc
-	client         *openapi.Client
+	client         *omada.Client
 }
 
 // Describe sends the collector metric descriptors to Prometheus.
@@ -22,7 +21,7 @@ func (c *vpnCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches current data and emits Prometheus metrics.
 func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
-	config := c.client.Config
+	config := c.client.Settings()
 
 	site := config.Site
 	seenIDs := map[string]struct{}{}
@@ -58,7 +57,7 @@ func (c *vpnCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // NewVpnCollector builds the Prometheus descriptors used to export VPN summary metrics.
-func NewVpnCollector(apiClient *api.Client) *vpnCollector {
+func NewVpnCollector(apiClient *omada.Client) *vpnCollector {
 	labels := []string{"vpn_id", "name", "purpose", "vpn_mode", "vpn_type", "remote_ip", "site", "site_id"}
 	labels = append(labels, model.VPNDetailLabelNames()...)
 
@@ -68,8 +67,6 @@ func NewVpnCollector(apiClient *api.Client) *vpnCollector {
 			labels,
 			nil,
 		),
-		client: &openapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }

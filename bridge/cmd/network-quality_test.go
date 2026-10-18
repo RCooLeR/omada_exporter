@@ -5,23 +5,9 @@ import (
 	"io"
 	"testing"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/config"
 	"github.com/urfave/cli/v3"
 )
-
-func TestNetworkQualityOptIn(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
-		client := &api.Client{Config: &config.Config{TrackNetworkQualityMetrics: enabled}}
-		_, exists := initCollectors(client)["network-quality"]
-		if exists != enabled {
-			t.Errorf("network-quality exists=%v enabled=%v", exists, enabled)
-		}
-	}
-	if initCollectors(nil)["network-quality"] == nil {
-		t.Fatal("metric documentation omits optional collector")
-	}
-}
 
 func TestNetworkQualityCLIFlagsAndEnvironment(t *testing.T) {
 	for _, mode := range []string{"defaults", "flags", "env"} {

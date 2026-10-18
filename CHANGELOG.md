@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [2.4.4] - 2026-10-18
+
+### Changed
+- Organize controller operations by feature behind one Omada client and a shared session layer; separate CLI commands from application startup, HTTP serving and collector wiring without changing metrics or configuration.
+- Write metric documentation deterministically through the CLI output writer.
+
+### Fixed
+- Stop and await the MQTT publisher when HTTP serving exits, including server startup failures.
+- Keep the release dashboard validation running after relocating its tests to the application package.
+
 ## [2.4.3] - 2026-10-17
 
 ### Fixed

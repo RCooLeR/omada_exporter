@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/RCooLeR/omada_exporter/internal/api"
 	"github.com/RCooLeR/omada_exporter/internal/model"
-	"github.com/RCooLeR/omada_exporter/internal/openapi"
+	"github.com/RCooLeR/omada_exporter/internal/omada"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/rs/zerolog/log"
 )
@@ -23,7 +22,7 @@ type clientCollector struct {
 	omadaClientTxRate                *prometheus.Desc
 	omadaClientRxRate                *prometheus.Desc
 	omadaClientConnectedTotal        *prometheus.Desc
-	client                           *openapi.Client
+	client                           *omada.Client
 }
 
 const clientNegotiationRateBitsPerKbit = 1000
@@ -96,13 +95,13 @@ func (c *clientCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // trackClientMetrics reports whether client metrics.
 func (c *clientCollector) trackClientMetrics() bool {
-	return trackClientMetrics(c.client.Client)
+	return trackClientMetrics(c.client)
 }
 
 // Collect fetches current data and emits Prometheus metrics.
 func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 	client := c.client
-	config := c.client.Config
+	config := c.client.Settings()
 
 	site := config.Site
 	clients, err := client.GetNetworkClients()
@@ -150,7 +149,7 @@ func (c *clientCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // NewClientCollector builds the Prometheus descriptors used to export client metrics.
-func NewClientCollector(apiClient *api.Client) *clientCollector {
+func NewClientCollector(apiClient *omada.Client) *clientCollector {
 	labels := []string{
 		"mac",
 		"ip",
@@ -242,8 +241,6 @@ func NewClientCollector(apiClient *api.Client) *clientCollector {
 			nil,
 		),
 
-		client: &openapi.Client{
-			Client: apiClient,
-		},
+		client: apiClient,
 	}
 }
