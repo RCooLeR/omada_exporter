@@ -102,6 +102,12 @@ bridge, site, and owning gateway** (`device_mac`/`gateway_mac`). Ambiguous or
 unscoped matches are not borrowed from another gateway. WAN details such as
 latency, link speed, and RX/TX rate then enrich the ISP table.
 
+Both cards prefer the matched WAN internet state for connectivity: Offline,
+Online, Connecting, or Disconnecting. A disconnected physical link remains
+Offline. If WAN connection data is missing, only the known ISP states 0 and 1
+are used; unknown, unavailable, or unsupported ISP values display Unknown,
+not an outage. A connected physical link alone does not prove Internet access.
+
 VPN rows use:
 
 ```text

@@ -17,6 +17,7 @@ import type {
 import { toNumber } from "./format";
 import { attachNetworkQuality, isNetworkQualityMetric } from "./network-quality-model";
 import { isControlEntity } from "./control-model";
+import { linkMetricValue } from "./wan-status-model";
 
 const dashboardModelCache = new WeakMap<HomeAssistant["states"], Map<string, DashboardModel>>();
 const recordUpdatedAt = new WeakMap<object, number>();
@@ -41,7 +42,7 @@ function isLatestRecord(record: object, entity: HassEntity): boolean {
 function setLatestMetric(
   record: { metrics: Record<string, number> },
   metric: string,
-  value: number,
+  value: number | undefined,
   entity: HassEntity
 ): void {
   let timestamps = metricUpdatedAt.get(record);
@@ -50,12 +51,19 @@ function setLatestMetric(
     metricUpdatedAt.set(record, timestamps);
   }
 
-  const observedAt = entityObservedAt(entity);
+  let observedAt = entityObservedAt(entity);
+  if (value === undefined) {
+    // HA can mark a sensor unavailable without updating its retained MQTT
+    // attributes. That newer availability state must invalidate older values.
+    const stateChangedAt = Date.parse(entity.last_updated ?? "");
+    if (Number.isFinite(stateChangedAt)) observedAt = Math.max(observedAt, stateChangedAt);
+  }
   if (observedAt < (timestamps.get(metric) ?? -1)) {
     return;
   }
   timestamps.set(metric, observedAt);
-  record.metrics[metric] = value;
+  if (value === undefined) delete record.metrics[metric];
+  else record.metrics[metric] = value;
 }
 
 function getMetric(entity: HassEntity): string {
@@ -968,7 +976,7 @@ export function buildDashboardModel(hass: HomeAssistant, filter?: string | Dashb
         joinKeyParts(attrString(entity, "name"), attrString(entity, "port")),
         attrString(entity, "ip")
       ]);
-      row.metrics[metric] = value;
+      setLatestMetric(row, metric, linkMetricValue(entity.state), entity);
       continue;
     }
 
@@ -1018,7 +1026,7 @@ export function buildDashboardModel(hass: HomeAssistant, filter?: string | Dashb
         joinKeyParts(attrString(entity, "name"), attrString(entity, "port")),
         attrString(entity, "ip")
       ]);
-      row.metrics[metric] = value;
+      setLatestMetric(row, metric, linkMetricValue(entity.state), entity);
       continue;
     }
   }

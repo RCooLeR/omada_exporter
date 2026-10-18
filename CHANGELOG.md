@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+### Fixed
+- Resolve Home Assistant WAN status from the matching WAN connection state, preserving unknown or unavailable ISP readings instead of reporting a false outage on Fusion controllers.
+
 ## [2.4.4] - 2026-10-18
 
 ### Changed
