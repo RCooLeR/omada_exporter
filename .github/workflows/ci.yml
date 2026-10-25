@@ -51,8 +51,8 @@ jobs:
 
       - name: Lint Grafana dashboards
         env:
-          DASHBOARD_LINTER_ARCHIVE_SHA256: 9a0eecb84ff22005dbd21c39ffd91534b407b511c45c21879df62ad0de33d79f
-          DASHBOARD_LINTER_VERSION: 0.3.0
+          DASHBOARD_LINTER_ARCHIVE_SHA256: df9a94834b5ea1273a2a79c649f0513913771a81ae25f194dc2244b7f45fef51
+          DASHBOARD_LINTER_VERSION: 0.4.0
         run: |
           archive="dashboard-linter_${DASHBOARD_LINTER_VERSION}_linux_amd64.tar.gz"
           curl --fail --location --silent --show-error \
@@ -160,13 +160,13 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
-          cosign-release: v3.1.3
+          cosign-release: v3.1.4
 
       - name: Validate GoReleaser configuration
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
-          version: v2.18.3
+          version: v2.19.0
           args: check
         env:
           GITHUB_TOKEN: ${{ github.token }}

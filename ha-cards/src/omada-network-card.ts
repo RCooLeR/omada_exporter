@@ -44,7 +44,7 @@ import {
   vpnUptimeSeconds
 } from "./model";
 import { registerCustomCard } from "./register-card";
-import { controlAvailable, controlScopeLabel, controlTarget, findControlEntity } from "./control-model";
+import { controlAvailable, controlScopeLabel, controlTarget, findControlEntity, poePortTargets, poePoweredTarget } from "./control-model";
 import type { ControlTarget } from "./control-model";
 import { wanDisplayStatus } from "./wan-status-model";
 
@@ -287,7 +287,7 @@ export class OmadaNetworkCard extends LitElement {
       .header, .content, .link-grid, .detail-hero, .chart-stack, .detail-bottom { grid-template-columns: 1fr; }
     }
     @media (max-width: 600px) { .chips, .chips.has-dpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    .control-box { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+    .control-box { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; white-space: normal; }
     .control-box p { margin: 8px 0; overflow-wrap: anywhere; }
     .control-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .control-action { cursor: pointer; font: inherit; color: inherit; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--surface-strong); }
@@ -378,7 +378,7 @@ export class OmadaNetworkCard extends LitElement {
       this.refreshSelectedRecords();
     }
     if (this._controlState && (this._controlState.context !== this.controlContext() ||
-        this.currentControl()?.target.key !== this._controlState.target.key)) {
+        !this.currentControl(this._controlState.target))) {
       this._controlState = undefined;
     }
   }
@@ -856,6 +856,7 @@ export class OmadaNetworkCard extends LitElement {
     const pendingUpdate = meta.pendingUpdate;
     const updateTarget = meta.updateTarget;
     const poeBudget = meta.poeBudget;
+    const portControls = new Map((this.hass ? poePortTargets(this.hass, device) : []).map((target) => [String(target.port), target]));
     const qualityDetail = renderNetworkQualityDetail(device);
     return html`
       <div class="detail-shell ${qualityDetail === nothing ? "" : "has-quality"}">
@@ -879,6 +880,7 @@ export class OmadaNetworkCard extends LitElement {
               ${this.renderDetailStat("Clients", String(device.clients.length))}
             </div>
             ${this.renderControl(controlTarget("device", device))}
+            ${this.renderControl(this.hass ? poePoweredTarget(this.hass, "device", device) : undefined)}
           </div>
           <div class="detail-card">
             <div class="section-title">Quick Read</div>
@@ -914,7 +916,7 @@ export class OmadaNetworkCard extends LitElement {
                         <td>${port.name}</td>
                         <td><span class="status-dot ${isUp ? "status-up" : "status-down"}"></span>${port.status || "-"}</td>
                         <td>${formatSpeedMbps(speed)}</td>
-                        <td>${this.portPoeLabel(port)}</td>
+                        <td>${this.portPoeLabel(port)}${this.renderControl(portControls.get(port.port))}</td>
                       </tr>
                     `;
                   })}
@@ -995,6 +997,7 @@ export class OmadaNetworkCard extends LitElement {
               ${client.wireless ? this.renderDetailStat("TX", formatRateBits(tx)) : nothing}
             </div>
             ${this.renderControl(controlTarget("client", client))}
+            ${this.renderControl(this.hass ? poePoweredTarget(this.hass, "client", client) : undefined)}
           </div>
           <div class="detail-card">
             <div class="section-title">Path</div>
@@ -1057,14 +1060,17 @@ export class OmadaNetworkCard extends LitElement {
     return JSON.stringify([this._selection, this._config?.bridge_id ?? "", this._config?.site_id ?? "", this._config?.site ?? ""]);
   }
 
-  private currentControl() {
+  private currentControl(requested: ControlTarget) {
     if (!this.hass || typeof this.hass.callService !== "function" || !this._selection || this._selection.kind === "dpi") return undefined;
     // Re-read the current HA snapshot, even if Lit has not processed a pending
     // selection/configuration/state update yet.
     const model = getDashboardModel(this.hass, this._config);
     const kind = this._selection.kind;
     const record = kind === "device" ? model.deviceByKey.get(this._selection.key) : model.clientByKey.get(this._selection.key);
-    const target = record && controlTarget(kind, record);
+    if (!record) return undefined;
+    const targets = [controlTarget(kind, record), poePoweredTarget(this.hass, kind, record)];
+    if (kind === "device") targets.push(...poePortTargets(this.hass, record as DeviceRecord));
+    const target = targets.find((entry) => entry?.key === requested.key);
     if (!target) return undefined;
     const entity = findControlEntity(this.hass, target);
     return entity ? { target, entity } : undefined;
@@ -1072,7 +1078,7 @@ export class OmadaNetworkCard extends LitElement {
 
   private beginControl(target: ControlTarget): void {
     if (this._controlPending) return;
-    const current = this.currentControl();
+    const current = this.currentControl(target);
     if (!current || current.target.key !== target.key || !controlAvailable(current.entity)) return;
     this._controlState = { phase: "confirm", context: this.controlContext(), target, entityId: current.entity.entity_id };
   }
@@ -1080,7 +1086,7 @@ export class OmadaNetworkCard extends LitElement {
   private async confirmControl(): Promise<void> {
     const confirmation = this._controlState;
     if (!confirmation || confirmation.phase !== "confirm" || this._controlPending) return;
-    const current = this.currentControl();
+    const current = this.currentControl(confirmation.target);
     if (confirmation.context !== this.controlContext()) {
       this._controlState = undefined;
       return;
@@ -1094,11 +1100,11 @@ export class OmadaNetworkCard extends LitElement {
     this._controlState = operation;
     try {
       await this.hass!.callService!("button", "press", { entity_id: operation.entityId });
-      if (this._controlState === operation && operation.context === this.controlContext() && this.currentControl()?.target.key === operation.target.key) {
+      if (this._controlState === operation && operation.context === this.controlContext() && this.currentControl(operation.target)) {
         this._controlState = { ...operation, phase: "success", message: "Request sent to bridge. This does not confirm the controller completed the operation." };
       }
     } catch {
-      if (this._controlState === operation && operation.context === this.controlContext() && this.currentControl()?.target.key === operation.target.key) {
+      if (this._controlState === operation && operation.context === this.controlContext() && this.currentControl(operation.target)) {
         this._controlState = { ...operation, phase: "error", message: "Unable to send the request through Home Assistant. Check your permissions, bridge availability and logs before retrying." };
       }
     } finally {
@@ -1110,14 +1116,20 @@ export class OmadaNetworkCard extends LitElement {
     if (!target || !this.hass || typeof this.hass.callService !== "function") return nothing;
     const entity = findControlEntity(this.hass, target);
     if (!entity) return nothing;
-    const label = target.action === "reboot_device" ? "Reboot device" : "Reconnect Wi-Fi client";
+    const label = target.action === "reboot_device" ? "Reboot device" : target.action === "reconnect_client" ? "Reconnect Wi-Fi client" : "Power-cycle PoE port";
+    const warning = target.action === "reboot_device"
+      ? "Rebooting disconnects this device and may interrupt the network and access to this bridge."
+      : target.action === "reconnect_client"
+        ? "This momentarily disconnects the client's Wi-Fi connection; reconnecting depends on the client."
+        : "This cuts power to all equipment powered through this port before restoring it. A hard power loss may interrupt the network, access to this bridge and unsaved work on connected equipment.";
     const state = this._controlState?.target.key === target.key && this._controlState.context === this.controlContext() ? this._controlState : undefined;
     const available = controlAvailable(entity);
     return html`<div class="control-box" aria-busy=${state?.phase === "pending"}>
       ${state?.phase === "confirm" ? html`
         <p><strong>${label}: ${target.name}</strong> · ${target.mac}</p>
+        ${target.action === "power_cycle_poe" && target.poweredDeviceMac ? html`<p>Powered endpoint: ${target.poweredDeviceName || target.poweredDeviceMac} · ${target.poweredDeviceMac}</p>` : nothing}
         <p>${controlScopeLabel(target)}</p>
-        <p>${target.action === "reboot_device" ? "Rebooting disconnects this device and may interrupt the network and access to this bridge." : "This momentarily disconnects the client's Wi-Fi connection; reconnecting depends on the client."}</p>
+        <p>${warning}</p>
         <div class="control-actions">
           <button type="button" class="control-action danger" ?disabled=${!available || this._controlPending}
             aria-label=${`Confirm ${label.toLowerCase()} for ${target.name} at ${controlScopeLabel(target)}`}
@@ -1173,7 +1185,7 @@ export class OmadaNetworkCard extends LitElement {
       .slice()
       .sort((left, right) => (right.metrics.omada_port_link_speed_mbps ?? 0) - (left.metrics.omada_port_link_speed_mbps ?? 0))
       .slice(0, 12);
-    const portsPreview = device.ports.slice(0, 18);
+    const portsPreview = device.ports;
     const clientPreview = device.clients.slice(0, 18);
 
     const meta = {

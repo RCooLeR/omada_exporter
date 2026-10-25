@@ -13,7 +13,7 @@ import (
 
 // WebControlSession pins a controller, site and web session while a control
 // target is freshly validated and its command is sent. It is only valid inside
-// WithWebControlSession's callback; callbacks must not call other Client methods.
+// a Client control-session callback; callbacks must not call other Client methods.
 type WebControlSession struct {
 	SiteID  string
 	ctx     context.Context
@@ -26,6 +26,17 @@ type WebControlSession struct {
 // target validation and a command. Unlike telemetry requests, commands never
 // retry, follow redirects, or rewrite their controller/site after validation.
 func (c *Client) WithWebControlSession(ctx context.Context, expectedSiteID string, run func(*WebControlSession) error) error {
+	return c.withWebControlSession(ctx, expectedSiteID, true, run)
+}
+
+// WithCurrentWebControlSession pins the existing session for optional read-only
+// inventory without checking or refreshing authentication. Expired authentication
+// fails the read; it must not trigger a login outside the caller's time budget.
+func (c *Client) WithCurrentWebControlSession(ctx context.Context, expectedSiteID string, run func(*WebControlSession) error) error {
+	return c.withWebControlSession(ctx, expectedSiteID, false, run)
+}
+
+func (c *Client) withWebControlSession(ctx context.Context, expectedSiteID string, authenticate bool, run func(*WebControlSession) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -36,8 +47,10 @@ func (c *Client) WithWebControlSession(ctx context.Context, expectedSiteID strin
 	if cid == "" || siteID != expectedSiteID {
 		return fmt.Errorf("control site does not match the configured site")
 	}
-	if err := c.ensureLoggedIn(); err != nil {
-		return fmt.Errorf("authenticate control session: %w", err)
+	if authenticate {
+		if err := c.ensureLoggedIn(); err != nil {
+			return fmt.Errorf("authenticate control session: %w", err)
+		}
 	}
 	unlock, err := c.webAuthTransition.lockControlContext(ctx)
 	if err != nil {

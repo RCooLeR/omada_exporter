@@ -7,7 +7,7 @@ import (
 
 func configFlags(conf *config.Config) []cli.Flag {
 	flags := []cli.Flag{
-		&cli.BoolFlag{Destination: &conf.AllowDeviceControl, Name: "allow-device-control", Value: false, Usage: "Enable opt-in MQTT device reboot and Wi-Fi client reconnect controls. Requires MQTT and controller write permissions.", Sources: cli.EnvVars("OMADA_ALLOW_DEVICE_CONTROL")},
+		&cli.BoolFlag{Destination: &conf.AllowDeviceControl, Name: "allow-device-control", Value: false, Usage: "Enable opt-in MQTT device reboot, Wi-Fi reconnect and PoE power-cycle controls. Requires MQTT and controller write permissions.", Sources: cli.EnvVars("OMADA_ALLOW_DEVICE_CONTROL")},
 		&cli.StringFlag{Destination: &conf.BridgeID, Name: "bridge-id", Value: "", Usage: "Stable bridge namespace for isolated MQTT/HA identities and Prometheus labels. Empty preserves legacy identities.", Sources: cli.EnvVars("OMADA_BRIDGE_ID"), Validator: config.ValidateBridgeID},
 		&cli.StringFlag{Destination: &conf.Host, Name: "host", Value: "", Usage: "The hostname of the Omada Controller, including protocol.", Sources: cli.EnvVars("OMADA_HOST"), Validator: validateControllerURL},
 		&cli.StringFlag{Destination: &conf.ClientId, Name: "client-id", Value: "", Usage: "ClientId for Omada OpenAPI client-credentials authentication.", Sources: cli.EnvVars("OMADA_CLIENT_ID")},

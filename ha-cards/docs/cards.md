@@ -13,7 +13,7 @@ It renders:
 - selected device details, port previews, PoE budget, update state, and charts
 - contextual AP interference/uplink counters and gateway WAN quality in the selected device details, when exported
 - selected client details, path information, LAG-aware wired details, and activity/signal charts
-- optional reboot and Wi-Fi reconnect controls, when enabled on the bridge and published as Home Assistant button entities
+- optional reboot, Wi-Fi reconnect and PoE power-cycle controls, when enabled on the bridge and published as Home Assistant button entities
 - a DPI summary chip when valid insight traffic entities are available; clicking it opens classified traffic totals, query windows, categories, and applications in the main detail panel
 
 Recommended Lovelace view:
@@ -43,15 +43,19 @@ Options:
 | `client_limit` | `150` | Maximum clients rendered in the client list. |
 | `show_vpn_peers` | `true` | Show per-peer VPN rows below VPN tunnel rows when peer metrics are available. |
 
-### Device and Wi-Fi client controls
+### Device, Wi-Fi client and PoE controls
 
 When the bridge publishes control buttons, the selected device details show **Reboot device** for APs, switches and gateways (including Fusion gateways). Wireless client details show **Reconnect Wi-Fi client**. Controllers and wired clients never show these actions. Controls are opt-in on the bridge; they do not appear just because monitoring is enabled, and no card setting enables controller access.
+
+Eligible switch/gateway rows in the **Ports** table show **Power-cycle PoE**. A device or wired-client detail also offers this action only when the bridge publishes a unique controller-confirmed powered-device binding. Wireless clients never inherit a PoE action from their AP. Unsupported or unknown attachment mappings have no shortcut; choose the explicitly named supplying port instead. All ports remain accessible, including ports beyond the former 18-row preview.
+
+PoE cycling is a hard power interruption, not a software reboot. Its confirmation names the supplying switch/gateway and port, plus the powered endpoint when known, and warns that all equipment powered through that port disconnects. Moving a device, replacing a binding, or removing a button invalidates the open confirmation. A changed binding creates a new HA button identity to prevent a stale confirmation from targeting different equipment.
 
 Each action requires two clicks: first open the confirmation, then confirm after checking the target name, MAC, bridge and site. Rebooting can interrupt the network and the bridge's controller connection. Reconnecting temporarily disconnects the client's Wi-Fi; the client must establish its own new connection. **Cancel** sends nothing. Buttons are disabled while a request is being sent or the Home Assistant button is unavailable.
 
 The card calls Home Assistant's `button.press` service, so the signed-in HA user must have permission to control the matching entity. It never stores controller credentials, calls controller APIs, or guesses entity IDs. It matches the `omada_control` and `target_mac` attributes in the exact bridge/site scope and hides ambiguous matches. Legacy bridges remain isolated from named bridges. Missing or incompatible controls leave the card read-only.
 
-Switching the selected target or card scope discards an open confirmation. An already-sent request cannot be cancelled by changing selection. **Request sent to bridge** means Home Assistant accepted the service call, not that Omada completed the reboot or reconnect. Check bridge logs and the target's subsequent state to verify the result. An unavailable control or permission/service failure is shown without retrying automatically.
+Switching the selected target or card scope discards an open confirmation. An already-sent request cannot be cancelled by changing selection. **Request sent to bridge** means Home Assistant accepted the service call, not that Omada completed the reboot, reconnect or PoE cycle. Check the button's `last_status` attribute and the target's subsequent state to verify the result. An unavailable control or permission/service failure is shown without retrying automatically.
 
 ### DPI insights
 

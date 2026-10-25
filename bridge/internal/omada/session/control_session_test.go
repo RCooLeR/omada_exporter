@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/config"
@@ -203,4 +204,90 @@ func TestControlSessionHonorsCancelledContext(t *testing.T) {
 	if err := client.WithWebControlSession(ctx, "site", func(*WebControlSession) error { t.Error("cancelled callback ran"); return nil }); !errors.Is(err, context.Canceled) {
 		t.Fatalf("error=%v", err)
 	}
+}
+
+func TestCurrentControlSessionDoesNotCheckOrRefreshAuthentication(t *testing.T) {
+	for _, expired := range []bool{false, true} {
+		name := "authenticated"
+		if expired {
+			name = "expired"
+		}
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var authCalls, inventoryCalls int
+				client := controlSessionTestClient(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					if strings.HasSuffix(req.URL.Path, "/loginStatus") || strings.HasSuffix(req.URL.Path, "/login") {
+						authCalls++
+						// Model authentication that ignores the optional inventory's
+						// deadline. This path must never be entered for the read.
+						time.Sleep(time.Minute)
+						return jsonResponse(`{"errorCode":0,"result":{"login":true}}`), nil
+					}
+					inventoryCalls++
+					if req.Method != http.MethodGet || req.URL.Path != "/cid/api/v2/sites/site/devices" || req.Header.Get("Csrf-Token") != "test-csrf" {
+						t.Errorf("read lost its pinned session: %s %s", req.Method, req.URL)
+					}
+					if expired {
+						return jsonResponse(`{"errorCode":-1200,"msg":"invalid token"}`), nil
+					}
+					return jsonResponse(`{"errorCode":0,"result":[]}`), nil
+				}))
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+				defer cancel()
+				start := time.Now()
+				err := client.WithCurrentWebControlSession(ctx, "site", func(session *WebControlSession) error {
+					var inventory any
+					return session.ReadJSON("/devices", &inventory)
+				})
+				if (err != nil) != expired || authCalls != 0 || inventoryCalls != 1 || time.Since(start) != 0 {
+					t.Fatalf("current-session read: err=%v auth=%d inventory=%d elapsed=%s", err, authCalls, inventoryCalls, time.Since(start))
+				}
+			})
+		})
+	}
+}
+
+func TestCurrentControlSessionHonorsDeadlineWhileWaitingForAuthenticationGate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		client := controlSessionTestClient(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			t.Errorf("blocked optional inventory made request: %s", req.URL)
+			return nil, context.DeadlineExceeded
+		}))
+		unlock := client.webAuthTransition.lock()
+		defer unlock()
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		start := time.Now()
+		err := client.WithCurrentWebControlSession(ctx, "site", func(*WebControlSession) error {
+			t.Error("callback ran without the authentication gate")
+			return nil
+		})
+		if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) != 5*time.Second {
+			t.Fatalf("gate wait exceeded optional budget: err=%v elapsed=%s", err, time.Since(start))
+		}
+	})
+}
+
+func TestCurrentControlSessionHonorsDeadlineDuringInventoryRead(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var requests int
+		client := controlSessionTestClient(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			requests++
+			if req.URL.Path != "/cid/api/v2/sites/site/devices" {
+				t.Errorf("unexpected optional inventory request: %s", req.URL)
+			}
+			<-req.Context().Done()
+			return nil, req.Context().Err()
+		}))
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		start := time.Now()
+		err := client.WithCurrentWebControlSession(ctx, "site", func(session *WebControlSession) error {
+			var inventory any
+			return session.ReadJSON("/devices", &inventory)
+		})
+		if !errors.Is(err, context.DeadlineExceeded) || requests != 1 || time.Since(start) != 5*time.Second {
+			t.Fatalf("inventory read exceeded optional budget or retried: err=%v requests=%d elapsed=%s", err, requests, time.Since(start))
+		}
+	})
 }

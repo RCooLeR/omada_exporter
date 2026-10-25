@@ -13,6 +13,7 @@ import (
 const (
 	ControlActionRebootDevice        = "reboot_device"
 	ControlActionReconnectWiFiClient = "reconnect_client"
+	ControlActionPowerCyclePoE       = "power_cycle_poe"
 	controlClientPageSize            = 100
 	controlMaxClientPages            = 1000
 )
@@ -25,6 +26,12 @@ type ControlTarget struct {
 	DeviceType string
 	Model      string
 	Action     string
+	// PoE targets identify the power-sourcing device and a physical port, never
+	// a client MAC substituted into a device command.
+	Port              int
+	PortName          string
+	PoweredDeviceMAC  string
+	PoweredDeviceName string
 }
 
 var controlMACPattern = regexp.MustCompile(`^(?:[0-9a-fA-F]{12}|(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}|(?:[0-9a-fA-F]{2}-){5}[0-9a-fA-F]{2})$`)
@@ -150,7 +157,7 @@ func controlDevices(session *session.WebControlSession) ([]ControlTarget, error)
 			return nil, fmt.Errorf("duplicate control device in fresh inventory")
 		}
 		seen[mac] = true
-		targets = append(targets, ControlTarget{session.SiteID, mac, device.Name, device.Type, device.Model, ControlActionRebootDevice})
+		targets = append(targets, ControlTarget{SiteID: session.SiteID, MAC: mac, Name: device.Name, DeviceType: device.Type, Model: device.Model, Action: ControlActionRebootDevice})
 	}
 	return targets, nil
 }
@@ -206,7 +213,7 @@ func controlClients(session *session.WebControlSession) ([]ControlTarget, error)
 				return nil, fmt.Errorf("duplicate control client in fresh inventory")
 			}
 			seen[mac] = true
-			targets = append(targets, ControlTarget{session.SiteID, mac, client.Name, "client", client.Model, ControlActionReconnectWiFiClient})
+			targets = append(targets, ControlTarget{SiteID: session.SiteID, MAC: mac, Name: client.Name, DeviceType: "client", Model: client.Model, Action: ControlActionReconnectWiFiClient})
 		}
 		if len(response.Result.Data) == 0 || response.Result.TotalRows <= rowsRead {
 			return targets, nil
