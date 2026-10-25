@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { controlAvailable, controlTarget, findControlEntity } from "./control-model";
+import { controlAvailable, controlTarget, findControlEntity, poePortTargets, poePoweredTarget } from "./control-model";
 import { buildDashboardModel, cardHassChanged } from "./model";
 import type { HassEntity, HomeAssistant } from "./ha-types";
 
@@ -97,5 +97,137 @@ describe("Omada control matching", () => {
   it("updates when HA service capabilities become available", () => {
     const { hass } = fixture();
     expect(cardHassChanged({ ...hass, callService: async () => {} }, hass)).toBe(true);
+  });
+});
+
+function poeFixture(bridgeId = "") {
+  const f = fixture(bridgeId);
+  const hass: HomeAssistant = f.hass;
+  for (const port of [1, 2]) {
+    const entityId = `sensor.port_${port}`;
+    hass.states[entityId] = { entity_id: entityId, state: "0", attributes: {
+      ...f.device.attributes, metric: "omada_port_power_watts", port: String(port), name: `Port ${port}`, poe: "false"
+    } };
+  }
+  const button: HassEntity = { entity_id: "button.poe_1", state: "unknown", attributes: {
+    ...f.button.attributes, omada_control: "power_cycle_poe", target_port: 1, switch_name: "Gateway", port_name: "Camera"
+  } };
+  hass.states[button.entity_id] = button;
+  hass.states["device_tracker.camera"] = { entity_id: "device_tracker.camera", state: "home", attributes: {
+    bridge_id: bridgeId, site: "Home", site_id: "site-1", mac: "11:22:33:44:55:66", name: "Camera", wireless: "false",
+    switch_mac: "aa:bb:cc:dd:ee:ff", port: "1"
+  } };
+  const model = buildDashboardModel(hass, { bridge_id: bridgeId });
+  return { ...f, hass, button, record: model.devices[0]!, client: model.clients[0]! };
+}
+
+describe("PoE control matching", () => {
+  it.each(["", "slobidska44"])("uses discovered physical ports for bridge %s, never telemetry eligibility", (bridgeId) => {
+    const f = poeFixture(bridgeId);
+    const targets = poePortTargets(f.hass, f.record);
+    expect(targets).toHaveLength(1);
+    expect(targets[0]).toMatchObject({ action: "power_cycle_poe", port: 1, mac: "aabbccddeeff", name: "Gateway · port 1 (Camera)" });
+    expect(findControlEntity(f.hass, targets[0]!)).toBe(f.button);
+    delete f.hass.states[f.button.entity_id];
+    f.record.ports.forEach((port) => { port.poe = true; port.metrics.omada_port_power_watts = 10; });
+    expect(poePortTargets(f.hass, f.record)).toEqual([]);
+  });
+
+  it.each([undefined, null, 0, -1, 256, 1.5, "1", "01", true, NaN, Infinity])("rejects invalid discovery port %s", (port) => {
+    const f = poeFixture();
+    f.button.attributes.target_port = port;
+    f.button.attributes.powered_device_mac = f.client.mac;
+    expect(poePortTargets(f.hass, f.record)).toEqual([]);
+    expect(poePoweredTarget(f.hass, "client", f.client)).toBeUndefined();
+  });
+
+  it("distinguishes ports on the same owner and rejects duplicate physical controls", () => {
+    const f = poeFixture();
+    const second = { ...f.button, entity_id: "button.poe_2", attributes: { ...f.button.attributes, target_port: 2 } };
+    f.hass.states[second.entity_id] = second;
+    const targets = poePortTargets(f.hass, f.record);
+    expect(targets.map((target) => target.port)).toEqual([1, 2]);
+    expect(targets[0]!.key).not.toBe(targets[1]!.key);
+    expect(findControlEntity(f.hass, targets[1]!)).toBe(second);
+    f.hass.states["button.duplicate"] = { ...f.button, entity_id: "button.duplicate", state: "unavailable",
+      attributes: { ...f.button.attributes, powered_device_mac: f.client.mac } };
+    expect(poePortTargets(f.hass, f.record).map((target) => target.port)).toEqual([2]);
+    expect(findControlEntity(f.hass, targets[0]!)).toBeUndefined();
+    expect(poePoweredTarget(f.hass, "client", f.client)).toBeUndefined();
+  });
+
+  it.each([{ bridge_id: "other" }, { site_id: "other" }, { site_id: "" }])("isolates port and endpoint controls from %o", (scope) => {
+    const f = poeFixture();
+    const target = poePortTargets(f.hass, f.record)[0]!;
+    f.button.attributes = { ...f.button.attributes, ...scope, powered_device_mac: f.client.mac };
+    expect(findControlEntity(f.hass, target)).toBeUndefined();
+    expect(poePortTargets(f.hass, f.record)).toEqual([]);
+    expect(poePoweredTarget(f.hass, "client", f.client)).toBeUndefined();
+  });
+
+  it("does not select the same owner MAC and port in another bridge or site", () => {
+    const f = poeFixture();
+    for (const [id, scope] of [["bridge", { bridge_id: "other" }], ["site", { site_id: "other" }]] as const) {
+      f.hass.states[`button.${id}`] = { ...f.button, entity_id: `button.${id}`, attributes: { ...f.button.attributes, ...scope } };
+    }
+    const targets = poePortTargets(f.hass, f.record);
+    expect(targets).toHaveLength(1);
+    expect(findControlEntity(f.hass, targets[0]!)).toBe(f.button);
+  });
+
+  it("requires a physical port belonging to the same scoped switch or gateway", () => {
+    const f = poeFixture();
+    expect(poePortTargets(f.hass, { ...f.record, type: "switch" })).toHaveLength(1);
+    expect(poePortTargets(f.hass, { ...f.record, type: "ap" })).toEqual([]);
+    expect(poePortTargets(f.hass, { ...f.record, ports: [] })).toEqual([]);
+    f.record.ports.forEach((port) => { port.attrs = { ...port.attrs, bridge_id: "other" }; });
+    expect(poePortTargets(f.hass, f.record)).toEqual([]);
+  });
+
+  it("uses only an explicit unique powered endpoint binding for aliases", () => {
+    const f = poeFixture();
+    expect(poePoweredTarget(f.hass, "client", f.client)).toBeUndefined();
+    expect(poePoweredTarget(f.hass, "client", { ...f.client, attachmentLagId: "1" })).toBeUndefined();
+    f.button.attributes.powered_device_mac = f.client.mac;
+    f.button.attributes.powered_device_name = "Camera";
+    expect(poePoweredTarget(f.hass, "client", f.client)?.poweredDeviceMac).toBe("112233445566");
+    expect(poePoweredTarget(f.hass, "device", { ...f.record, type: "ap", mac: f.client.mac })?.port).toBe(1);
+    expect(poePoweredTarget(f.hass, "device", { ...f.record, type: "controller", mac: f.client.mac })).toBeUndefined();
+    expect(poePoweredTarget(f.hass, "client", { ...f.client, wireless: true, apMac: f.record.mac })).toBeUndefined();
+    f.hass.states["button.poe_2"] = { ...f.button, entity_id: "button.poe_2", attributes: { ...f.button.attributes, target_port: 2 } };
+    expect(poePortTargets(f.hass, f.record)).toHaveLength(2);
+    expect(poePoweredTarget(f.hass, "client", f.client)).toBeUndefined();
+  });
+
+  it.each([
+    { powered_device_mac: "22:22:33:44:55:66" }, { powered_device_name: "Another camera" },
+    { switch_name: "Renamed gateway" }, { port_name: "Another port" }
+  ])("invalidates the original identity when binding or labels change: %o", (attrs) => {
+    const f = poeFixture();
+    f.button.attributes.powered_device_mac = f.client.mac;
+    const target = poePortTargets(f.hass, f.record)[0]!;
+    f.button.attributes = { ...f.button.attributes, ...attrs };
+    expect(findControlEntity(f.hass, target)).toBeUndefined();
+    expect(poePortTargets(f.hass, f.record)[0]!.key).not.toBe(target.key);
+  });
+
+  it.each(["not-a-mac", "aa:bb:cc:dd:ee:ff", false])("rejects malformed or self-powered bindings: %s", (poweredMac) => {
+    const f = poeFixture();
+    f.button.attributes.powered_device_mac = poweredMac;
+    expect(poePortTargets(f.hass, f.record)).toEqual([]);
+  });
+
+  it("observes PoE discovery and binding changes without creating metric records", () => {
+    const f = poeFixture("slobidska44");
+    const previous: HomeAssistant = { states: { ...f.hass.states } };
+    delete previous.states[f.button.entity_id];
+    expect(cardHassChanged(f.hass, previous, { bridge_id: "slobidska44" })).toBe(true);
+    expect(cardHassChanged(previous, f.hass, { bridge_id: "slobidska44" })).toBe(true);
+    expect(cardHassChanged(f.hass, previous)).toBe(false);
+    const next: HomeAssistant = { states: { ...f.hass.states, [f.button.entity_id]: {
+      ...f.button, attributes: { ...f.button.attributes, powered_device_mac: f.client.mac }
+    } } };
+    expect(cardHassChanged(next, f.hass, { bridge_id: "slobidska44" })).toBe(true);
+    expect(buildDashboardModel({ states: { [f.button.entity_id]: f.button } }, { bridge_id: "slobidska44" }).devices).toEqual([]);
   });
 });

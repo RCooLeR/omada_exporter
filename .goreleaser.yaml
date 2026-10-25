@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.18.3/www/docs/static/schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.19.0/www/docs/static/schema.json
 
 version: 2
 

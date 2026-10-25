@@ -33,15 +33,17 @@ type controlAPI interface {
 
 type controlButton struct {
 	Action, MAC, SiteID                                              string
+	Port                                                             int
+	PoweredDeviceMAC, Payload                                        string
 	CommandTopic, DiscoveryTopic, AttributesTopic, AvailabilityTopic string
 	Config                                                           map[string]any
 	Attributes                                                       map[string]any
 }
 
 type controlCommand struct {
-	Topic      string
-	Epoch      uint64
-	ReceivedAt time.Time
+	Topic, Payload, PoweredDeviceMAC string
+	Epoch                            uint64
+	ReceivedAt                       time.Time
 }
 
 type controlState struct {
@@ -184,6 +186,7 @@ func (p *Publisher) makeControlButton(target omada.ControlTarget) (controlButton
 		return controlButton{}, false
 	}
 	action := target.Action
+	port, poweredDeviceMAC := 0, ""
 	switch action {
 	case omada.ControlActionRebootDevice:
 		if target.DeviceType != "ap" && target.DeviceType != "switch" && target.DeviceType != "gateway" {
@@ -191,12 +194,27 @@ func (p *Publisher) makeControlButton(target omada.ControlTarget) (controlButton
 		}
 	case omada.ControlActionReconnectWiFiClient:
 		action = controlReconnect
+	case omada.ControlActionPowerCyclePoE:
+		if p.controls == nil {
+			return controlButton{}, false
+		}
+		if _, supported := p.controls.api.(poeControlAPI); !supported {
+			return controlButton{}, false
+		}
+		var ok bool
+		poweredDeviceMAC, ok = poeControlBinding(target)
+		if !ok {
+			return controlButton{}, false
+		}
+		port = target.Port
 	default:
 		return controlButton{}, false
 	}
 	siteKey := controlSiteKey(siteID, p.client.Settings().Site)
-	button := p.controlButtonTopics(siteKey, action, mac)
+	button := p.controlButtonTopics(siteKey, action, mac, port, poweredDeviceMAC)
 	button.SiteID = siteID
+	button.PoweredDeviceMAC = poweredDeviceMAC
+	button.Payload = "PRESS"
 	button.Attributes = map[string]any{
 		"omada_control": action, "target_mac": mac, "site": p.client.Settings().Site, "site_id": siteID,
 	}
@@ -205,16 +223,29 @@ func (p *Publisher) makeControlButton(target omada.ControlTarget) (controlButton
 	}
 	labels := p.scopedLabels(map[string]string{"site": p.client.Settings().Site, "site_id": siteID})
 	metric, name, icon := "omada_device_status", "Reboot device", "mdi:restart"
-	if action == controlReboot {
+	if action != controlReconnect {
 		labels["device_mac"], labels["device_name"], labels["device_model"] = mac, target.Name, target.Model
 	} else {
 		metric, name, icon = "omada_client_device_tracker", "Reconnect Wi-Fi client", "mdi:wifi-refresh"
 		labels["mac"], labels["name"] = mac, target.Name
 	}
+	if action == omada.ControlActionPowerCyclePoE {
+		name, icon = fmt.Sprintf("Power cycle PoE port %d", port), "mdi:power-cycle"
+		button.Payload = poeControlPayload(poweredDeviceMAC)
+		button.Attributes["target_port"] = port
+		button.Attributes["switch_name"] = target.Name
+		button.Attributes["port_name"] = target.PortName
+		if poweredDeviceMAC != "" {
+			button.Attributes["powered_device_mac"] = poweredDeviceMAC
+		}
+		if target.PoweredDeviceName != "" {
+			button.Attributes["powered_device_name"] = target.PoweredDeviceName
+		}
+	}
 	button.Config = map[string]any{
-		"name": name, "unique_id": p.discoveryNode() + "_" + p.controlObjectID(siteKey, action, mac),
-		"object_id": p.controlObjectID(siteKey, action, mac), "icon": icon,
-		"command_topic": button.CommandTopic, "payload_press": "PRESS", "qos": 0, "retain": false,
+		"name": name, "unique_id": p.discoveryNode() + "_" + p.controlObjectID(siteKey, action, mac, port, poweredDeviceMAC),
+		"object_id": p.controlObjectID(siteKey, action, mac, port, poweredDeviceMAC), "icon": icon,
+		"command_topic": button.CommandTopic, "payload_press": button.Payload, "qos": 0, "retain": false,
 		"json_attributes_topic": button.AttributesTopic, "entity_category": "config",
 		"availability_mode": "all",
 		"availability": []map[string]string{
@@ -228,15 +259,15 @@ func (p *Publisher) makeControlButton(target omada.ControlTarget) (controlButton
 	return button, true
 }
 
-func (p *Publisher) controlObjectID(siteKey, action, mac string) string {
-	return "omada_control_" + siteKey + "_" + action + "_" + trackerID(mac)
+func (p *Publisher) controlObjectID(siteKey, action, mac string, port int, poweredDeviceMAC string) string {
+	return "omada_control_" + siteKey + "_" + action + "_" + controlTargetLeaf(mac, port, poweredDeviceMAC)
 }
 
-func (p *Publisher) controlButtonTopics(siteKey, action, mac string) controlButton {
-	base := fmt.Sprintf("%s/controls/%s/%s/%s", p.statePrefix(), siteKey, action, trackerID(mac))
+func (p *Publisher) controlButtonTopics(siteKey, action, mac string, port int, poweredDeviceMAC string) controlButton {
+	base := fmt.Sprintf("%s/controls/%s/%s/%s", p.statePrefix(), siteKey, action, controlTargetLeaf(mac, port, poweredDeviceMAC))
 	return controlButton{
-		Action: action, MAC: mac, CommandTopic: base + "/command", AttributesTopic: base + "/attributes", AvailabilityTopic: base + "/status",
-		DiscoveryTopic: fmt.Sprintf("%s/button/%s/%s/config", topicPrefix(p.client.Settings().MQTTDiscoveryPrefix), p.discoveryNode(), p.controlObjectID(siteKey, action, mac)),
+		Action: action, MAC: mac, Port: port, CommandTopic: base + "/command", AttributesTopic: base + "/attributes", AvailabilityTopic: base + "/status",
+		DiscoveryTopic: fmt.Sprintf("%s/button/%s/%s/config", topicPrefix(p.client.Settings().MQTTDiscoveryPrefix), p.discoveryNode(), p.controlObjectID(siteKey, action, mac, port, poweredDeviceMAC)),
 	}
 }
 
@@ -260,7 +291,7 @@ func (p *Publisher) handleRetainedControl(_ mqtt.Client, message mqtt.Message) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(config.CommandTopic, prefix), "/")
-	if len(parts) != 4 || len(parts[0]) != 10 || (parts[1] != controlReboot && parts[1] != controlReconnect) || parts[3] != "command" {
+	if len(parts) != 4 || len(parts[0]) != 10 || parts[3] != "command" {
 		return
 	}
 	for _, ch := range parts[0] {
@@ -268,11 +299,11 @@ func (p *Publisher) handleRetainedControl(_ mqtt.Client, message mqtt.Message) {
 			return
 		}
 	}
-	mac, ok := normalizeClientMAC(parts[2])
+	mac, port, poweredDeviceMAC, ok := parseControlTargetLeaf(parts[1], parts[2])
 	if !ok {
 		return
 	}
-	button := p.controlButtonTopics(parts[0], parts[1], mac)
+	button := p.controlButtonTopics(parts[0], parts[1], mac, port, poweredDeviceMAC)
 	if button.CommandTopic != config.CommandTopic || button.AttributesTopic != config.AttributesTopic || button.DiscoveryTopic != message.Topic() {
 		return
 	}
@@ -299,15 +330,15 @@ func (p *Publisher) handleControlMessage(_ mqtt.Client, message mqtt.Message) {
 	} // Never acknowledge or adopt arbitrary target topics.
 	now := time.Now().UTC()
 	eligible := p.client.Settings().AllowDeviceControl && c.ctx != nil && c.ctx.Err() == nil && c.connected && c.ready && now.Sub(c.validatedAt) <= controlInventoryMaxAge && p.currentControlButton(button)
-	if !eligible || c.pending || message.Retained() || message.Duplicate() || message.Qos() != 0 || len(message.Payload()) != 5 || string(message.Payload()) != "PRESS" || now.Sub(c.lastAttempt[button.CommandTopic]) < controlCooldown {
+	if !eligible || c.pending || message.Retained() || message.Duplicate() || message.Qos() != 0 || len(message.Payload()) != len(button.Payload) || string(message.Payload()) != button.Payload || now.Sub(c.lastAttempt[controlCooldownKey(button)]) < controlCooldown {
 		p.setControlStatusLocked(button.CommandTopic, "rejected", now)
 		return
 	}
 	c.pending = true
-	c.lastAttempt[button.CommandTopic] = now
+	c.lastAttempt[controlCooldownKey(button)] = now
 	// pending permits at most one queued or executing mutation across all targets.
 	select {
-	case c.commands <- controlCommand{Topic: button.CommandTopic, Epoch: c.epoch, ReceivedAt: now}:
+	case c.commands <- controlCommand{Topic: button.CommandTopic, Epoch: c.epoch, ReceivedAt: now, Payload: button.Payload, PoweredDeviceMAC: button.PoweredDeviceMAC}:
 	default:
 		c.pending = false
 		p.setControlStatusLocked(button.CommandTopic, "rejected", now)
@@ -359,6 +390,25 @@ func (p *Publisher) refreshControls(ctx context.Context) {
 	targets, err := c.api.ControlTargets(requestCtx)
 	cancel()
 	c.mu.Lock()
+	pending := c.pending
+	c.mu.Unlock()
+	if err == nil && !pending {
+		if poeAPI, supported := c.api.(poeControlAPI); supported {
+			// Optional PoE reads have their own deadline. Their absence must not
+			// invalidate successful reboot and Wi-Fi reconnect inventory.
+			poeCtx, poeCancel := context.WithTimeout(ctx, poeControlInventoryTimeout)
+			poeTargets, poeErr := poeAPI.PoEControlTargets(poeCtx)
+			poeCancel()
+			if poeErr == nil {
+				for _, target := range poeTargets {
+					if target.Action == omada.ControlActionPowerCyclePoE {
+						targets = append(targets, target)
+					}
+				}
+			}
+		}
+	}
+	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.epoch != epoch || ctx.Err() != nil {
 		return
@@ -373,20 +423,23 @@ func (p *Publisher) refreshControls(ctx context.Context) {
 	}
 	current := map[string]controlButton{}
 	ambiguous := map[string]bool{}
+	targetTopics := map[string]string{}
 	for _, target := range targets {
 		button, ok := p.makeControlButton(target)
 		if !ok {
 			continue
 		}
-		if ambiguous[button.CommandTopic] {
+		physicalTarget := controlCooldownKey(button)
+		if ambiguous[physicalTarget] {
 			continue
 		}
-		if _, duplicate := current[button.CommandTopic]; duplicate {
-			delete(current, button.CommandTopic)
-			ambiguous[button.CommandTopic] = true
+		if previousTopic, duplicate := targetTopics[physicalTarget]; duplicate {
+			delete(current, previousTopic)
+			ambiguous[physicalTarget] = true
 			continue
 		}
-		if previous, ok := c.buttons[button.CommandTopic]; ok {
+		targetTopics[physicalTarget] = button.CommandTopic
+		if previous, ok := c.buttons[button.CommandTopic]; ok && previous.PoweredDeviceMAC == button.PoweredDeviceMAC {
 			for _, key := range []string{"last_status", "last_status_at"} {
 				if value, present := previous.Attributes[key]; present {
 					button.Attributes[key] = value
@@ -465,8 +518,20 @@ func (p *Publisher) publishControlJSON(topic string, payload any) bool {
 }
 
 func (p *Publisher) currentControlButton(button controlButton) bool {
+	switch button.Action {
+	case controlReboot, controlReconnect:
+		if button.Port != 0 || button.Payload != "PRESS" {
+			return false
+		}
+	case omada.ControlActionPowerCyclePoE:
+		if !validPoEControlPort(button.Port) || button.Payload != poeControlPayload(button.PoweredDeviceMAC) {
+			return false
+		}
+	default:
+		return false
+	}
 	_, siteID := p.client.ContextIDs()
-	return siteID != "" && siteID == button.SiteID && button.CommandTopic == p.controlButtonTopics(controlSiteKey(siteID, p.client.Settings().Site), button.Action, button.MAC).CommandTopic
+	return siteID != "" && siteID == button.SiteID && button.CommandTopic == p.controlButtonTopics(controlSiteKey(siteID, p.client.Settings().Site), button.Action, button.MAC, button.Port, button.PoweredDeviceMAC).CommandTopic
 }
 
 func (p *Publisher) executeControl(ctx context.Context, command controlCommand) {
@@ -474,7 +539,7 @@ func (p *Publisher) executeControl(ctx context.Context, command controlCommand) 
 	topic := command.Topic
 	c.mu.Lock()
 	button, known := c.buttons[topic]
-	eligible := known && p.client.Settings().AllowDeviceControl && c.connected && c.ready && ctx.Err() == nil && time.Since(c.validatedAt) <= controlInventoryMaxAge && c.epoch == command.Epoch && time.Since(command.ReceivedAt) <= controlCommandMaxAge && p.currentControlButton(button)
+	eligible := known && p.client.Settings().AllowDeviceControl && c.connected && c.ready && ctx.Err() == nil && time.Since(c.validatedAt) <= controlInventoryMaxAge && c.epoch == command.Epoch && time.Since(command.ReceivedAt) <= controlCommandMaxAge && p.currentControlButton(button) && command.Payload == button.Payload && command.PoweredDeviceMAC == button.PoweredDeviceMAC
 	if !eligible {
 		c.pending = false
 		p.setControlStatusLocked(topic, "rejected", time.Now().UTC())
@@ -484,10 +549,19 @@ func (p *Publisher) executeControl(ctx context.Context, command controlCommand) 
 	c.mu.Unlock()
 	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	var err error
-	if button.Action == controlReboot {
+	switch button.Action {
+	case controlReboot:
 		err = c.api.RebootDevice(requestCtx, button.SiteID, button.MAC)
-	} else {
+	case controlReconnect:
 		err = c.api.ReconnectWiFiClient(requestCtx, button.SiteID, button.MAC)
+	case omada.ControlActionPowerCyclePoE:
+		if poeAPI, supported := c.api.(poeControlAPI); supported {
+			err = poeAPI.PowerCyclePoEPort(requestCtx, button.SiteID, button.MAC, button.Port, command.PoweredDeviceMAC)
+		} else {
+			err = fmt.Errorf("PoE control capability unavailable")
+		}
+	default:
+		err = fmt.Errorf("unsupported control action")
 	}
 	cancel()
 	c.mu.Lock()

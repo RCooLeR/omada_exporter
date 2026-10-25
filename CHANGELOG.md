@@ -1,7 +1,13 @@
 ## [Unreleased]
 
+### Added
+- Add guarded native PoE port power-cycling for supported switches and gateways, with Home Assistant port controls and client/device shortcuts only when Omada confirms their powered attachment. Revalidate capability and binding before each non-retried command; preserve bridge/site isolation and existing reboot/reconnect identities.
+
 ### Fixed
 - Resolve Home Assistant WAN status from the matching WAN connection state, preserving unknown or unavailable ISP readings instead of reporting a false outage on Fusion controllers.
+
+### Changed
+- Update Go to 1.27.3 and the pinned Alpine container base to 3.24.3; refresh Go dependencies, Home Assistant build/test dependencies, and CI/release tooling.
 
 ## [2.4.4] - 2026-10-18
 
