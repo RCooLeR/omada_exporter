@@ -104,8 +104,12 @@ func isUnsupportedClientsV2Error(err error) bool {
 		return false
 	}
 	message := strings.ToLower(err.Error())
+	// Controllers without the v2 endpoint answer in one of two ways: an Omada
+	// API error (-1600 / "Unsupported request path"), or, on Omada Software
+	// Controller 5.15.x, a plain Spring "404 Not Found" with no errorCode.
 	return strings.Contains(message, "errorcode -1600") ||
-		strings.Contains(message, "unsupported request path")
+		strings.Contains(message, "unsupported request path") ||
+		strings.Contains(message, "returned http 404")
 }
 
 // clientRequest represents the Open API request payload for network clients.
