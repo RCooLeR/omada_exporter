@@ -18,6 +18,10 @@ func TestIsUnsupportedClientsV2Error(t *testing.T) {
 		// answers with a plain Spring 404 body, so readResponseBody yields no errorCode.
 		{"plain 404 from 5.15 controller", errors.New("clients returned HTTP 404 "), true},
 		{"404 with status text", errors.New("clients returned HTTP 404 Not Found"), true},
+		{"OpenAPI login 404", errors.New("OpenAPI login returned HTTP 404 Not Found"), false},
+		{"web login 404", errors.New("web login returned HTTP 404 Not Found"), false},
+		{"login status 404", errors.New("login status returned HTTP 404 Not Found"), false},
+		{"controller info 404", errors.New("controller info returned HTTP 404 Not Found"), false},
 		{"auth failure", errors.New("clients returned HTTP 401 Unauthorized"), false},
 		{"server error", errors.New("clients returned HTTP 500 Internal Server Error"), false},
 		{"other api error", errors.New("clients returned HTTP 200 OK: errorCode -44112: token expired"), false},
