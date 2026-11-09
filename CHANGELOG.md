@@ -1,14 +1,18 @@
 ## [Unreleased]
 
+## [2.4.5] - 2026-11-09
+
 ### Added
 - Add guarded native PoE port power-cycling for supported switches and gateways, with Home Assistant port controls and client/device shortcuts only when Omada confirms their powered attachment. Revalidate capability and binding before each non-retried command; preserve bridge/site isolation and existing reboot/reconnect identities.
 
 ### Fixed
-- Resolve Home Assistant WAN status from the matching WAN connection state, preserving unknown or unavailable ISP readings instead of reporting a false outage on Fusion controllers.
+- Resolve Home Assistant WAN status from the matching WAN connection state, preserving unknown or unavailable ISP readings instead of reporting a false outage on Fusion controllers. Show transitional states and invalidate stale retained readings when newer availability data marks a sensor unavailable.
 - Fall back to the v1 client inventory when the v2 clients endpoint returns HTTP 404, without mistaking authentication or session endpoint failures for an unsupported clients API.
 
 ### Changed
+- Keep all switch and gateway ports accessible in the Home Assistant card instead of limiting the preview to 18 ports.
 - Update Go to 1.27.3 and the pinned Alpine container base to 3.24.4; refresh Go dependencies, Home Assistant build/test dependencies, and CI/release tooling, using Node.js 26 LTS for card validation and builds.
+- Retry transient dashboard-linter download failures while retaining pinned checksum verification.
 
 ## [2.4.4] - 2026-10-18
 
