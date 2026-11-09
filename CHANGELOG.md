@@ -5,9 +5,10 @@
 
 ### Fixed
 - Resolve Home Assistant WAN status from the matching WAN connection state, preserving unknown or unavailable ISP readings instead of reporting a false outage on Fusion controllers.
+- Fall back to the v1 client inventory when the v2 clients endpoint returns HTTP 404, without mistaking authentication or session endpoint failures for an unsupported clients API.
 
 ### Changed
-- Update Go to 1.27.3 and the pinned Alpine container base to 3.24.3; refresh Go dependencies, Home Assistant build/test dependencies, and CI/release tooling.
+- Update Go to 1.27.3 and the pinned Alpine container base to 3.24.4; refresh Go dependencies, Home Assistant build/test dependencies, and CI/release tooling, using Node.js 26 LTS for card validation and builds.
 
 ## [2.4.4] - 2026-10-18
 
