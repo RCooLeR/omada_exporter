@@ -51,11 +51,11 @@ jobs:
 
       - name: Lint Grafana dashboards
         env:
-          DASHBOARD_LINTER_ARCHIVE_SHA256: df9a94834b5ea1273a2a79c649f0513913771a81ae25f194dc2244b7f45fef51
-          DASHBOARD_LINTER_VERSION: 0.4.0
+          DASHBOARD_LINTER_ARCHIVE_SHA256: 108004b1020eac3f578752d3245def9180ea08667fe25d54a09a422039b13aab
+          DASHBOARD_LINTER_VERSION: 0.5.2
         run: |
           archive="dashboard-linter_${DASHBOARD_LINTER_VERSION}_linux_amd64.tar.gz"
-          curl --fail --location --silent --show-error \
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 --retry-max-time 60 \
             "https://github.com/grafana/dashboard-linter/releases/download/v${DASHBOARD_LINTER_VERSION}/${archive}" \
             --output "/tmp/${archive}"
           echo "${DASHBOARD_LINTER_ARCHIVE_SHA256}  /tmp/${archive}" | sha256sum --check --strict
@@ -97,7 +97,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.22.2
+          node-version: 26.13.0
           cache: npm
           cache-dependency-path: ha-cards/package-lock.json
 
@@ -166,7 +166,7 @@ jobs:
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
-          version: v2.19.0
+          version: v2.20.0
           args: check
         env:
           GITHUB_TOKEN: ${{ github.token }}
