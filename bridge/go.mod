@@ -1,6 +1,6 @@
 module github.com/RCooLeR/omada_exporter
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1
@@ -26,3 +26,5 @@ require (
 	golang.org/x/sys v0.50.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+replace golang.org/x/crypto v0.58.0 => golang.org/x/crypto v0.59.0
