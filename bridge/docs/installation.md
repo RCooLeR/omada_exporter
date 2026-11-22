@@ -352,11 +352,17 @@ it in the queries:
   start with them. Run a separate non-MSP exporter for a site that needs them.
 - `OMADA_DUMP_RESPONSES_DIR` writes one dump per target, each in its own `omada-*`
   subdirectory. `manifest.json` names the customer ID (`omadaCid`), site and site ID.
-- Endpoints verified against a real MSP controller (v5.15.24.19): login, login status,
-  current user, devices and system status per customer, OpenAPI sites, devices, clients
-  and VPN per customer. Alert count, DPI, switch/gateway/EAP ports, AP wired uplink,
-  WAN status, ISP load, VPN statistics/site-to-site and gateway health detail use the
-  same path rule but were not verified on a real MSP controller yet.
+- Verified end to end on a real MSP controller (v5.15.24.19, two customers, sites
+  with access points and switches but no gateway): discovery, devices, switch ports and
+  LAGs, AP radios, clients (OpenAPI v1; v2 answers 404 and the existing v1 fallback is
+  used), controller status and upgrades, alert count, VPN list and tunnel statistics,
+  DPI requests (empty without a gateway) and AP wired uplink. Gateway-only endpoints
+  (ISP load, WAN status, gateway ports, gateway health detail, site-to-site VPN summary)
+  answer HTTP 404 on sites without a gateway and are not verified on an MSP site with a
+  gateway yet. EAP port requests were not exercised.
+- On sites without a gateway, those gateway endpoints fail on every scrape, so
+  `omada_msp_target_api_errors` stays above zero (4 per site with the default
+  collectors). Alert on `omada_msp_target_up == 0`, or on increases of the error count.
 - Every metric gains the `customer` and `customer_id` labels, so the number of series
   grows with the number of customers and sites. Use the filters to limit it.
 
