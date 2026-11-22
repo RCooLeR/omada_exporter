@@ -31,6 +31,9 @@ dependent dashboard panels to be unavailable while other supported collectors ma
 continue to work. `/healthz` reports bridge process health, not support for every
 controller endpoint.
 
+Controllers in MSP mode are supported with MSP-level credentials; see
+[MSP Mode](#msp-mode).
+
 ## Omada Credentials
 
 If you are setting this up for the first time, read [Omada Credentials](./omada-credentials.md). It explains how to create:
@@ -230,6 +233,133 @@ For Fusion gateways without OpenAPI app credentials:
   --insecure
 ```
 
+## MSP Mode
+
+If the controller runs in **MSP mode**, a single exporter scrapes every MSP customer and
+every site and labels all metrics with the customer. It is enabled automatically when
+`/api/info` reports `mspMode: true` and `OMADA_SYSTEM_TYPE=auto`, or explicitly with
+`OMADA_SYSTEM_TYPE=msp`. Non-MSP controllers behave exactly as before.
+
+Requirements (see [Omada credentials: MSP mode](./omada-credentials.md#msp-mode)):
+
+- An MSP account (`OMADA_USER` / `OMADA_PASS`), verified with the **MSP Owner** role.
+- An **MSP-level** Open API app in **Client** mode (`OMADA_CLIENT_ID` / `OMADA_SECRET_ID`).
+  The exporter refuses to start in MSP mode without it, or with `OMADA_OPENAPI_AUTH`
+  set to `disabled` or `web_session`.
+
+```yaml
+services:
+  omada_exporter:
+    image: rcooler/omada_exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9202:9202"
+    environment:
+      OMADA_HOST: "https://omada.example.net:8043"
+      OMADA_USER: "msp-exporter"
+      OMADA_PASS: "change-me"
+      OMADA_CLIENT_ID: "msp-level-client-id"
+      OMADA_SECRET_ID: "msp-level-client-secret"
+      OMADA_SYSTEM_TYPE: "auto"
+      OMADA_OPENAPI_AUTH: "auto"
+      # Optional:
+      # OMADA_MSP_CUSTOMERS: "Alpha Corp,Beta Ltd"
+      # OMADA_SITE: "*"
+      # OMADA_MSP_DISCOVERY_INTERVAL: "600"
+      # OMADA_MSP_SCRAPE_CONCURRENCY: "4"
+```
+
+### MSP options
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OMADA_MSP_CUSTOMERS` | `all` | `all` (or empty), or a comma-separated list of customer names (case-insensitive) or customer IDs. Entries that match nothing are logged as warnings. |
+| `OMADA_SITE` | all sites | In MSP mode the `Default` flag default is **not** applied. Set it to a comma-separated list of site names (case-insensitive) or site IDs to limit the sites of every selected customer; `*` or empty means all. |
+| `OMADA_MSP_DISCOVERY_INTERVAL` | `600` | Re-list customers and sites every this many seconds and add or remove targets. `0` discovers only at startup. |
+| `OMADA_MSP_SCRAPE_CONCURRENCY` | `4` | How many customer sites are scraped at the same time. The collectors of one site still run in parallel. Raise it if a scrape of all targets gets close to the Prometheus scrape timeout. |
+
+### How it works
+
+1. At startup the exporter logs in with the MSP ID (web session and OpenAPI token) and
+   lists customers (`/openapi/v1/msp/{mspId}/customers`) and each customer's sites
+   (`/openapi/v1/{customerId}/sites`), then applies the filters.
+2. Every (customer, site) pair becomes a target with its own collectors and cache. All
+   targets share one web session and one OpenAPI token; data requests put the customer ID
+   where the controller ID normally goes.
+3. Discovery repeats every `OMADA_MSP_DISCOVERY_INTERVAL`. If the customer list fails,
+   all current targets are kept; if one customer's site list fails, that customer's
+   targets are kept.
+4. One failing customer does not affect the others. Re-logins triggered by a customer
+   are limited to one per 30 seconds so a misconfigured customer cannot keep replacing
+   the shared credentials.
+
+### Labels
+
+Every collector metric gets two extra labels; `site` and `site_id` carry the real site
+name and ID of the target:
+
+| Label | Value |
+| --- | --- |
+| `customer` | Customer name from the MSP customer list. |
+| `customer_id` | Customer ID (the `omadacId` of the customer). |
+
+`omada_collector_*` health metrics additionally carry `customer`, `customer_id`, `site` and
+`site_id`. With `OMADA_BRIDGE_ID` set, `bridge_id` is added as usual.
+
+MSP-only exporter metrics:
+
+| Metric | Labels | Meaning |
+| --- | --- | --- |
+| `omada_msp_target_up` | `customer`, `customer_id`, `site`, `site_id` | `1` when at least one API request for the target succeeded during its last full scrape, `0` when all failed. |
+| `omada_msp_target_scrape_duration_seconds` | same | Duration of the target's last full scrape. |
+| `omada_msp_target_api_errors` | same | Failed API requests (transport error, HTTP error, non-zero `errorCode`) during the last full scrape. |
+| `omada_msp_targets` | - | Number of targets currently scraped. |
+| `omada_msp_discovery_last_success_timestamp_seconds` | - | Last discovery in which the customer list and all site lists loaded. |
+| `omada_msp_discovery_failures_total` | - | Discovery runs with at least one failed list. |
+
+`/metrics/{collector}` endpoints serve that collector for all targets; the target and
+discovery metrics are only on `/metrics`.
+
+Example alert for an unreachable customer site:
+
+```yaml
+- alert: OmadaMSPTargetDown
+  expr: omada_msp_target_up == 0
+  for: 15m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Omada customer {{ $labels.customer }} / site {{ $labels.site }} is not answering"
+```
+
+### Grafana
+
+The bundled dashboards filter by `site`, which is not unique across customers (many
+customers have a site called `Default`). For MSP mode add a `customer` variable and use
+it in the queries:
+
+- Variable: `label_values(omada_controller_uptime_seconds{job=~"$job", instance=~"$instance"}, customer)`,
+  multi-value, include **All** with custom all value `.*`.
+- Make the `site` variable depend on it:
+  `label_values(omada_controller_uptime_seconds{customer=~"$customer"}, site)`.
+- Add `customer=~"$customer"` to the panel selectors. `=~".*"` also matches series
+  without the label, so the change keeps working for non-MSP exporters.
+
+### Limitations
+
+- The Home Assistant MQTT publisher (`OMADA_MQTT_ENABLED`) and device control
+  (`OMADA_ALLOW_DEVICE_CONTROL`) are not available in MSP mode; the exporter refuses to
+  start with them. Run a separate non-MSP exporter for a site that needs them.
+- `OMADA_DUMP_RESPONSES_DIR` writes one dump per target, each in its own `omada-*`
+  subdirectory. `manifest.json` names the customer ID (`omadaCid`), site and site ID.
+- Endpoints verified against a real MSP controller (v5.15.24.19): login, login status,
+  current user, devices and system status per customer, OpenAPI sites, devices, clients
+  and VPN per customer. Alert count, DPI, switch/gateway/EAP ports, AP wired uplink,
+  WAN status, ISP load, VPN statistics/site-to-site and gateway health detail use the
+  same path rule but were not verified on a real MSP controller yet.
+- Every metric gains the `customer` and `customer_id` labels, so the number of series
+  grows with the number of customers and sites. Use the filters to limit it.
+
 ## Health Checks
 
 Default HTTP port: `9202`.
@@ -253,9 +383,9 @@ The Docker image health check calls `/healthz`.
 | `OMADA_PASS` | empty | yes | Omada service user password. |
 | `OMADA_CLIENT_ID` | empty | no | Omada OpenAPI client id for standard client-credentials auth. |
 | `OMADA_SECRET_ID` | empty | no | Omada OpenAPI secret for standard client-credentials auth. |
-| `OMADA_SYSTEM_TYPE` | `auto` | no | Omada system type: `auto`, `standard`, or `fusion`. |
+| `OMADA_SYSTEM_TYPE` | `auto` | no | Omada system type: `auto`, `standard`, `fusion`, or `msp`. `auto` detects MSP mode from the controller. |
 | `OMADA_OPENAPI_AUTH` | `auto` | no | OpenAPI auth mode: `auto`, `client_credentials`, `web_session`, or `disabled`. |
-| `OMADA_SITE` | `Default` | no | Site name to collect. |
+| `OMADA_SITE` | `Default` | no | Site name to collect. In [MSP mode](#msp-mode): unset, empty or `*` collects every site; otherwise a comma-separated list of site names or IDs. |
 | `OMADA_PORT` | `9202` | no | HTTP listen port. |
 | `OMADA_INSECURE` | `false` | no | Skip TLS certificate verification for the controller. |
 | `OMADA_REQUEST_TIMEOUT` | `15` | no | API request timeout in seconds. |
