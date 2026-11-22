@@ -23,7 +23,7 @@ func (c *Client) makeRequest(req *http.Request) (*http.Response, error) {
 		req.Header.Set("Csrf-Token", token)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.authRoot().httpClient.Do(req)
 	if err != nil {
 		return nil, redactError(err)
 	}
@@ -78,6 +78,10 @@ func (c *Client) requestWithCurrentContext(req *http.Request) (*http.Request, er
 		switch {
 		case parts[i] == "api" && parts[i+1] == "v2" && i > 0:
 			cidIndex, apiStart = i-1, i+2
+		case parts[i] == "openapi" && (parts[i+1] == "v1" || parts[i+1] == "v2") && i+3 < len(parts) && parts[i+2] == "msp":
+			// MSP-scoped endpoints (/openapi/v1/msp/{mspId}/...) carry the
+			// controller ID one segment later; "msp" itself is not an ID.
+			cidIndex, apiStart = i+3, i+4
 		case parts[i] == "openapi" && (parts[i+1] == "v1" || parts[i+1] == "v2") && i+2 < len(parts):
 			cidIndex, apiStart = i+2, i+3
 		}
@@ -115,6 +119,9 @@ func (c *Client) requestWithCurrentContext(req *http.Request) (*http.Request, er
 
 // ensureLoggedIn makes sure the web session is authenticated.
 func (c *Client) ensureLoggedIn() error {
+	if c.authParent != nil {
+		return c.authParent.ensureLoggedIn()
+	}
 	// Only one goroutine should check/login at a time. Without singleflight,
 	// a Prometheus scrape that touches several web API collectors can trigger
 	// several identical login attempts when the session expires.
@@ -141,6 +148,12 @@ func (c *Client) ensureLoggedIn() error {
 
 // reauthenticateWebSession refreshes the web session after authentication expires.
 func (c *Client) reauthenticateWebSession() error {
+	if c.authParent != nil {
+		return c.authParent.reauthenticateForTarget(webAuthKind)
+	}
+	if c.mspMode {
+		return c.reauthenticateMSPWebSession()
+	}
 	// Reauthentication also refreshes controller/site context because some
 	// Omada controllers issue session-scoped IDs. The cache is cleared after a
 	// successful refresh so callers do not keep serving data fetched with the
@@ -170,6 +183,12 @@ func (c *Client) reauthenticateWebSession() error {
 
 // MakeLoggedInRequest performs a web API request and retries after reauthentication when needed.
 func (c *Client) MakeLoggedInRequest(req *http.Request) (*http.Response, error) {
+	resp, err := c.makeLoggedInRequest(req)
+	c.recordOutcome(resp, err)
+	return resp, err
+}
+
+func (c *Client) makeLoggedInRequest(req *http.Request) (*http.Response, error) {
 	if err := c.ensureLoggedIn(); err != nil {
 		return nil, err
 	}
@@ -236,7 +255,7 @@ func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 		cloned.Header.Set("Authorization", "AccessToken="+c.currentOpenAPIAccessToken())
 	}
 
-	resp, err := c.httpClient.Do(cloned)
+	resp, err := c.authRoot().httpClient.Do(cloned)
 	if err != nil {
 		return nil, redactError(err)
 	}
@@ -245,6 +264,9 @@ func (c *Client) doOpenAPIRequest(req *http.Request) (*http.Response, error) {
 
 // ensureOpenAPIAccessToken makes sure the Open API token is available.
 func (c *Client) ensureOpenAPIAccessToken() error {
+	if c.authParent != nil {
+		return c.authParent.ensureOpenAPIAccessToken()
+	}
 	switch c.OpenAPIAuthMode {
 	case config.OpenAPIAuthWebSession:
 		return c.ensureLoggedIn()
@@ -290,6 +312,9 @@ func (c *Client) reauthenticateOpenAPISession() error {
 	if c.OpenAPIAuthMode == config.OpenAPIAuthDisabled {
 		return fmt.Errorf("OpenAPI authentication is disabled or unavailable")
 	}
+	if c.authParent != nil {
+		return c.authParent.reauthenticateForTarget(openAPIAuthKind)
+	}
 
 	_, err, _ := c.openAPIAuthGroup.Do("openapi-reauth", func() (any, error) {
 		unlock := c.openAuthTransition.lock()
@@ -314,6 +339,12 @@ func (c *Client) reauthenticateOpenAPISession() error {
 
 // MakeOpenApiRequest performs an Open API request and retries after reauthentication when needed.
 func (c *Client) MakeOpenApiRequest(req *http.Request) (*http.Response, error) {
+	resp, err := c.makeOpenAPIRequest(req)
+	c.recordOutcome(resp, err)
+	return resp, err
+}
+
+func (c *Client) makeOpenAPIRequest(req *http.Request) (*http.Response, error) {
 	if err := c.ensureOpenAPIAccessToken(); err != nil {
 		return nil, err
 	}

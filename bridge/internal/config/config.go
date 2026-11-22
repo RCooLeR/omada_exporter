@@ -4,6 +4,7 @@ const (
 	SystemTypeAuto     = "auto"
 	SystemTypeStandard = "standard"
 	SystemTypeFusion   = "fusion"
+	SystemTypeMSP      = "msp"
 
 	OpenAPIAuthAuto              = "auto"
 	OpenAPIAuthClientCredentials = "client_credentials"
@@ -24,6 +25,10 @@ type Config struct {
 	OpenAPIAuth                 string
 	Port                        string
 	Site                        string
+	SiteSet                     bool
+	MSPCustomers                string
+	MSPDiscoveryInterval        int
+	MSPScrapeConcurrency        int
 	LogLevel                    string
 	Timeout                     int
 	CacheTTL                    int

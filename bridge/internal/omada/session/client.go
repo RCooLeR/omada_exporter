@@ -3,6 +3,7 @@ package session
 import (
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/RCooLeR/omada_exporter/internal/config"
@@ -45,6 +46,27 @@ type Client struct {
 	openAuthTransition   authTransitionGate
 	webAuthGroup         singleflight.Group
 	openAPIAuthGroup     singleflight.Group
+
+	// MSP mode. The root client authenticates with the MSP ID (web login,
+	// loginStatus, OpenAPI token) and owns all credential state. Target views
+	// created by ForTarget carry only a customer/site path context and a cache,
+	// and delegate every authentication operation to authParent, so one web
+	// session and one OpenAPI token serve all customers. authParent is nil for
+	// the root client and in non-MSP mode.
+	authParent        *Client
+	mspMode           bool
+	lastWebAuthAt     time.Time // guarded by authMu
+	lastOpenAPIAuthAt time.Time // guarded by authMu
+	requestsOK        atomic.Uint64
+	requestsFailed    atomic.Uint64
+}
+
+// authRoot returns the client that owns authentication state.
+func (c *Client) authRoot() *Client {
+	if c.authParent != nil {
+		return c.authParent
+	}
+	return c
 }
 
 // ContextIDs returns an atomic snapshot of the controller and site identifiers.
@@ -75,24 +97,29 @@ func (c *Client) Settings() *config.Config {
 // written under a lock to keep retries and background MQTT publishing from
 // racing each other.
 func (c *Client) currentWebToken() string {
+	c = c.authRoot()
 	c.authMu.RLock()
 	defer c.authMu.RUnlock()
 	return c.token
 }
 
 func (c *Client) setWebToken(token string) {
+	c = c.authRoot()
 	c.authMu.Lock()
 	c.token = token
+	c.lastWebAuthAt = time.Now()
 	c.authMu.Unlock()
 }
 
 func (c *Client) currentOpenAPITokenState() (string, string, time.Time) {
+	c = c.authRoot()
 	c.authMu.RLock()
 	defer c.authMu.RUnlock()
 	return c.accessToken, c.refreshToken, c.accessTokenExpiresAt
 }
 
 func (c *Client) setOpenAPITokens(accessToken, refreshToken string, expiresIn int32) {
+	c = c.authRoot()
 	lifetime := time.Duration(expiresIn) * time.Second
 	if lifetime > 5*time.Second {
 		lifetime -= 5 * time.Second
@@ -102,10 +129,12 @@ func (c *Client) setOpenAPITokens(accessToken, refreshToken string, expiresIn in
 	c.accessToken = accessToken
 	c.refreshToken = refreshToken
 	c.accessTokenExpiresAt = time.Now().Add(lifetime)
+	c.lastOpenAPIAuthAt = time.Now()
 	c.authMu.Unlock()
 }
 
 func (c *Client) clearOpenAPITokens() {
+	c = c.authRoot()
 	c.authMu.Lock()
 	c.accessToken = ""
 	c.refreshToken = ""
@@ -114,6 +143,7 @@ func (c *Client) clearOpenAPITokens() {
 }
 
 func (c *Client) currentOpenAPIAccessToken() string {
+	c = c.authRoot()
 	c.authMu.RLock()
 	defer c.authMu.RUnlock()
 	return c.accessToken
