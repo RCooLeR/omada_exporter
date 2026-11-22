@@ -51,7 +51,9 @@ func newCLICommand(conf *config.Config) *cli.Command {
 				return app.WriteMetricDocs(command.Writer)
 			}},
 	}
-	command.Action = func(ctx context.Context, _ *cli.Command) error {
+	command.Action = func(ctx context.Context, command *cli.Command) error {
+		// MSP mode scrapes every site unless OMADA_SITE was set on purpose.
+		conf.SiteSet = command.IsSet("site")
 		return app.Run(ctx, conf)
 	}
 	return command
