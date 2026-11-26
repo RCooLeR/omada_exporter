@@ -14,6 +14,7 @@ For Omada Fusion, you usually only need `OMADA_USER` and `OMADA_PASS`.
 | --- | --- | --- |
 | Standard Omada Controller, OC200/OC300/software/cloud-accessed controller | `OMADA_HOST`, `OMADA_USER`, `OMADA_PASS` | `OMADA_CLIENT_ID`, `OMADA_SECRET_ID` for WAN, VPN, ISP, and detailed client metrics |
 | Omada Fusion gateway | `OMADA_HOST`, `OMADA_USER`, `OMADA_PASS` | Usually none. Fusion uses web-session OpenAPI automatically. |
+| Controller in **MSP mode** (one exporter for all MSP customers) | `OMADA_HOST`, `OMADA_USER`, `OMADA_PASS` of an MSP account, `OMADA_CLIENT_ID`, `OMADA_SECRET_ID` of an **MSP-level** Open API app | `OMADA_MSP_CUSTOMERS`, `OMADA_SITE`. See [MSP Mode](#msp-mode). |
 
 Use these defaults unless you know you need to force a mode:
 
@@ -128,6 +129,68 @@ What happens internally:
 
 You do not need `OMADA_CLIENT_ID` or `OMADA_SECRET_ID` for Fusion in this mode.
 
+## MSP Mode
+
+On a controller running in MSP mode, one exporter scrapes **every customer and every
+site** the MSP account can see and labels each metric with the customer.
+
+How MSP mode differs:
+
+- Authentication (web login, login check and OpenAPI token) always uses the **MSP ID**.
+  Data requests use the **customer ID** instead. The exporter handles this itself; you
+  only configure MSP-level credentials.
+- One web session and one OpenAPI token are shared by all customers.
+- OpenAPI client credentials are **required**. The MSP controller rejects web-session
+  OpenAPI (`HTTP 401`, `-44116`), and customer and site discovery uses the OpenAPI.
+
+### MSP account
+
+Use an MSP account with the **MSP Owner** role (the role used for verification), or an
+MSP-level role that can see all customers you want to monitor.
+
+```env
+OMADA_USER=msp-exporter
+OMADA_PASS=change-me
+```
+
+### MSP-level Open API app
+
+Create the app in the **MSP view**, not inside a customer:
+
+1. Log in to the controller with the MSP account.
+2. Stay in the **MSP** view (the customer list). Do not open a customer.
+3. Open the Open API settings (**Settings > Platform Integration > Open API**; menu
+   names can differ between controller releases).
+4. Click **Add New App** and choose **Client** mode.
+5. Give it an MSP-level role that can read every monitored customer.
+6. Save, then copy **Client ID** to `OMADA_CLIENT_ID` and **Client Secret** to
+   `OMADA_SECRET_ID`.
+
+An app created inside a customer cannot be used: the exporter requests the token with the
+MSP ID, and the controller answers `-44106 Client Id Or Client Secret is Invalid`. If you
+see that error in MSP mode, create the app at MSP level.
+
+### Example
+
+```env
+OMADA_HOST=https://omada.example.net:8043
+OMADA_USER=msp-exporter
+OMADA_PASS=change-me
+OMADA_CLIENT_ID=msp-level-client-id
+OMADA_SECRET_ID=msp-level-client-secret
+OMADA_SYSTEM_TYPE=auto          # detects MSP mode; or set msp explicitly
+OMADA_OPENAPI_AUTH=auto
+# Optional filters:
+# OMADA_MSP_CUSTOMERS=Alpha Corp,7d2c1b...   # names or IDs; default: all
+# OMADA_SITE=Default,HQ                      # names or IDs; default: all sites
+```
+
+The exporter fails at startup in MSP mode when `OMADA_CLIENT_ID` or `OMADA_SECRET_ID` is
+missing, or when `OMADA_OPENAPI_AUTH` is `disabled` or `web_session`.
+
+See [MSP mode in the installation guide](./installation.md#msp-mode) for every MSP
+option, the labels, and the limitations.
+
 ## If You Cannot Find Open API
 
 Check these first:
@@ -220,3 +283,7 @@ OpenAPI authentication or unsupported endpoint messages.
 | `controllerStatus returned errorCode -1600: Unsupported request path` | The controller release does not expose the controller-status Web API used by OmadaBridge; this is known on older firmware. | Verify the controller URL and system type, then upgrade the controller. Other collectors may continue, but controller metrics and related dashboard panels will show no data. |
 | Platform Integration only shows Webhooks | Fusion firmware or controller without OpenAPI app support. | For Fusion use `OMADA_OPENAPI_AUTH=auto`; for standard use `disabled` or update firmware. |
 | Web API metrics work but WAN/VPN/client details are missing | OpenAPI is disabled or unavailable. | Add OpenAPI app credentials on standard controllers, or check Fusion auto mode. |
+| `current user returned errorCode -1: General error.` at startup | The controller is in MSP mode but the exporter runs in single-site mode (an older release, or `OMADA_SYSTEM_TYPE=standard`/`fusion`). | Use `OMADA_SYSTEM_TYPE=auto` or `msp` with MSP-level OpenAPI credentials. |
+| `MSP OpenAPI login ... errorCode -44106` | The Open API app was created inside a customer, not at MSP level, or the secret is wrong. | Create a Client-mode app in the MSP view. See [MSP Mode](#msp-mode). |
+| `MSP mode requires OMADA_CLIENT_ID and OMADA_SECRET_ID` | MSP mode was detected or forced without OpenAPI credentials. | Add MSP-level app credentials. MSP controllers reject web-session OpenAPI (`-44116`). |
+| `omada_msp_target_up` is `0` for one customer | The MSP account or app cannot read that customer (often `-1005 Operation forbidden`). | Check the MSP role and the app's customer privileges. Other customers are not affected. |

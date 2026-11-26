@@ -13,6 +13,9 @@ import (
 
 // IsLoggedIn reports whether the current web session is still authenticated.
 func (c *Client) IsLoggedIn() (bool, error) {
+	if c.authParent != nil {
+		return c.authParent.IsLoggedIn()
+	}
 	omadaCID, _ := c.ContextIDs()
 	url := fmt.Sprintf("%s/%s/api/v2/loginStatus", c.Config.Host, omadaCID)
 	req, err := http.NewRequest("GET", url, nil)
@@ -52,24 +55,39 @@ func (c *Client) IsLoggedIn() (bool, error) {
 
 // getCid fetches the controller ID required for login requests.
 func (c *Client) getCid() (string, error) {
+	info, err := c.getControllerInfo()
+	if err != nil {
+		return "", err
+	}
+	return info.OmadaCID, nil
+}
+
+// controllerInfo is the unauthenticated /api/info summary.
+type controllerInfo struct {
+	OmadaCID string
+	MSPMode  bool
+}
+
+// getControllerInfo fetches the controller ID and whether the controller runs in MSP mode.
+func (c *Client) getControllerInfo() (controllerInfo, error) {
 	url := fmt.Sprintf("%s/api/info", c.Config.Host)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		return controllerInfo{}, err
 	}
 
 	res, err := c.makeRequest(req)
 	if err != nil {
-		return "", err
+		return controllerInfo{}, err
 	}
 
 	defer res.Body.Close()
 	body, err := ReadResponseBody(res, "controller info")
 	if err != nil {
-		return "", err
+		return controllerInfo{}, err
 	}
 	if err := ValidateAPIResponse(body, "controller info"); err != nil {
-		return "", err
+		return controllerInfo{}, err
 	}
 
 	var infoResponse struct {
@@ -77,21 +95,25 @@ func (c *Client) getCid() (string, error) {
 		Msg       string `json:"msg"`
 		Result    struct {
 			OmadaCID string `json:"omadacId"`
+			MSPMode  bool   `json:"mspMode"`
 		}
 	}
 	if err := json.Unmarshal(body, &infoResponse); err != nil {
-		return "", err
+		return controllerInfo{}, err
 	}
 
 	if infoResponse.Result.OmadaCID == "" {
-		return "", fmt.Errorf("no CID found in response")
+		return controllerInfo{}, fmt.Errorf("no CID found in response")
 	}
 
-	return infoResponse.Result.OmadaCID, nil
+	return controllerInfo{OmadaCID: infoResponse.Result.OmadaCID, MSPMode: infoResponse.Result.MSPMode}, nil
 }
 
 // Login authenticates the web session against the Omada controller.
 func (c *Client) Login() error {
+	if c.authParent != nil {
+		return c.authParent.Login()
+	}
 	unlock := c.webAuthTransition.lock()
 	defer unlock()
 
@@ -147,6 +169,9 @@ func (c *Client) login(omadaCID string) error {
 
 // LoginOpenApi authenticates against the Omada Open API.
 func (c *Client) LoginOpenApi() error {
+	if c.authParent != nil {
+		return c.authParent.LoginOpenApi()
+	}
 	unlock := c.openAuthTransition.lock()
 	defer unlock()
 
@@ -254,6 +279,9 @@ func (c *Client) getControllerSystemStatus() (controllerSystemStatus, error) {
 
 // RefreshOpenApiToken refreshes the Open API access token.
 func (c *Client) RefreshOpenApiToken() error {
+	if c.authParent != nil {
+		return c.authParent.RefreshOpenApiToken()
+	}
 	unlock := c.openAuthTransition.lock()
 	defer unlock()
 	return c.refreshOpenAPIToken()

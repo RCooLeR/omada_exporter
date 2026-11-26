@@ -88,3 +88,12 @@ func boundedSeconds(name string, allowZero bool) func(int) error {
 		return nil
 	}
 }
+
+func positiveInt(name string) func(int) error {
+	return func(value int) error {
+		if value <= 0 {
+			return fmt.Errorf("%s must be greater than zero", name)
+		}
+		return nil
+	}
+}

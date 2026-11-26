@@ -33,6 +33,9 @@ func Run(ctx context.Context, conf *config.Config) error {
 	if err != nil {
 		return err
 	}
+	if shared.MSPMode() {
+		return runMSP(ctx, conf, shared)
+	}
 	if conf.DumpResponsesDir != "" {
 		if err := debugdump.DumpResponses(ctx, shared, conf.DumpResponsesDir); err != nil {
 			return err
@@ -69,6 +72,11 @@ func validateConfig(conf *config.Config) error {
 	}
 	if err := config.ValidateBridgeID(conf.BridgeID); err != nil {
 		return err
+	}
+	if strings.EqualFold(strings.TrimSpace(conf.SystemType), config.SystemTypeMSP) {
+		if err := config.ValidateMSP(conf); err != nil {
+			return err
+		}
 	}
 	if conf.AllowDeviceControl && !conf.MQTTEnabled {
 		return fmt.Errorf("allow-device-control requires mqtt-enabled")

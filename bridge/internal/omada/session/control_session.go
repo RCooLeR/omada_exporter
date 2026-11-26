@@ -40,6 +40,9 @@ func (c *Client) withWebControlSession(ctx context.Context, expectedSiteID strin
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if c.MSPMode() {
+		return fmt.Errorf("device control is not supported in MSP mode")
+	}
 	if expectedSiteID == "" {
 		return fmt.Errorf("control requires an explicit site ID")
 	}

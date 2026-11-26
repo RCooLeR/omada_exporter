@@ -44,11 +44,19 @@ func Configure(c *config.Config) (*Client, error) {
 		httpClient:   httpClient,
 		requestCache: map[string]cacheEntry{},
 	}
-	cid, err := client.getCid()
+	info, err := client.getControllerInfo()
 	if err != nil {
 		return nil, err
 	}
+	cid := info.OmadaCID
 	client.SetContextIDs(cid, "")
+
+	if useMSPMode(c.SystemType, info.MSPMode) {
+		if err := client.configureMSP(); err != nil {
+			return nil, err
+		}
+		return client, nil
+	}
 
 	sid, err := client.getSiteId(c.Site)
 	if err != nil {
